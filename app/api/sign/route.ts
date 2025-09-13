@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import QRCode from 'qrcode';
 import { PDFDocument, degrees } from 'pdf-lib';
+import type { Database } from '@/lib/types';
 
 export const runtime = 'nodejs';
 
@@ -103,26 +104,18 @@ export async function POST(req: NextRequest) {
 
     const pubQr = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/qr.png`);
 
-    // 7) Atualizar registro (cast para evitar 'never' do tipo gerado)
-    const upd = await supabaseAdmin
-      .from('documents')
-      .update({
-        signed_pdf_url: pubSigned.data.publicUrl,
-        qr_code_url: pubQr.data.publicUrl,
-        status: 'signed',
-      } as any) // <- FIX: cast para compatibilizar com tipos gerados simplificados
-      .eq('id', id);
+  // 7) Atualizar registro com payload tipado (evita 'never')
+const payload: Database['public']['Tables']['documents']['Update'] = {
+  signed_pdf_url: pubSigned.data.publicUrl,
+  qr_code_url: pubQr.data.publicUrl,
+  status: 'signed',
+};
 
-    if (upd.error) return NextResponse.json({ error: upd.error.message }, { status: 500 });
+const upd = await supabaseAdmin
+  .from('documents')
+  .update(payload)
+  .eq('id', id);
 
-    // 8) Resposta
-    return NextResponse.json({
-      ok: true,
-      id,
-      signed_pdf_url: pubSigned.data.publicUrl,
-      qr_code_url: pubQr.data.publicUrl,
-    });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'Falha ao assinar' }, { status: 500 });
-  }
+if (upd.error) {
+  return NextResponse.json({ error: upd.error.message }, { status: 500 });
 }
