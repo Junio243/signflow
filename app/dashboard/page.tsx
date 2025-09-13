@@ -1,32 +1,78 @@
+// app/dashboard/page.tsx
 'use client';
-import useSWR from 'swr';
-import { createClient } from '@supabase/supabase-js';
-import Link from 'next/link';
+export const revalidate = 0;
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-const fetcher = async () => {
-  const { data, error } = await supabase.from('documents').select('*').order('created_at', { ascending: false });
-  if (error) throw error; return data as any[];
+import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+type Doc = {
+  id: string;
+  original_pdf_name: string | null;
+  status: string | null;
+  created_at: string;
+  signed_pdf_url: string | null;
+  qr_code_url: string | null;
 };
 
-export default function Dashboard(){
-  const { data, error } = useSWR('docs', fetcher);
+export default function Dashboard() {
+  const [docs, setDocs] = useState<Doc[]>([]);
+  const [email, setEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supabase = createClient(url, key);
+
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setEmail(user?.email ?? null);
+
+      if (!user) return;
+      const { data, error } = await supabase
+        .from('documents')
+        .select('id, original_pdf_name, status, created_at, signed_pdf_url, qr_code_url')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) setDocs(data as Doc[]);
+    })();
+  }, []);
+
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Seus documentos</h1>
-        <Link href="/editor/new" className="btn">Novo documento</Link>
+    <div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">Meus documentos</h1>
+        <p className="text-sm text-slate-600">
+          {email ? `Logado como ${email}` : 'Entre para ver seus documentos.'}
+        </p>
       </div>
-      {error && <p className="text-red-600 text-sm">{String(error)}</p>}
-      <div className="grid md:grid-cols-2 gap-3">
-        {data?.map(d => (
-          <div key={d.id} className="card">
-            <div className="font-medium">{d.original_pdf_name}</div>
-            <div className="text-xs text-slate-500">{new Date(d.created_at).toLocaleString()}</div>
-            <div className="mt-2 flex gap-2 text-sm">
-              <Link className="btn" href={`/editor/${d.id}`}>Editar</Link>
-              {d.signed_pdf_url && <a className="btn" href={d.signed_pdf_url} target="_blank">Baixar assinado</a>}
-              <Link className="btn" href={`/validate/${d.id}`}>Validar</Link>
+
+      <div className="grid gap-4">
+        {docs.length === 0 && (
+          <div className="rounded-lg border p-4 text-sm text-slate-600">
+            Você ainda não enviou documentos. Vá para{' '}
+            <a className="text-indigo-600 underline" href="/editor/new">
+              Assinar um PDF
+            </a>.
+          </div>
+        )}
+
+        {docs.map((d) => (
+          <div key={d.id} className="rounded-lg border p-4 flex items-center justify-between">
+            <div>
+              <div className="font-medium">{d.original_pdf_name ?? d.id}</div>
+              <div className="text-xs text-slate-500">
+                Status: {d.status ?? '—'} • {new Date(d.created_at).toLocaleString()}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {d.signed_pdf_url && (
+                <a className="rounded-lg border px-3 py-1.5 text-sm hover:bg-slate-50" href={d.signed_pdf_url} target="_blank">
+                  Baixar
+                </a>
+              )}
+              <a className="rounded-lg bg-indigo-600 text-white px-3 py-1.5 text-sm hover:bg-indigo-700" href={`/validate?id=${d.id}`}>
+                Validar
+              </a>
             </div>
           </div>
         ))}
