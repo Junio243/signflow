@@ -8,7 +8,7 @@ export default function LoginPage() {
   const [status, setStatus] = useState<'idle' | 'sending' | 'ok' | 'error'>('idle');
   const [msg, setMsg] = useState('');
 
-  // Cliente do Supabase no browser (usa variáveis públicas do Vercel)
+  // Cliente do Supabase no browser (usa as variáveis públicas do Vercel)
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
