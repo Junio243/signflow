@@ -1,14 +1,13 @@
-// @ts-nocheck
-// app/validate/[id]/page.tsx
+// app/validate/[id]/page.jsx
 export const runtime = 'nodejs';
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-export default async function ValidatePage({ params }: { params: { id: string } }) {
+export default async function ValidatePage({ params }) {
   // Busca o documento correspondente ao ID
-  const { data, error } = await (supabaseAdmin as any)
+  const { data, error } = await supabaseAdmin
     .from('documents')
-    .select('*')
+    .select('id,status,created_at,signed_pdf_url,qr_code_url,user_id')
     .eq('id', params.id)
     .maybeSingle();
 
@@ -21,7 +20,7 @@ export default async function ValidatePage({ params }: { params: { id: string } 
     );
   }
 
-  const doc = (data as any) ?? null;
+  const doc = data ?? null;
 
   if (!doc) {
     return (
@@ -34,9 +33,9 @@ export default async function ValidatePage({ params }: { params: { id: string } 
     );
   }
 
-  const signedUrl: string = doc.signed_pdf_url ?? '';
-  const qrUrl: string = doc.qr_code_url ?? '';
-  const createdAt: string = doc.created_at ? new Date(doc.created_at).toLocaleString('pt-BR') : '-';
+  const signedUrl = doc.signed_pdf_url ?? '';
+  const qrUrl = doc.qr_code_url ?? '';
+  const createdAt = doc.created_at ? new Date(doc.created_at).toLocaleString('pt-BR') : '-';
 
   return (
     <main className="max-w-3xl mx-auto p-6 space-y-6">
