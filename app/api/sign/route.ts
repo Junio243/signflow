@@ -18,38 +18,30 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const id = String(body?.id || '');
-
     if (!id) {
       return NextResponse.json({ error: 'id obrigatório' }, { status: 400 });
     }
 
-    // 1) Buscar documento no banco
+    // 1) Buscar documento
     const { data: doc, error: errDoc } = await supabaseAdmin
       .from('documents')
       .select('*')
       .eq('id', id)
       .maybeSingle();
 
-    if (errDoc) {
-      return NextResponse.json({ error: errDoc.message }, { status: 500 });
-    }
-    if (!doc) {
-      return NextResponse.json({ error: 'Documento não encontrado' }, { status: 404 });
-    }
+    if (errDoc) return NextResponse.json({ error: errDoc.message }, { status: 500 });
+    if (!doc)   return NextResponse.json({ error: 'Documento não encontrado' }, { status: 404 });
 
-    // 2) Baixar PDF original e (se existir) a imagem da assinatura
+    // 2) Baixar PDF original e (se houver) assinatura
     const orig = await supabaseAdmin.storage.from('signflow').download(`${id}/original.pdf`);
-    if (!orig.data) {
-      return NextResponse.json({ error: 'PDF original ausente' }, { status: 404 });
-    }
+    if (!orig.data) return NextResponse.json({ error: 'PDF original ausente' }, { status: 404 });
 
     const sig = await supabaseAdmin.storage.from('signflow').download(`${id}/signature`);
     const pdfDoc = await PDFDocument.load(await orig.data.arrayBuffer());
 
-    // 3) Gerar QR que aponta para a página pública de validação
+    // 3) QR para página pública de validação
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
     const validateUrl = `${siteUrl}/validate/${id}`;
-
     const qrPng = await QRCode.toBuffer(validateUrl, {
       errorCorrectionLevel: 'M',
       type: 'png',
@@ -57,7 +49,7 @@ export async function POST(req: NextRequest) {
     });
     const qrImage = await pdfDoc.embedPng(qrPng);
 
-    // 4) Inserir assinaturas (se houver posições e imagem enviada)
+    // 4) Inserir assinaturas (se houver)
     const positions: Position[] =
       (((doc as any)?.metadata as any)?.positions as Position[]) || [];
 
@@ -65,19 +57,14 @@ export async function POST(req: NextRequest) {
       const sigBytes = new Uint8Array(await sig.data.arrayBuffer());
 
       let sigImg;
-      try {
-        sigImg = await pdfDoc.embedPng(sigBytes);
-      } catch {
-        // fallback para JPG
-        sigImg = await pdfDoc.embedJpg(sigBytes);
-      }
+      try { sigImg = await pdfDoc.embedPng(sigBytes); }
+      catch { sigImg = await pdfDoc.embedJpg(sigBytes); }
 
       for (const p of positions) {
-        const page = pdfDoc.getPage(p.page - 1); // pages are 0-based
+        const page = pdfDoc.getPage(p.page - 1); // 0-based no pdf-lib
         const { width, height } = page.getSize();
 
-        // largura base 240pt (pode ajustar), proporcional ao scale
-        const w = 240 * (p.scale || 1);
+        const w = 240 * (p.scale || 1);  // largura base 240pt
         const h = w * 0.35;
 
         // coordenadas normalizadas -> pontos PDF
@@ -94,49 +81,41 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 5) Inserir QR na ÚLTIMA página (80x80 pt, offset 30x30 pt)
+    // 5) Inserir QR na última página (80x80 pt, offset 30x30)
     const last = pdfDoc.getPage(pdfDoc.getPageCount() - 1);
     last.drawImage(qrImage, { x: 30, y: 30, width: 80, height: 80 });
 
-    // 6) Salvar, enviar para o Storage e tornar público
+    // 6) Salvar e publicar no Storage
     const bytes = await pdfDoc.save();
-
     const signedPath = `${id}/signed.pdf`;
+
     const upSigned = await supabaseAdmin.storage
       .from('signflow')
       .upload(signedPath, bytes, { contentType: 'application/pdf', upsert: true });
-
-    if (upSigned.error) {
-      return NextResponse.json({ error: upSigned.error.message }, { status: 500 });
-    }
+    if (upSigned.error) return NextResponse.json({ error: upSigned.error.message }, { status: 500 });
 
     const pubSigned = supabaseAdmin.storage.from('signflow').getPublicUrl(signedPath);
 
     const upQr = await supabaseAdmin.storage
       .from('signflow')
       .upload(`${id}/qr.png`, qrPng, { contentType: 'image/png', upsert: true });
-
-    if (upQr.error) {
-      return NextResponse.json({ error: upQr.error.message }, { status: 500 });
-    }
+    if (upQr.error) return NextResponse.json({ error: upQr.error.message }, { status: 500 });
 
     const pubQr = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/qr.png`);
 
-    // 7) Atualizar registro do documento
+    // 7) Atualizar registro (cast para evitar 'never' do tipo gerado)
     const upd = await supabaseAdmin
       .from('documents')
       .update({
         signed_pdf_url: pubSigned.data.publicUrl,
         qr_code_url: pubQr.data.publicUrl,
         status: 'signed',
-      })
+      } as any) // <- FIX: cast para compatibilizar com tipos gerados simplificados
       .eq('id', id);
 
-    if (upd.error) {
-      return NextResponse.json({ error: upd.error.message }, { status: 500 });
-    }
+    if (upd.error) return NextResponse.json({ error: upd.error.message }, { status: 500 });
 
-    // 8) Resposta final
+    // 8) Resposta
     return NextResponse.json({
       ok: true,
       id,
