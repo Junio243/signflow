@@ -2,8 +2,15 @@
 export const runtime = 'nodejs';
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import type { Database } from '@/lib/types';
 
-export default async function ValidatePage({ params }) {
+interface PageParams {
+  params: {
+    id: string;
+  };
+}
+
+export default async function ValidatePage({ params }: PageParams) {
   // Busca o documento correspondente ao ID
   const { data, error } = await supabaseAdmin
     .from('documents')
@@ -20,7 +27,8 @@ export default async function ValidatePage({ params }) {
     );
   }
 
-  const doc = data ?? null;
+  type Document = Database['public']['Tables']['documents']['Row'];
+  const doc = data as Document | null;
 
   if (!doc) {
     return (
