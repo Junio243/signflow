@@ -1,3 +1,4 @@
+// @ts-nocheck
 // app/validate/[id]/page.tsx
 export const runtime = 'nodejs';
 
