@@ -38,22 +38,30 @@ export async function POST(req: NextRequest){
       userId = u?.user?.id || null;
     }
 
-    // cria registro do documento
-    const { error: errDoc } = await supabaseAdmin.from('documents').insert({
-      id,
-      user_id: userId,
-      original_pdf_name,
-      metadata: { positions },
-      status: 'draft',
-      created_at: new Date().toISOString(),
-      expires_at: new Date(Date.now()+7*24*3600*1000).toISOString(),
-      signed_pdf_url: null,
-      qr_code_url: null,
-      ip_hash
-    });
-    if (errDoc) throw errDoc;
+ // cria registro do documento (forçando tipagem apenas aqui)
+const payload = {
+  id,
+  user_id: userId,
+  original_pdf_name,
+  metadata: { positions },
+  status: 'draft',
+  created_at: new Date().toISOString(),
+  expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  signed_pdf_url: null,
+  qr_code_url: null,
+  ip_hash,
+};
 
-    // salva arquivos no Storage (bucket: 'signflow')
+// usando 'as any' só aqui para evitar o 'never' do TS
+const { error: errDoc } = await (supabaseAdmin as any)
+  .from('documents')
+  .insert(payload);
+
+if (errDoc) {
+  return NextResponse.json({ error: errDoc.message }, { status: 500 });
+}
+
+ // salva arquivos no Storage (bucket: 'signflow')
     const arrayBuffer = await pdf.arrayBuffer();
     const pathOriginal = `${id}/original.pdf`;
     const { error: upErr } = await supabaseAdmin.storage.from('signflow').upload(pathOriginal, Buffer.from(arrayBuffer), { contentType: 'application/pdf', upsert: true });
