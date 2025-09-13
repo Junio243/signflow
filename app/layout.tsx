@@ -1,4 +1,5 @@
-import './globals.css';
+import '../styles/globals.css';
+import 'pdfjs-dist/web/pdf_viewer.css';
 import Link from 'next/link';
 
 export const metadata = { title: 'SignFlow', description: 'Assine PDFs com assinatura visual e QR de validação.' };
