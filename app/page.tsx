@@ -1,42 +1,43 @@
-'use client';
-import { useState } from 'react';
-import { Mail } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
+// app/page.tsx
+export const revalidate = 0;
+export const dynamic = 'force-dynamic';
+
+import Link from 'next/link';
 
 export default function Home() {
-  const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
-  async function sendMagicLink(e: React.FormEvent) {
-    e.preventDefault();
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard` } });
-    if (!error) setSent(true);
-    else alert(error.message);
-  }
-
   return (
-    <div className="grid md:grid-cols-2 gap-6 items-center">
-      <div className="card">
-        <h1 className="text-2xl font-semibold mb-2">Assine PDFs com QR e histórico</h1>
-        <p className="text-slate-600 mb-4">Login sem senha. Envie seu PDF, posicione a assinatura visual, gere QR dinâmico e compartilhe o documento assinado.</p>
-        <form onSubmit={sendMagicLink} className="flex gap-2">
-          <input className="input" type="email" required placeholder="seu@email.com" value={email} onChange={e=>setEmail(e.target.value)} />
-          <button className="btn" disabled={sent}><Mail className="w-4 h-4 mr-2 inline"/> {sent? 'Link enviado' : 'Receber link mágico'}</button>
-        </form>
-        <p className="text-xs text-slate-500 mt-2">Usamos seu e‑mail apenas para autenticação. Sem spam.</p>
+    <section className="grid gap-10 md:grid-cols-2 items-center">
+      <div className="space-y-6">
+        <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
+          Assine PDFs <span className="text-indigo-600">de forma visual</span> e valide por QR Code
+        </h1>
+        <p className="text-slate-600">
+          Faça upload do PDF, posicione sua assinatura escaneada e gere um QR de validação pública.
+          Ideal para autorizações, recibos e contratos informais no DF.
+        </p>
+        <div className="flex gap-3">
+          <Link href="/login" className="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700">
+            Começar agora
+          </Link>
+          <Link href="/dashboard" className="inline-flex items-center rounded-lg border px-4 py-2 hover:bg-slate-50">
+            Ver meus documentos
+          </Link>
+        </div>
+        <ul className="text-sm text-slate-600 space-y-1">
+          <li>• Login por e-mail (link mágico)</li>
+          <li>• QR Code com página pública de validação</li>
+          <li>• Armazenamento temporário (7 dias)</li>
+        </ul>
       </div>
-      <div className="card">
-        <ol className="list-decimal pl-6 text-sm space-y-2">
-          <li>Faça login por link mágico.</li>
-          <li>Envie um PDF e sua assinatura PNG/JPG.</li>
-          <li>Arraste/ajuste a assinatura e gere o QR.</li>
-          <li>Baixe o PDF assinado e compartilhe o link de validação.</li>
-        </ol>
+
+      <div className="rounded-2xl border bg-white p-6 shadow-sm">
+        <div className="aspect-[4/3] rounded-lg border grid place-content-center text-slate-400">
+          Prévia do editor / PDF
+        </div>
+        <p className="text-xs text-slate-500 mt-3">
+          Após entrar, você poderá enviar um PDF e assinar.
+        </p>
       </div>
-    </div>
+    </section>
   );
 }
