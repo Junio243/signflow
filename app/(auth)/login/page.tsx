@@ -1,63 +1,56 @@
-// app/(auth)/login/page.tsx
-'use client';
-export const revalidate = 0;
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+'use client';
 
 import { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
-  const [sent, setSent]   = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  async function handleLogin(e: React.FormEvent) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const sendMagic = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const supabase    = createClient(supabaseUrl, anonKey);
-
+    setLoading(true); setOk(null); setErr(null);
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/dashboard` },
     });
-
-    if (error) setError(error.message);
-    else setSent(true);
-  }
+    setLoading(false);
+    if (error) setErr(error.message);
+    else setOk('Enviamos um link de login para seu e-mail.');
+  };
 
   return (
-    <div className="max-w-md mx-auto">
-      <h1 className="text-2xl font-semibold mb-2">Entrar</h1>
-      <p className="text-sm text-slate-600 mb-6">
-        Digite seu e-mail. Enviaremos um link mágico para acessar o SignFlow.
-      </p>
-
-      <form onSubmit={handleLogin} className="space-y-4">
+    <main className="min-h-screen grid place-items-center bg-slate-50 px-4">
+      <form onSubmit={sendMagic} className="w-full max-w-md bg-white p-6 rounded-2xl border shadow">
+        <h1 className="text-xl font-semibold mb-2">Entrar</h1>
+        <p className="text-sm text-slate-600 mb-4">Receba um link mágico por e-mail.</p>
         <input
           type="email"
           required
-          className="w-full rounded-lg border px-3 py-2"
           placeholder="seuemail@exemplo.com"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e)=>setEmail(e.target.value)}
+          className="w-full rounded-lg border px-3 py-2"
         />
         <button
-          type="submit"
-          className="w-full rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700"
-          disabled={sent}
+          disabled={loading}
+          className="mt-4 w-full rounded-lg bg-sky-600 text-white py-2 hover:bg-sky-700 disabled:opacity-50"
         >
-          {sent ? 'Link enviado!' : 'Enviar link mágico'}
+          {loading ? 'Enviando…' : 'Enviar link de login'}
         </button>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {ok && <p className="mt-3 text-green-600 text-sm">{ok}</p>}
+        {err && <p className="mt-3 text-red-600 text-sm">{err}</p>}
       </form>
-
-      <p className="text-xs text-slate-500 mt-4">
-        Dica: verifique caixa de entrada e spam. No DF, alguns provedores demoram alguns segundos para entregar o e-mail.
-      </p>
-    </div>
+    </main>
   );
 }
