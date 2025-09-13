@@ -1,44 +1,76 @@
-// app/page.tsx
-export const revalidate = 0;
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-import Link from 'next/link';
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <section className="grid gap-10 md:grid-cols-2 items-center">
-      <div className="space-y-6">
-        <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
-          Assine PDFs <span className="text-indigo-600">de forma visual</span> e valide por QR Code
-        </h1>
-        <p className="text-slate-600">
-          Faça upload do PDF, posicione sua assinatura escaneada e gere um QR de validação pública.
-          Ideal para autorizações, recibos e contratos informais no DF.
-        </p>
-        <div className="flex gap-3">
-          <Link href="/login" className="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700">
-            Começar agora
-          </Link>
-          <Link href="/dashboard" className="inline-flex items-center rounded-lg border px-4 py-2 hover:bg-slate-50">
-            Ver meus documentos
-          </Link>
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+      <header className="border-b bg-white/80 backdrop-blur">
+        <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-xl bg-sky-600" />
+            <span className="font-semibold text-slate-800">SignFlow</span>
+          </div>
+          <nav className="flex items-center gap-3">
+            <Link className="text-slate-600 hover:text-slate-900" href="/dashboard">Dashboard</Link>
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 rounded-xl border border-sky-600 px-4 py-2 text-sky-700 hover:bg-sky-50"
+            >
+              Entrar
+            </Link>
+          </nav>
         </div>
-        <ul className="text-sm text-slate-600 space-y-1">
-          <li>• Login por e-mail (link mágico)</li>
-          <li>• QR Code com página pública de validação</li>
-          <li>• Armazenamento temporário (7 dias)</li>
-        </ul>
-      </div>
+      </header>
 
-      <div className="rounded-2xl border bg-white p-6 shadow-sm">
-        <div className="aspect-[4/3] rounded-lg border grid place-content-center text-slate-400">
-          Prévia do editor / PDF
+      <section className="mx-auto max-w-6xl px-4 pt-16 pb-10 grid md:grid-cols-2 gap-10 items-center">
+        <div>
+          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 leading-tight">
+            Assine PDFs de forma visual, simples e gratuita
+          </h1>
+          <p className="mt-4 text-lg text-slate-600">
+            Envie seu PDF, posicione a assinatura escaneada, gere QR Code de validação e baixe o documento final.
+          </p>
+          <div className="mt-6 flex gap-3">
+            <Link
+              href="/login"
+              className="rounded-xl bg-sky-600 px-6 py-3 text-white font-medium hover:bg-sky-700"
+            >
+              Assinar PDF agora
+            </Link>
+            <Link
+              href="/validate/demo"
+              className="rounded-xl border px-6 py-3 text-slate-700 hover:bg-white"
+            >
+              Ver exemplo de validação
+            </Link>
+          </div>
+          <ul className="mt-6 space-y-2 text-slate-700">
+            <li>• Login por e-mail (link mágico)</li>
+            <li>• QR Code para validar a origem</li>
+            <li>• Armazenamento por 7 dias (LGPD friendly)</li>
+          </ul>
         </div>
-        <p className="text-xs text-slate-500 mt-3">
-          Após entrar, você poderá enviar um PDF e assinar.
-        </p>
-      </div>
-    </section>
+        <div className="bg-white rounded-2xl shadow p-6 border">
+          <div className="aspect-[4/3] w-full rounded-xl border grid place-items-center text-slate-500">
+            Prévia do editor aqui (após login)
+          </div>
+          <p className="mt-3 text-sm text-slate-500">
+            Depois de entrar, você fará upload do PDF e posicionará a assinatura visualmente.
+          </p>
+        </div>
+      </section>
+
+      <footer className="border-t bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-6 text-sm text-slate-500 flex justify-between">
+          <span>© {new Date().getFullYear()} SignFlow</span>
+          <div className="flex gap-4">
+            <Link href="/terms">Termos</Link>
+            <Link href="/privacy">Privacidade</Link>
+          </div>
+        </div>
+      </footer>
+    </main>
   );
 }
