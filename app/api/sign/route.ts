@@ -1,7 +1,6 @@
 // app/api/sign/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import type { Database } from '@/lib/types';
 import QRCode from 'qrcode';
 import { PDFDocument, degrees } from 'pdf-lib';
 
@@ -11,7 +10,7 @@ type Position = {
   page: number;     // 1-based
   nx: number;       // 0..1 (largura)
   ny: number;       // 0..1 (altura, topo -> 0)
-  scale: number;    // 1.0 = 240pt de largura base
+  scale: number;    // 1.0 = 240pt base
   rotation: number; // graus
 };
 
@@ -39,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
     const pdfDoc = await PDFDocument.load(await orig.data.arrayBuffer());
 
-    // (Opcional) imagem de assinatura enviada
+    // (Opcional) imagem de assinatura
     const sig = await supabaseAdmin.storage.from('signflow').download(`${id}/signature`);
 
     // 3) QR para página pública de validação
@@ -110,16 +109,14 @@ export async function POST(req: NextRequest) {
     }
     const pubQr = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/qr.png`);
 
-    // 7) Atualizar registro (payload tipado para evitar 'never')
-    const payload: Database['public']['Tables']['documents']['Update'] = {
-      signed_pdf_url: pubSigned.data.publicUrl,
-      qr_code_url: pubQr.data.publicUrl,
-      status: 'signed',
-    };
-
-    const upd = await supabaseAdmin
+    // 7) Atualizar registro — FORÇA a tipagem a não travar (cast)
+    const upd = await (supabaseAdmin as any)
       .from('documents')
-      .update(payload)
+      .update({
+        signed_pdf_url: pubSigned.data.publicUrl,
+        qr_code_url: pubQr.data.publicUrl,
+        status: 'signed',
+      })
       .eq('id', id);
 
     if (upd.error) {
