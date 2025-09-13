@@ -1,6 +1,8 @@
 // app/dashboard/page.tsx
 'use client';
 export const revalidate = 0;
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
