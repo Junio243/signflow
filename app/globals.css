@@ -1,0 +1,3 @@
+/* Faz o app/globals.css “apontar” para o CSS verdadeiro */
+@import '../styles/globals.css';
+@import 'pdfjs-dist/web/pdf_viewer.css';
