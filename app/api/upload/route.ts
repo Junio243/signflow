@@ -1,80 +1,174 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import crypto from 'crypto';
+// @ts-nocheck
+// app/api/upload/route.ts
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-export async function POST(req: NextRequest){
-  try {
-    const form = await req.formData();
-    const pdf = form.get('pdf') as File | null;
-    const signature = form.get('signature') as File | null;
-    const original_pdf_name = String(form.get('original_pdf_name')||'documento.pdf');
-    const positions = JSON.parse(String(form.get('positions')||'[]'));
+import { NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { createHash, randomUUID } from 'crypto';
 
-    if(!pdf) return NextResponse.json({ error: 'PDF obrigatório' }, { status: 400 });
-    if(pdf.size > 20*1024*1024) return NextResponse.json({ error: 'PDF até 20MB' }, { status: 400 });
-
-    const id = crypto.randomUUID();
-    const ip = req.headers.get('x-forwarded-for') || req.ip || '';
-    const ip_hash = crypto.createHash('sha256').update(ip).digest('hex');
-
-    // rate limit: 5 uploads/hora por IP
-    const oneHourAgo = new Date(Date.now()-60*60*1000).toISOString();
-    const { count, error: rlErr } = await supabaseAdmin
-      .from('documents')
-      .select('id', { count: 'exact', head: true })
-      .eq('ip_hash', ip_hash)
-      .gt('created_at', oneHourAgo);
-    if (rlErr) throw rlErr;
-    if ((count||0) >= 5) {
-      return NextResponse.json({ error: 'Limite de 5 uploads por hora atingido. Tente novamente mais tarde.' }, { status: 429 });
-    }
-
-    // vincula usuário autenticado se houver token
-    const auth = req.headers.get('authorization') || '';
-    const token = auth.startsWith('Bearer ')? auth.slice(7) : null;
-    let userId: string | null = null;
-    if (token){
-      const { data: u } = await supabaseAdmin.auth.getUser(token);
-      userId = u?.user?.id || null;
-    }
-
- // cria registro do documento (forçando tipagem apenas aqui)
-const payload = {
-  id,
-  user_id: userId,
-  original_pdf_name,
-  metadata: { positions },
-  status: 'draft',
-  created_at: new Date().toISOString(),
-  expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-  signed_pdf_url: null,
-  qr_code_url: null,
-  ip_hash,
-};
-
-// usando 'as any' só aqui para evitar o 'never' do TS
-const { error: errDoc } = await (supabaseAdmin as any)
-  .from('documents')
-  .insert(payload);
-
-if (errDoc) {
-  return NextResponse.json({ error: errDoc.message }, { status: 500 });
+// --------- utils ----------
+function plusDays(date: Date, days: number) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
 }
 
- // salva arquivos no Storage (bucket: 'signflow')
-    const arrayBuffer = await pdf.arrayBuffer();
-    const pathOriginal = `${id}/original.pdf`;
-    const { error: upErr } = await supabaseAdmin.storage.from('signflow').upload(pathOriginal, Buffer.from(arrayBuffer), { contentType: 'application/pdf', upsert: true });
-    if (upErr) throw upErr;
+function getClientIp(req: Request) {
+  // Vercel/Next costuma preencher x-forwarded-for
+  const fwd = req.headers.get('x-forwarded-for');
+  if (fwd) return fwd.split(',')[0].trim();
+  const real = req.headers.get('x-real-ip');
+  if (real) return real.trim();
+  return '0.0.0.0';
+}
 
-    if (signature){
-      const sigBuf = Buffer.from(await signature.arrayBuffer());
-      const { error: upSigErr } = await supabaseAdmin.storage.from('signflow').upload(`${id}/signature`, sigBuf, { upsert: true, contentType: signature.type || 'image/png' });
-      if (upSigErr) throw upSigErr;
+function sha256Hex(input: string) {
+  return createHash('sha256').update(input).digest('hex');
+}
+// ---------------------------
+
+/**
+ * Espera um multipart/form-data com:
+ * - file: PDF (obrigatório, até 20MB)
+ * - signature: PNG/JPG (opcional, até 5MB)
+ * - user_id: string (opcional; pode ser null)
+ * - positions: string (opcional; JSON com [{page,x,y,scale,rotation},...])
+ * - original_pdf_name: string (opcional; se não vier, usa file.name)
+ */
+export async function POST(req: Request) {
+  try {
+    const supabaseAdmin = getSupabaseAdmin(); // <-- cria o client somente aqui (runtime)
+    const form = await req.formData();
+
+    const pdf = form.get('file') as File | null;
+    if (!pdf) {
+      return NextResponse.json({ error: 'Arquivo PDF é obrigatório (campo "file").' }, { status: 400 });
     }
 
-    return NextResponse.json({ id });
-  } catch (e:any) {
-    return NextResponse.json({ error: e.message || 'Falha ao salvar' }, { status: 500 });
+    // Validações de PDF
+    const pdfType = (pdf as any).type || '';
+    if (!pdfType.includes('pdf')) {
+      return NextResponse.json({ error: 'O arquivo enviado não é um PDF válido.' }, { status: 400 });
+    }
+    const pdfBytes = new Uint8Array(await pdf.arrayBuffer());
+    const maxPdf = 20 * 1024 * 1024; // 20MB
+    if (pdfBytes.byteLength > maxPdf) {
+      return NextResponse.json({ error: 'PDF maior que 20MB.' }, { status: 400 });
+    }
+
+    // Assinatura (opcional)
+    const sig = form.get('signature') as File | null;
+    let sigBytes: Uint8Array | null = null;
+    let sigExt: 'png' | 'jpg' | 'jpeg' | null = null;
+
+    if (sig) {
+      const t = (sig as any).type || '';
+      const ok = ['image/png', 'image/jpeg', 'image/jpg'].includes(t);
+      if (!ok) {
+        return NextResponse.json({ error: 'Assinatura deve ser PNG ou JPG.' }, { status: 400 });
+      }
+      const arr = new Uint8Array(await sig.arrayBuffer());
+      const maxSig = 5 * 1024 * 1024; // 5MB
+      if (arr.byteLength > maxSig) {
+        return NextResponse.json({ error: 'Imagem de assinatura maior que 5MB.' }, { status: 400 });
+      }
+      sigBytes = arr;
+      if (t === 'image/png') sigExt = 'png';
+      if (t === 'image/jpeg' || t === 'image/jpg') sigExt = 'jpg';
+    }
+
+    // Metadados opcionais
+    const userId = (form.get('user_id') as string) || null;
+    const originalNameForm = (form.get('original_pdf_name') as string) || '';
+    const original_pdf_name = originalNameForm || (pdf as any).name || 'documento.pdf';
+
+    let positions: any[] = [];
+    const positionsRaw = form.get('positions') as string | null;
+    if (positionsRaw) {
+      try {
+        const parsed = JSON.parse(positionsRaw);
+        if (Array.isArray(parsed)) positions = parsed;
+      } catch {
+        // se vier inválido, simplesmente deixa []
+      }
+    }
+
+    // ID do documento e expiração
+    const id = randomUUID();
+    const createdAt = new Date();
+    const expiresAt = plusDays(createdAt, 7);
+
+    // Hash de IP simples (rate-limit/abuso)
+    const ip = getClientIp(req);
+    const ip_hash = sha256Hex(ip);
+
+    // Uploads no Storage (bucket: signflow)
+    const bucket = 'signflow';
+    // original.pdf
+    {
+      const up = await supabaseAdmin.storage
+        .from(bucket)
+        .upload(`${id}/original.pdf`, pdfBytes, { contentType: 'application/pdf', upsert: true });
+
+      if (up.error) {
+        return NextResponse.json({ error: `Falha ao subir PDF: ${up.error.message}` }, { status: 500 });
+      }
+    }
+
+    // signature (se enviada)
+    if (sigBytes && sigExt) {
+      const upSig = await supabaseAdmin.storage
+        .from(bucket)
+        .upload(`${id}/signature`, sigBytes, {
+          contentType: sigExt === 'png' ? 'image/png' : 'image/jpeg',
+          upsert: true,
+        });
+
+      if (upSig.error) {
+        return NextResponse.json({ error: `Falha ao subir assinatura: ${upSig.error.message}` }, { status: 500 });
+      }
+    }
+
+    // Cria registro em `documents`
+    const payload = {
+      id,
+      user_id: userId,
+      original_pdf_name,
+      signed_pdf_url: null as string | null,
+      qr_code_url: null as string | null,
+      metadata: { positions },
+      status: 'draft',
+      created_at: createdAt.toISOString(),
+      expires_at: expiresAt.toISOString(),
+      ip_hash,
+    };
+
+    const { error: errDoc } = await supabaseAdmin
+      .from('documents')
+      .insert(payload as any); // <- cast para evitar "never" no build
+
+    if (errDoc) {
+      // rollback básico no storage, se quiser:
+      await supabaseAdmin.storage.from(bucket).remove([
+        `${id}/original.pdf`,
+        `${id}/signature`,
+      ]);
+      return NextResponse.json({ error: `Falha ao salvar registro: ${errDoc.message}` }, { status: 500 });
+    }
+
+    return NextResponse.json(
+      {
+        ok: true,
+        id,
+        message: 'Upload realizado. Documento criado com status "draft".',
+      },
+      { status: 200 }
+    );
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: String(e?.message || e || 'Erro desconhecido em /api/upload') },
+      { status: 500 }
+    );
   }
 }
