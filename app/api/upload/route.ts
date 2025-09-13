@@ -1,174 +1,89 @@
-// @ts-nocheck
 // app/api/upload/route.ts
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
-import { createHash, randomUUID } from 'crypto';
-
-// --------- utils ----------
-function plusDays(date: Date, days: number) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function getClientIp(req: Request) {
-  // Vercel/Next costuma preencher x-forwarded-for
-  const fwd = req.headers.get('x-forwarded-for');
-  if (fwd) return fwd.split(',')[0].trim();
-  const real = req.headers.get('x-real-ip');
-  if (real) return real.trim();
-  return '0.0.0.0';
-}
 
 function sha256Hex(input: string) {
-  return createHash('sha256').update(input).digest('hex');
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+    .then(buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join(''));
 }
-// ---------------------------
 
-/**
- * Espera um multipart/form-data com:
- * - file: PDF (obrigatório, até 20MB)
- * - signature: PNG/JPG (opcional, até 5MB)
- * - user_id: string (opcional; pode ser null)
- * - positions: string (opcional; JSON com [{page,x,y,scale,rotation},...])
- * - original_pdf_name: string (opcional; se não vier, usa file.name)
- */
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const supabaseAdmin = getSupabaseAdmin(); // <-- cria o client somente aqui (runtime)
+    const supabaseAdmin = getSupabaseAdmin(); // ← client dentro do handler
+
     const form = await req.formData();
 
-    const pdf = form.get('file') as File | null;
+    const pdf = form.get('pdf') as File | null;
+    const signature = form.get('signature') as File | null;
+    const original_pdf_name =
+      form.get('original_pdf_name')?.toString() || 'documento.pdf';
+    const positionsRaw = form.get('positions')?.toString() || '[]';
+    const userId = form.get('user_id')?.toString() || null;
+
     if (!pdf) {
-      return NextResponse.json({ error: 'Arquivo PDF é obrigatório (campo "file").' }, { status: 400 });
+      return NextResponse.json({ error: 'PDF é obrigatório' }, { status: 400 });
     }
 
-    // Validações de PDF
-    const pdfType = (pdf as any).type || '';
-    if (!pdfType.includes('pdf')) {
-      return NextResponse.json({ error: 'O arquivo enviado não é um PDF válido.' }, { status: 400 });
-    }
+    const id = crypto.randomUUID();
+    const ip = req.headers.get('x-forwarded-for') || req.ip || '0.0.0.0';
+    const ip_hash = await sha256Hex(ip);
+
+    // uploads no Storage
     const pdfBytes = new Uint8Array(await pdf.arrayBuffer());
-    const maxPdf = 20 * 1024 * 1024; // 20MB
-    if (pdfBytes.byteLength > maxPdf) {
-      return NextResponse.json({ error: 'PDF maior que 20MB.' }, { status: 400 });
+    const up1 = await supabaseAdmin.storage
+      .from('signflow')
+      .upload(`${id}/original.pdf`, pdfBytes, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+    if (up1.error) {
+      return NextResponse.json({ error: up1.error.message }, { status: 500 });
     }
 
-    // Assinatura (opcional)
-    const sig = form.get('signature') as File | null;
-    let sigBytes: Uint8Array | null = null;
-    let sigExt: 'png' | 'jpg' | 'jpeg' | null = null;
-
-    if (sig) {
-      const t = (sig as any).type || '';
-      const ok = ['image/png', 'image/jpeg', 'image/jpg'].includes(t);
-      if (!ok) {
-        return NextResponse.json({ error: 'Assinatura deve ser PNG ou JPG.' }, { status: 400 });
-      }
-      const arr = new Uint8Array(await sig.arrayBuffer());
-      const maxSig = 5 * 1024 * 1024; // 5MB
-      if (arr.byteLength > maxSig) {
-        return NextResponse.json({ error: 'Imagem de assinatura maior que 5MB.' }, { status: 400 });
-      }
-      sigBytes = arr;
-      if (t === 'image/png') sigExt = 'png';
-      if (t === 'image/jpeg' || t === 'image/jpg') sigExt = 'jpg';
-    }
-
-    // Metadados opcionais
-    const userId = (form.get('user_id') as string) || null;
-    const originalNameForm = (form.get('original_pdf_name') as string) || '';
-    const original_pdf_name = originalNameForm || (pdf as any).name || 'documento.pdf';
-
-    let positions: any[] = [];
-    const positionsRaw = form.get('positions') as string | null;
-    if (positionsRaw) {
-      try {
-        const parsed = JSON.parse(positionsRaw);
-        if (Array.isArray(parsed)) positions = parsed;
-      } catch {
-        // se vier inválido, simplesmente deixa []
-      }
-    }
-
-    // ID do documento e expiração
-    const id = randomUUID();
-    const createdAt = new Date();
-    const expiresAt = plusDays(createdAt, 7);
-
-    // Hash de IP simples (rate-limit/abuso)
-    const ip = getClientIp(req);
-    const ip_hash = sha256Hex(ip);
-
-    // Uploads no Storage (bucket: signflow)
-    const bucket = 'signflow';
-    // original.pdf
-    {
-      const up = await supabaseAdmin.storage
-        .from(bucket)
-        .upload(`${id}/original.pdf`, pdfBytes, { contentType: 'application/pdf', upsert: true });
-
-      if (up.error) {
-        return NextResponse.json({ error: `Falha ao subir PDF: ${up.error.message}` }, { status: 500 });
-      }
-    }
-
-    // signature (se enviada)
-    if (sigBytes && sigExt) {
-      const upSig = await supabaseAdmin.storage
-        .from(bucket)
+    if (signature) {
+      const sigBytes = new Uint8Array(await signature.arrayBuffer());
+      const up2 = await supabaseAdmin.storage
+        .from('signflow')
         .upload(`${id}/signature`, sigBytes, {
-          contentType: sigExt === 'png' ? 'image/png' : 'image/jpeg',
+          contentType: signature.type || 'image/png',
           upsert: true,
         });
-
-      if (upSig.error) {
-        return NextResponse.json({ error: `Falha ao subir assinatura: ${upSig.error.message}` }, { status: 500 });
+      if (up2.error) {
+        return NextResponse.json({ error: up2.error.message }, { status: 500 });
       }
     }
 
-    // Cria registro em `documents`
-    const payload = {
-      id,
-      user_id: userId,
-      original_pdf_name,
-      signed_pdf_url: null as string | null,
-      qr_code_url: null as string | null,
-      metadata: { positions },
-      status: 'draft',
-      created_at: createdAt.toISOString(),
-      expires_at: expiresAt.toISOString(),
-      ip_hash,
-    };
+    // cria registro
+    const positions = JSON.parse(positionsRaw || '[]');
+    const now = new Date();
+    const expires = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    const { error: errDoc } = await supabaseAdmin
+    const ins = await supabaseAdmin
       .from('documents')
-      .insert(payload as any); // <- cast para evitar "never" no build
+      // @ts-ignore (evita never do types gerados no build)
+      .insert({
+        id,
+        user_id: userId,
+        original_pdf_name,
+        metadata: { positions },
+        status: 'draft',
+        created_at: now.toISOString(),
+        expires_at: expires.toISOString(),
+        signed_pdf_url: null,
+        qr_code_url: null,
+        ip_hash,
+      })
+      .select('id')
+      .maybeSingle();
 
-    if (errDoc) {
-      // rollback básico no storage, se quiser:
-      await supabaseAdmin.storage.from(bucket).remove([
-        `${id}/original.pdf`,
-        `${id}/signature`,
-      ]);
-      return NextResponse.json({ error: `Falha ao salvar registro: ${errDoc.message}` }, { status: 500 });
+    if (ins.error) {
+      return NextResponse.json({ error: ins.error.message }, { status: 500 });
     }
 
-    return NextResponse.json(
-      {
-        ok: true,
-        id,
-        message: 'Upload realizado. Documento criado com status "draft".',
-      },
-      { status: 200 }
-    );
+    return NextResponse.json({ ok: true, id });
   } catch (e: any) {
-    return NextResponse.json(
-      { error: String(e?.message || e || 'Erro desconhecido em /api/upload') },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
 }
