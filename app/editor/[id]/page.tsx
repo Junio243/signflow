@@ -1,19 +1,11 @@
 // app/validate/[id]/page.tsx
-import type { Metadata } from 'next';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import type { Database } from '@/lib/types';
-
-type DocRow = Database['public']['Tables']['documents']['Row'];
-
 export const runtime = 'nodejs';
 
-export const metadata: Metadata = {
-  title: 'Validar documento — SignFlow',
-};
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export default async function ValidatePage({ params }: { params: { id: string } }) {
-  // Busca o documento no Supabase
-  const { data, error } = await supabaseAdmin
+  // Busca o documento correspondente ao ID
+  const { data, error } = await (supabaseAdmin as any)
     .from('documents')
     .select('*')
     .eq('id', params.id)
@@ -23,27 +15,27 @@ export default async function ValidatePage({ params }: { params: { id: string } 
     return (
       <main className="max-w-2xl mx-auto p-6">
         <h1 className="text-xl font-semibold mb-2">Erro ao carregar</h1>
-        <p className="text-sm text-red-600">{error.message}</p>
+        <p className="text-sm text-red-600">{String(error.message || error)}</p>
       </main>
     );
   }
 
-  const doc = (data as DocRow | null);
+  const doc = (data as any) ?? null;
 
   if (!doc) {
     return (
       <main className="max-w-2xl mx-auto p-6">
         <h1 className="text-xl font-semibold mb-2">Documento não encontrado</h1>
         <p className="text-sm text-slate-600">
-          Verifique se o QR Code/URL está correto: <code>{params.id}</code>
+          Verifique o QR Code/URL. ID solicitado: <code>{params.id}</code>
         </p>
       </main>
     );
   }
 
-  const signedUrl = doc.signed_pdf_url ?? '';
-  const qrUrl = doc.qr_code_url ?? '';
-  const createdAt = doc.created_at ? new Date(doc.created_at).toLocaleString('pt-BR') : '-';
+  const signedUrl: string = doc.signed_pdf_url ?? '';
+  const qrUrl: string = doc.qr_code_url ?? '';
+  const createdAt: string = doc.created_at ? new Date(doc.created_at).toLocaleString('pt-BR') : '-';
 
   return (
     <main className="max-w-3xl mx-auto p-6 space-y-6">
