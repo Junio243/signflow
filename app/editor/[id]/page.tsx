@@ -1,113 +1,100 @@
-'use client';
+// app/validate/[id]/page.tsx
+import type { Metadata } from 'next';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import type { Database } from '@/lib/types';
 
-import { useState, type ChangeEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, Label, Input, cn } from '@/components/Ui';
+type DocRow = Database['public']['Tables']['documents']['Row'];
 
-type Position = {
-  page: number;     // 1-based
-  nx: number;       // 0..1 (largura, 0 = esquerda, 1 = direita)
-  ny: number;       // 0..1 (altura, 0 = topo, 1 = base)
-  scale: number;    // 1.0 = largura base ~240pt no PDF final
-  rotation: number; // graus
+export const runtime = 'nodejs';
+
+export const metadata: Metadata = {
+  title: 'Validar documento — SignFlow',
 };
 
-export default function EditorPage({ params }: { params: { id: string } }) {
-  const router = useRouter();
-  const [pdf, setPdf] = useState<File | null>(null);
-  const [sig, setSig] = useState<File | null>(null);
+export default async function ValidatePage({ params }: { params: { id: string } }) {
+  // Busca o documento no Supabase
+  const { data, error } = await supabaseAdmin
+    .from('documents')
+    .select('*')
+    .eq('id', params.id)
+    .maybeSingle();
 
-  // exemplo simples de posição padrão (você pode trocar por algo interativo depois)
-  const [positions] = useState<Position[]>([
-    { page: 1, nx: 0.5, ny: 0.2, scale: 1, rotation: 0 },
-  ]);
+  if (error) {
+    return (
+      <main className="max-w-2xl mx-auto p-6">
+        <h1 className="text-xl font-semibold mb-2">Erro ao carregar</h1>
+        <p className="text-sm text-red-600">{error.message}</p>
+      </main>
+    );
+  }
 
-  const handlePdfChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setPdf(e.currentTarget.files?.[0] ?? null);
-  };
+  const doc = (data as DocRow | null);
 
-  const handleSigChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setSig(e.currentTarget.files?.[0] ?? null);
-  };
+  if (!doc) {
+    return (
+      <main className="max-w-2xl mx-auto p-6">
+        <h1 className="text-xl font-semibold mb-2">Documento não encontrado</h1>
+        <p className="text-sm text-slate-600">
+          Verifique se o QR Code/URL está correto: <code>{params.id}</code>
+        </p>
+      </main>
+    );
+  }
 
-  const handleUploadAndSign = async () => {
-    if (!pdf) {
-      alert('Envie um PDF primeiro.');
-      return;
-    }
-
-    try {
-      // 1) /api/upload → cria registro e sobe arquivos
-      const fd = new FormData();
-      fd.append('id', params.id);
-      fd.append('pdf', pdf);
-      if (sig) fd.append('signature', sig);
-      fd.append('positions', JSON.stringify(positions));
-
-      const up = await fetch('/api/upload', { method: 'POST', body: fd });
-      const upJson = await up.json();
-      if (!up.ok) {
-        console.error(upJson);
-        alert(upJson.error || 'Falha no upload');
-        return;
-      }
-
-      // 2) /api/sign → aplica assinatura e QR no PDF
-      const sign = await fetch('/api/sign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: params.id }),
-      });
-      const signJson = await sign.json();
-      if (!sign.ok) {
-        console.error(signJson);
-        alert(signJson.error || 'Falha ao assinar');
-        return;
-      }
-
-      // 3) Redireciona para a página pública de validação
-      router.push(`/validate/${params.id}`);
-    } catch (err: any) {
-      console.error(err);
-      alert(err?.message || 'Erro inesperado');
-    }
-  };
+  const signedUrl = doc.signed_pdf_url ?? '';
+  const qrUrl = doc.qr_code_url ?? '';
+  const createdAt = doc.created_at ? new Date(doc.created_at).toLocaleString('pt-BR') : '-';
 
   return (
-    <main className={cn('mx-auto max-w-2xl p-6 space-y-6')}>
-      <h1 className="text-2xl font-semibold">Editor — Documento {params.id}</h1>
+    <main className="max-w-3xl mx-auto p-6 space-y-6">
+      <section>
+        <h1 className="text-2xl font-semibold mb-2">Validação do documento</h1>
+        <ul className="text-sm text-slate-700 space-y-1">
+          <li><strong>ID:</strong> {doc.id}</li>
+          <li><strong>Status:</strong> {doc.status}</li>
+          <li><strong>Assinado em:</strong> {createdAt}</li>
+          {doc.user_id && <li><strong>Usuário:</strong> {doc.user_id}</li>}
+        </ul>
+      </section>
 
-      <Card className="space-y-4 p-4">
-        <div>
-          <Label>PDF</Label>
-          <Input
-            type="file"
-            accept="application/pdf"
-            onChange={handlePdfChange}
-          />
+      <section className="space-y-3">
+        <div className="flex gap-3 flex-wrap">
+          {signedUrl && (
+            <a
+              href={signedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded border hover:bg-gray-50"
+            >
+              Baixar PDF assinado
+            </a>
+          )}
+          {qrUrl && (
+            <a
+              href={qrUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded border hover:bg-gray-50"
+            >
+              Abrir QR Code
+            </a>
+          )}
         </div>
 
-        <div>
-          <Label>Assinatura (PNG/JPG)</Label>
-          <Input
-            type="file"
-            accept="image/png,image/jpeg"
-            onChange={handleSigChange}
-          />
-        </div>
-
-        <p className="text-sm text-gray-600">
-          *Padrão de posição: página 1, centro inferior (nx=0.5, ny=0.2), escala 1.0, rotação 0°.
-          Depois podemos trocar por posicionamento visual (arrastar e soltar).
-        </p>
-
-        <button
-          onClick={handleUploadAndSign}
-          className="rounded-lg px-4 py-2 border hover:bg-gray-50"
-        >
-          Aplicar assinatura + Gerar QR
-        </button>
-      </Card>
+        {signedUrl ? (
+          <div className="border rounded">
+            <iframe
+              src={signedUrl}
+              className="w-full h-[70vh]"
+              title="PDF assinado"
+            />
+          </div>
+        ) : (
+          <p className="text-sm text-slate-600">
+            Ainda não há PDF assinado disponível para este documento.
+          </p>
+        )}
+      </section>
     </main>
   );
 }
