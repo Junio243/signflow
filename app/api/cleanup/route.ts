@@ -1,11 +1,20 @@
+// app/api/cleanup/route.ts
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function GET() {
+  const supabaseAdmin = getSupabaseAdmin();
+
+  const now = new Date().toISOString();
+
+  // Busca documentos expirados
   const { data, error } = await supabaseAdmin
     .from('documents')
     .select('id')
-    .lt('expires_at', new Date().toISOString());
+    .lt('expires_at', now);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -13,6 +22,7 @@ export async function GET() {
 
   const rows = (data ?? []) as Array<{ id: string }>;
 
+  // Remove arquivos no Storage
   for (const row of rows) {
     await supabaseAdmin.storage.from('signflow').remove([
       `${row.id}/original.pdf`,
@@ -22,10 +32,8 @@ export async function GET() {
     ]);
   }
 
-  await supabaseAdmin
-    .from('documents')
-    .delete()
-    .lt('expires_at', new Date().toISOString());
+  // Apaga registros
+  await supabaseAdmin.from('documents').delete().lt('expires_at', now);
 
   return NextResponse.json({ ok: true, removed: rows.length });
 }
