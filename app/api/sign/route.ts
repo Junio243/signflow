@@ -111,15 +111,15 @@ export async function POST(req: NextRequest) {
     const pubQr = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/qr.png`);
 
     // 7) Atualizar registro (payload tipado para evitar 'never')
-    const payload: Database['public']['Tables']['documents']['Update'] = {
+    const payload = {
       signed_pdf_url: pubSigned.data.publicUrl,
       qr_code_url: pubQr.data.publicUrl,
       status: 'signed',
-    };
+    } satisfies Database['public']['Tables']['documents']['Update'];
 
     const upd = await supabaseAdmin
       .from('documents')
-      .update(payload)
+      .update(payload as never)
       .eq('id', id);
 
     if (upd.error) {

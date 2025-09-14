@@ -1,13 +1,21 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import PdfEditor from '@/components/PdfEditor';
 import { Card, Input, Label } from '@/components/Ui';
 import { createClient } from '@supabase/supabase-js';
 
+type Position = {
+  page: number;
+  nx: number;
+  ny: number;
+  scale: number;
+  rotation: number;
+};
+
 export default function Editor({ params }: { params: { id: string } }){
   const [pdf, setPdf] = useState<File|null>(null);
   const [sig, setSig] = useState<File|null>(null);
-  const [positions, setPositions] = useState<any[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
 
@@ -42,11 +50,23 @@ export default function Editor({ params }: { params: { id: string } }){
         <div className="grid md:grid-cols-2 gap-3">
           <div>
             <Label>PDF</Label>
-            <Input type="file" accept="application/pdf" onChange={e=>setPdf(e.target.files?.[0]||null)} />
+            <Input
+              type="file"
+              accept="application/pdf"
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setPdf(e.target.files?.[0] || null)
+              }
+            />
           </div>
           <div>
             <Label>Assinatura (PNG/JPG)</Label>
-            <Input type="file" accept="image/*" onChange={e=>setSig(e.target.files?.[0]||null)} />
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setSig(e.target.files?.[0] || null)
+              }
+            />
           </div>
         </div>
         <PdfEditor file={pdf} signature={sig} positions={positions} onPositions={setPositions} />
@@ -54,7 +74,13 @@ export default function Editor({ params }: { params: { id: string } }){
       <Card>
         <div className="space-y-2">
           <Label>Nome do arquivo</Label>
-          <Input value={name} onChange={e=>setName(e.target.value)} placeholder="Contrato.pdf" />
+          <Input
+            value={name}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setName(e.target.value)
+            }
+            placeholder="Contrato.pdf"
+          />
           <button className="btn w-full" onClick={handleUpload} disabled={saving}>Aplicar assinatura + Gerar QR</button>
           <p className="text-xs text-slate-500">O QR será inserido na última página, canto inferior esquerdo.</p>
         </div>
