@@ -1,57 +1,44 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
 
-export default function AuthCallbackPage() {
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+export default function AuthCallback() {
   const router = useRouter();
-  const [msg, setMsg] = useState('Validando seu login…');
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const [msg, setMsg] = useState('Validando seu link…');
 
   useEffect(() => {
-    const handle = async () => {
+    (async () => {
       try {
         const url = new URL(window.location.href);
-        const token_hash = url.searchParams.get('token_hash');
-        const type = (url.searchParams.get('type') || 'magiclink') as
-          | 'magiclink'
-          | 'recovery'
-          | 'signup'
-          | 'invite';
+        const code = url.searchParams.get('code');
 
-        if (token_hash) {
-          const { error } = await supabase.auth.verifyOtp({ token_hash, type });
-          if (error) throw error;
+        if (!code) {
+          setMsg('Link inválido ou expirado. Peça um novo no login.');
+          return;
         }
 
-        // checa sessão e vai pro dashboard
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          router.replace('/dashboard');
-        } else {
-          setMsg('Não foi possível validar sua sessão. Tente novamente.');
-          setTimeout(() => router.replace('/login'), 1500);
-        }
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) throw error;
+
+        // Login concluído: vá para o dashboard (ajuste se quiser outra rota)
+        router.replace('/dashboard');
       } catch (e: any) {
-        setMsg(e?.message || 'Erro ao validar login.');
-        setTimeout(() => router.replace('/login'), 1500);
+        setMsg(e?.message || 'Não foi possível validar o link.');
       }
-    };
-
-    handle();
-  }, [router, supabase]);
+    })();
+  }, [router]);
 
   return (
-    <main className="min-h-screen grid place-items-center bg-slate-50 px-4">
-      <div className="bg-white p-6 rounded-2xl border shadow w-full max-w-md text-center">
-        <h1 className="text-xl font-semibold mb-2">Aguarde…</h1>
-        <p className="text-slate-600">{msg}</p>
-      </div>
+    <main className="max-w-md mx-auto p-6">
+      <h1 className="text-xl font-semibold mb-2">Autenticando…</h1>
+      <p className="text-sm text-slate-600">{msg}</p>
     </main>
   );
 }
