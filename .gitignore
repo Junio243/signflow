@@ -6,3 +6,10 @@ dist
 .vscode
 .DS_Store
 next-env.d.ts
+.vercel
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+coverage
+build

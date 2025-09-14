@@ -55,6 +55,7 @@ export async function POST(req: NextRequest){
 
     const { error: errDoc } = await supabaseAdmin
       .from('documents')
+      // Supabase types infer `never` without casting
       .insert(insertPayload as never);
     if (errDoc) throw errDoc;
 

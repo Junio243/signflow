@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
 
     const upd = await supabaseAdmin
       .from('documents')
-      // Supabase types infer `never` without casting
+      // Supabase types infer `never` without casting; cast avoids TS error
       .update(payload as never)
       .eq('id', id);
 
