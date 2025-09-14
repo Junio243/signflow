@@ -1,44 +1,68 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export default function AuthCallback() {
   const router = useRouter();
-  const [msg, setMsg] = useState('Validando seu link…');
+  const search = useSearchParams();
+  const [msg, setMsg] = useState('Autenticando…');
 
   useEffect(() => {
-    (async () => {
-      try {
-        const url = new URL(window.location.href);
-        const code = url.searchParams.get('code');
+    const run = async () => {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
 
-        if (!code) {
-          setMsg('Link inválido ou expirado. Peça um novo no login.');
+      // 1) Fluxo PKCE (code)
+      const code = search.get('code');
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error) {
+          setMsg('Tudo certo! Redirecionando…');
+          router.replace('/dashboard');
           return;
         }
-
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) throw error;
-
-        // Login concluído: vá para o dashboard (ajuste se quiser outra rota)
-        router.replace('/dashboard');
-      } catch (e: any) {
-        setMsg(e?.message || 'Não foi possível validar o link.');
       }
-    })();
-  }, [router]);
+
+      // 2) Fluxo magic link (token_hash)
+      const token_hash =
+        search.get('token_hash') ||
+        search.get('token') ||
+        search.get('verification_token') ||
+        undefined;
+
+      const typeParam = search.get('type');
+      const type =
+        (typeParam as 'magiclink' | 'signup' | 'recovery' | 'invite' | null) ??
+        'magiclink';
+
+      if (token_hash) {
+        const { error } = await supabase.auth.verifyOtp({ token_hash, type });
+        if (!error) {
+          setMsg('Tudo certo! Redirecionando…');
+          router.replace('/dashboard');
+          return;
+        }
+      }
+
+      setMsg('Link inválido ou expirado. Peça um novo no login.');
+    };
+
+    run();
+  }, [router, search]);
 
   return (
-    <main className="max-w-md mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-2">Autenticando…</h1>
-      <p className="text-sm text-slate-600">{msg}</p>
-    </main>
+    <div className="max-w-xl mx-auto py-24">
+      <h1 className="text-2xl font-semibold mb-2">Autenticando…</h1>
+      <p className="text-slate-600">{msg}</p>
+      {msg.startsWith('Link inválido') && (
+        <a className="text-indigo-600 underline mt-4 inline-block" href="/login">
+          Voltar para o login
+        </a>
+      )}
+    </div>
   );
 }
