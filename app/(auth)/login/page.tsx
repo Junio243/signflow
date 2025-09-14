@@ -3,62 +3,66 @@
 import { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 export default function LoginPage() {
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
-  const [msg, setMsg] = useState<string>('');
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  async function handleSend(e: React.FormEvent) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setStatus('sending');
-    setMsg('');
+    setError(null);
+    setLoading(true);
 
-    // Depois que o usuário clicar no e-mail, ele volta para esta rota:
-    const redirect = `${window.location.origin}/auth/callback`;
+    const redirectTo =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/callback`
+        : undefined;
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: redirect },
+      options: { emailRedirectTo: redirectTo },
     });
 
-    if (error) {
-      setStatus('error');
-      setMsg(error.message || 'Falha ao enviar o link. Tente novamente.');
-      return;
-    }
-
-    setStatus('sent');
-    setMsg('Enviamos um e-mail com seu link de acesso. Abra pelo mesmo dispositivo.');
+    setLoading(false);
+    if (error) setError(error.message);
+    else setSent(true);
   }
 
   return (
-    <main className="max-w-md mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">Entrar por e-mail</h1>
+    <div className="max-w-md mx-auto py-16">
+      <h1 className="text-2xl font-semibold mb-2">Entrar</h1>
+      <p className="text-slate-600 mb-6">Envie o link mágico para seu e-mail.</p>
 
-      <form onSubmit={handleSend} className="space-y-3">
-        <input
-          type="email"
-          required
-          placeholder="seu@email.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full border rounded-md px-3 py-2"
-        />
-        <button
-          type="submit"
-          disabled={status === 'sending'}
-          className="w-full rounded-md px-3 py-2 bg-blue-600 text-white"
-        >
-          {status === 'sending' ? 'Enviando…' : 'Enviar link mágico'}
-        </button>
-      </form>
-
-      {msg && <p className="mt-3 text-sm">{msg}</p>}
-    </main>
+      {sent ? (
+        <div className="rounded-lg border p-4 text-sm">
+          Verifique sua caixa de entrada. Abra o link no <b>mesmo dispositivo</b> se possível.
+        </div>
+      ) : (
+        <form onSubmit={onSubmit} className="space-y-4">
+          <input
+            type="email"
+            required
+            placeholder="seu@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full rounded-lg border px-3 py-2"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-lg bg-indigo-600 text-white px-4 py-2 disabled:opacity-60"
+          >
+            {loading ? 'Enviando…' : 'Enviar link de acesso'}
+          </button>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </form>
+      )}
+    </div>
   );
 }
