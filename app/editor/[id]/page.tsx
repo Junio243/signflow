@@ -42,11 +42,23 @@ export default function Editor({ params }: { params: { id: string } }){
         <div className="grid md:grid-cols-2 gap-3">
           <div>
             <Label>PDF</Label>
-            <Input type="file" accept="application/pdf" onChange={e=>setPdf(e.target.files?.[0]||null)} />
+            <Input
+              type="file"
+              accept="application/pdf"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setPdf(e.target.files?.[0] || null)
+              }
+            />
           </div>
           <div>
             <Label>Assinatura (PNG/JPG)</Label>
-            <Input type="file" accept="image/*" onChange={e=>setSig(e.target.files?.[0]||null)} />
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setSig(e.target.files?.[0] || null)
+              }
+            />
           </div>
         </div>
         <PdfEditor file={pdf} signature={sig} positions={positions} onPositions={setPositions} />
@@ -54,7 +66,13 @@ export default function Editor({ params }: { params: { id: string } }){
       <Card>
         <div className="space-y-2">
           <Label>Nome do arquivo</Label>
-          <Input value={name} onChange={e=>setName(e.target.value)} placeholder="Contrato.pdf" />
+          <Input
+            value={name}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setName(e.target.value)
+            }
+            placeholder="Contrato.pdf"
+          />
           <button className="btn w-full" onClick={handleUpload} disabled={saving}>Aplicar assinatura + Gerar QR</button>
           <p className="text-xs text-slate-500">O QR será inserido na última página, canto inferior esquerdo.</p>
         </div>

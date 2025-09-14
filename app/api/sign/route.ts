@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     const pubQr = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/qr.png`);
 
     // 7) Atualizar registro (payload tipado para evitar 'never')
-    const payload: Database['public']['Tables']['documents']['Update'] = {
+    const payload: Partial<Database['public']['Tables']['documents']['Row']> = {
       signed_pdf_url: pubSigned.data.publicUrl,
       qr_code_url: pubQr.data.publicUrl,
       status: 'signed',
@@ -119,7 +119,9 @@ export async function POST(req: NextRequest) {
 
     const upd = await supabaseAdmin
       .from('documents')
-      .update(payload)
+      // supabase typings sometimes infer `never` for the update payload in edge/runtime builds.
+      // Cast to `never` to satisfy TypeScript while still sending the typed payload at runtime.
+      .update(payload as never)
       .eq('id', id);
 
     if (upd.error) {
