@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import type { Database } from '@/lib/types';
 import crypto from 'crypto';
 
 export async function POST(req: NextRequest){
@@ -38,8 +39,8 @@ export async function POST(req: NextRequest){
       userId = u?.user?.id || null;
     }
 
-    // cria registro do documento
-    const { error: errDoc } = await supabaseAdmin.from('documents').insert({
+    // cria registro do documento (payload tipado)
+    const insertPayload = {
       id,
       user_id: userId,
       original_pdf_name,
@@ -49,8 +50,12 @@ export async function POST(req: NextRequest){
       expires_at: new Date(Date.now()+7*24*3600*1000).toISOString(),
       signed_pdf_url: null,
       qr_code_url: null,
-      ip_hash
-    });
+      ip_hash,
+    } satisfies Database['public']['Tables']['documents']['Insert'];
+
+    const { error: errDoc } = await supabaseAdmin
+      .from('documents')
+      .insert(insertPayload as never);
     if (errDoc) throw errDoc;
 
     // salva arquivos no Storage (bucket: 'signflow')
