@@ -1,9 +1,10 @@
 'use client'
-/* Editor FINAL (sem CDNs, login obrigatório p/ salvar):
+/* Editor FINAL (login obrigatório p/ salvar):
    - Prévia com <object> (nativo do navegador)
    - Assinatura em canvas (pointer events)
    - Clique para posicionar assinatura + QR (aplica em TODAS as páginas)
-   - Gera QR (qrcode) -> assina (pdf-lib) -> salva no Supabase -> /validate/{id}
+   - Gera QR (qrcode) -> assina (pdf-lib) -> SALVA no Supabase (agora enviando original_pdf_name)
+   - Redireciona para /validate/{id}
 */
 
 import { useEffect, useRef, useState } from 'react'
@@ -95,7 +96,7 @@ export default function EditorPage() {
     setDrewSomething(false)
   }
 
-  // Seleção e prévia do PDF (sem dependências)
+  // Seleção e prévia do PDF
   const onPdfChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] || null
     setPdfFile(f)
@@ -163,7 +164,7 @@ export default function EditorPage() {
     try {
       setBusy(true); setInfo(null)
 
-      // 0) Exige login (evita RLS bloquear INSERT/Storage)
+      // 0) Exige login
       const { data: sessionData, error: sessionErr } = await supabase.auth.getSession()
       if (sessionErr) { setInfo('Não consegui validar sua sessão. Entre novamente.'); return }
       if (!sessionData?.session) {
@@ -172,12 +173,18 @@ export default function EditorPage() {
         return
       }
 
-      if (!pdfBytes) { setInfo('Envie um PDF primeiro.'); return }
+      if (!pdfBytes || !pdfFile) { setInfo('Envie um PDF primeiro.'); return }
       if (!drewSomething) { setInfo('Desenhe sua assinatura no quadro.'); return }
 
       // 1) Cria registro rascunho e pega id
+      //    👇 **CORREÇÃO**: enviar também original_pdf_name (NOT NULL no seu schema)
+      const originalName = pdfFile.name || 'upload.pdf'
       const { data: inserted, error: insErr } = await supabase
-        .from('documents').insert({ status: 'draft' }).select('id').single()
+        .from('documents')
+        .insert({ status: 'draft', original_pdf_name: originalName })
+        .select('id')
+        .single()
+
       if (insErr || !inserted?.id) {
         console.error('SUPABASE INSERT ERROR:', insErr)
         setInfo('Erro ao criar registro: ' + (insErr?.message ?? 'desconhecido'))
