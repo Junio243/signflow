@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import 'pdfjs-dist/web/pdf_viewer.css';
 
+if (typeof window !== 'undefined') {
+  (pdfjsLib as any).GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs`;
+}
+
 type Pos = { page: number; nx: number; ny: number; scale: number; rotation: number };
 
 type Props = {
@@ -60,8 +64,6 @@ export default function PdfEditor({
           const uint8 = new Uint8Array(ab);
           task = (pdfjsLib as any).getDocument({
             data: uint8,
-            disableWorker: true,
-            useWorkerFetch: false,
           });
           const doc = await task.promise;
           if (cancelled) {
@@ -83,8 +85,6 @@ export default function PdfEditor({
           blobUrl = URL.createObjectURL(file);
           task = (pdfjsLib as any).getDocument({
             url: blobUrl,
-            disableWorker: true,
-            useWorkerFetch: false,
           });
           const doc = await task.promise;
           if (cancelled) {
