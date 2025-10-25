@@ -3,7 +3,8 @@
    - Prévia com <object> (nativo do navegador)
    - Assinatura em canvas (pointer events)
    - Clique para posicionar assinatura + QR (aplica em TODAS as páginas)
-   - Gera QR (qrcode) -> assina (pdf-lib) -> SALVA no Supabase (agora enviando original_pdf_name)
+   - Gera QR (qrcode) -> assina (pdf-lib) -> SALVA no Supabase
+   - Envia original_pdf_name e expires_at (30 dias) no INSERT
    - Redireciona para /validate/{id}
 */
 
@@ -177,11 +178,13 @@ export default function EditorPage() {
       if (!drewSomething) { setInfo('Desenhe sua assinatura no quadro.'); return }
 
       // 1) Cria registro rascunho e pega id
-      //    👇 **CORREÇÃO**: enviar também original_pdf_name (NOT NULL no seu schema)
       const originalName = pdfFile.name || 'upload.pdf'
+      // 👉 expires_at em 30 dias; formato 'YYYY-MM-DD' (serve para date ou timestamptz)
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
       const { data: inserted, error: insErr } = await supabase
         .from('documents')
-        .insert({ status: 'draft', original_pdf_name: originalName })
+        .insert({ status: 'draft', original_pdf_name: originalName, expires_at: expiresAt })
         .select('id')
         .single()
 
