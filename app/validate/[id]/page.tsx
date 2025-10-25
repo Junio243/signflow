@@ -56,7 +56,7 @@ export default function ValidatePage() {
   const color = snap.color || '#2563eb'
   const issuer = snap.issuer || 'Instituição/Profissional'
   const reg = snap.reg || 'Registro'
-  const footer = snap.footer || 'Documento assinado digitalmente via SignFlow.'
+  const footer = snap.footer || ''
   const logo = snap.logo_url || null
   const st = (doc.status || '').toLowerCase()
   const isCanceled = st === 'canceled'
