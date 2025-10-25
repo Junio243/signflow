@@ -1,26 +1,20 @@
 // app/layout.tsx
 import './globals.css';
 import Link from 'next/link';
-
-export const metadata = {
-  title: 'SignFlow — Assine PDFs em minutos',
-  description: 'Assinatura visual com QR e validação pública.',
-};
-
-export const revalidate = 0;           // sem cache
-export const dynamic = 'force-dynamic';
+import HeaderClient from '@/components/HeaderClient'; // <--- adicione
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
       <body className="min-h-screen bg-gradient-to-b from-slate-50 to-white text-slate-900">
-        <Header />
+        <HeaderClient />   {/* <-- usar o cabeçalho client-side */}
         <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
         <Footer />
       </body>
     </html>
   );
 }
+
 
 function Header() {
   return (
