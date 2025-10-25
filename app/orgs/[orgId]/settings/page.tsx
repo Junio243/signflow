@@ -124,16 +124,28 @@ export default function OrgSettings({ params }: { params: { orgId: string } }) {
     // simple UI to invite current user as admin (for initial bootstrap)
     const uid = (await supabase.auth.getSession()).data?.session?.user?.id;
     if (!uid) return setInfo('Faça login.');
-    const { error } = await supabase.rpc('add_org_member', { p_org => orgId, p_user => uid, p_role => 'admin' } as any).catch(e=>({ error: e }));
-    // If RPC not allowed, fallback:
-    if ((error as any)?.message) {
-      console.warn('rpc fallback', error);
-      // fallback upsert
-      const { error: iErr } = await supabase.from('organization_members').upsert({ org_id: orgId, user_id: uid, role: 'admin' });
-      if (iErr) setInfo('Erro ao criar membro: ' + iErr.message);
-      else setInfo('Você foi adicionado como admin.');
-    } else {
-      setInfo('Você foi adicionado como admin.');
+    setBusy(true); setInfo(null);
+    try {
+      // try RPC first
+      const { error } = await supabase.rpc('add_org_member', { p_org: orgId, p_user: uid, p_role: 'admin' });
+      if (error) {
+        // fallback upsert
+        const { error: iErr } = await supabase.from('organization_members').upsert({ org_id: orgId, user_id: uid, role: 'admin' });
+        if (iErr) {
+          setInfo('Erro ao criar membro: ' + iErr.message);
+        } else {
+          setInfo('Você foi adicionado como admin.');
+          setIsAdmin(true);
+        }
+      } else {
+        setInfo('Você foi adicionado como admin.');
+        setIsAdmin(true);
+      }
+    } catch (e:any) {
+      console.error(e);
+      setInfo('Erro ao criar membro: ' + (e?.message ?? 'desconhecido'));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -193,7 +205,7 @@ export default function OrgSettings({ params }: { params: { orgId: string } }) {
         <div>
           <label>Rodapé (template)</label>
           <textarea value={footerTemplate} onChange={e=>setFooterTemplate(e.target.value)} disabled={!isAdmin} style={{ width:'100%', minHeight:120, padding:8, border:'1px solid #e5e7eb', borderRadius:8 }} />
-          <div style={{ fontSize:13, color:'#6b7280', marginTop:6 }}>Use placeholders como <code>{{name}}</code>, <code>{{org}}</code>, <code>{{dpo_contact}}</code>.</div>
+          <div style={{ fontSize:13, color:'#6b7280', marginTop:6 }}>Use placeholders como <code>{'{{name}}'}</code>, <code>{'{{org}}'}</code>, <code>{'{{dpo_contact}}'}</code>.</div>
         </div>
 
         <div>
