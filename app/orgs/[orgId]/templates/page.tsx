@@ -85,7 +85,6 @@ export default function OrgTemplates({ params }: { params: { orgId: string } }) 
     setBusy(true); setInfo(null);
     try {
       // delete storage
-      // storage path is stored? we used storage_path; attempt delete if present
       const { data: rows } = await supabase.from('templates').select('storage_path').eq('id', t.id).single();
       const path = (rows as any)?.storage_path;
       if (path) {
@@ -115,7 +114,7 @@ export default function OrgTemplates({ params }: { params: { orgId: string } }) 
         <div style={{ display:'grid', gap:8 }}>
           <input ref={nameRef} placeholder="Nome do template" style={{ padding:8, border:'1px solid #e5e7eb', borderRadius:8 }} />
           <input type="file" accept="application/pdf" ref={fileRef} />
-          <label>Placeholders (JSON) — ex: [{"name":"nome","label":"Nome"}]</label>
+          <label>Placeholders (JSON) — ex: {'[{"name":"nome","label":"Nome"}]'}</label>
           <textarea ref={placeholdersRef} defaultValue={'[]'} style={{ minHeight:120, padding:8, border:'1px solid #e5e7eb', borderRadius:8 }} />
           <div>
             <button onClick={handleUpload} disabled={busy} style={{ padding:'8px 12px', borderRadius:8, background:'#2563eb', color:'#fff' }}>{busy ? 'Enviando…' : 'Criar template'}</button>
