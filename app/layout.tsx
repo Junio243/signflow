@@ -44,7 +44,7 @@ function Footer() {
   return (
     <footer className="border-t mt-16">
       <div className="mx-auto max-w-6xl px-4 py-8 text-xs text-slate-500">
-        © {new Date().getFullYear()} SignFlow — Brasília/DF • Uso informativo (não substitui ICP-Brasil).
+        © {new Date().getFullYear()} SignFlow — Brasília/DF
       </div>
     </footer>
   );
