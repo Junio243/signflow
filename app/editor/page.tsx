@@ -1,13 +1,5 @@
+// app/editor/page.tsx
 'use client'
-
-/* Editor bonito com:
-   - Layout em cards, ícones inline (sem libs)
-   - Assinatura: desenhar OU importar PNG/JPG
-   - Sliders: tamanho da assinatura e do QR
-   - Clique na prévia para posicionar (aplica em TODAS as páginas)
-   - Perfis de validação (Médico/Faculdade/Genérico) -> salva snapshot no documento
-   - Gera QR, assina com pdf-lib, salva no Storage, atualiza record e redireciona
-*/
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -59,6 +51,10 @@ export default function EditorPage() {
   const [busy, setBusy] = useState(false)
   const [info, setInfo] = useState<string | null>(null)
 
+  // ====== NOVOS: guardar traços do desenho para não sumirem ======
+  const strokesRef = useRef<Array<Array<{x:number,y:number}>>>([]);
+  const currentStrokeRef = useRef<Array<{x:number,y:number}> | null>(null);
+
   // ====== UI helper ======
   const Card: React.FC<React.PropsWithChildren<{title?: string; right?: React.ReactNode}>> = ({ title, right, children }) => (
     <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, padding:16, boxShadow:'0 1px 2px rgba(0,0,0,.03)' }}>
@@ -69,6 +65,20 @@ export default function EditorPage() {
       {children}
     </div>
   )
+
+  // estilo para destacar botões
+  const buttonStyle: React.CSSProperties = {
+    display:'inline-flex',
+    alignItems:'center',
+    gap:6,
+    padding:'8px 12px',
+    border:'1px solid #e5e7eb',
+    borderRadius:8,
+    background:'#2563eb',
+    color:'#fff',
+    cursor:'pointer',
+    boxShadow:'0 1px 1px rgba(0,0,0,.03)'
+  };
 
   // ====== Canvas assinatura (draw) ======
   useEffect(() => {
@@ -89,6 +99,18 @@ export default function EditorPage() {
       ctx.lineJoin = 'round'
       ctx.lineWidth = 2
       ctx.strokeStyle = '#111'
+
+      // redesenha traços salvos (em CSS pixels)
+      strokesRef.current.forEach(stroke=>{
+        if (!stroke || stroke.length === 0) return;
+        ctx.beginPath();
+        ctx.moveTo(stroke[0].x, stroke[0].y);
+        for (let i=1;i<stroke.length;i++){
+          const p = stroke[i];
+          ctx.lineTo(p.x,p.y);
+        }
+        ctx.stroke();
+      });
     }
     resize()
     window.addEventListener('resize', resize)
@@ -96,29 +118,45 @@ export default function EditorPage() {
   }, [])
 
   const ctx = () => signCanvasRef.current!.getContext('2d')!
+
+  // ====== NOVAS funções de desenho (persistem traços) ======
   const onPD = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    setDrawing(true)
-    const r = (e.target as HTMLCanvasElement).getBoundingClientRect()
-    ctx().beginPath()
-    ctx().moveTo(e.clientX - r.left, e.clientY - r.top)
-    ;(e.target as HTMLCanvasElement).setPointerCapture(e.pointerId)
+    setDrawing(true);
+    const r = (e.target as HTMLCanvasElement).getBoundingClientRect();
+    const startX = e.clientX - r.left;
+    const startY = e.clientY - r.top;
+    ctx().beginPath();
+    ctx().moveTo(startX, startY);
+    (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
+    currentStrokeRef.current = [{x:startX, y:startY}];
   }
+
   const onPM = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!drawing) return
-    setDrewSomething(true)
-    const r = (e.target as HTMLCanvasElement).getBoundingClientRect()
-    ctx().lineTo(e.clientX - r.left, e.clientY - r.top)
-    ctx().stroke()
+    if (!drawing || !currentStrokeRef.current) return;
+    setDrewSomething(true);
+    const r = (e.target as HTMLCanvasElement).getBoundingClientRect();
+    const x = e.clientX - r.left;
+    const y = e.clientY - r.top;
+    currentStrokeRef.current.push({x,y});
+    ctx().lineTo(x, y);
+    ctx().stroke();
   }
+
   const onPU = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    setDrawing(false)
-    ;(e.target as HTMLCanvasElement).releasePointerCapture(e.pointerId)
+    setDrawing(false);
+    (e.target as HTMLCanvasElement).releasePointerCapture(e.pointerId);
+    if (currentStrokeRef.current && currentStrokeRef.current.length) {
+      strokesRef.current.push(currentStrokeRef.current);
+      currentStrokeRef.current = null;
+    }
   }
+
   const clearSignature = () => {
     if (sigMode === 'draw') {
       const cvs = signCanvasRef.current!
       const c = cvs.getContext('2d')!
       c.clearRect(0, 0, cvs.width, cvs.height)
+      strokesRef.current = [];
       setDrewSomething(false)
     } else {
       setSigImgFile(null)
@@ -302,7 +340,8 @@ export default function EditorPage() {
           >
             {pdfUrl ? (
               <>
-                <object data={pdfUrl} type="application/pdf" width="100%" height="100%"></object>
+                {/* garantir que o object não capture eventos */}
+                <object data={pdfUrl} type="application/pdf" width="100%" height="100%" style={{ pointerEvents: 'none' }}></object>
                 <div onClick={onPreviewClick} title="Clique para escolher a posição" style={{ position:'absolute', inset:0, cursor:'crosshair' }} />
                 <Marker />
               </>
@@ -336,7 +375,7 @@ export default function EditorPage() {
                   style={{ width:'100%', height:180, border:'1px dashed #94a3b8', borderRadius:8, background:'#fff', touchAction:'none' }}
                 />
                 <div style={{ marginTop: 8 }}>
-                  <button onClick={clearSignature} disabled={busy}>Limpar</button>
+                  <button onClick={clearSignature} disabled={busy} style={{...buttonStyle, background:'#fff', color:'#111', border:'1px solid #e5e7eb'}}>Limpar</button>
                 </div>
               </>
             ) : (
@@ -355,7 +394,7 @@ export default function EditorPage() {
                   </div>
                 )}
                 <div style={{ marginTop:8 }}>
-                  <button onClick={clearSignature} disabled={busy}>Remover imagem</button>
+                  <button onClick={clearSignature} disabled={busy} style={{...buttonStyle, background:'#fff', color:'#111', border:'1px solid #e5e7eb'}}>Remover imagem</button>
                 </div>
               </>
             )}
@@ -385,10 +424,10 @@ export default function EditorPage() {
 
           <Card>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              <button onClick={assinarESalvar} disabled={busy || !pdfBytes || (sigMode==='draw' && !drewSomething) || (sigMode==='upload' && !sigImgFile)}>
+              <button onClick={assinarESalvar} disabled={busy || !pdfBytes || (sigMode==='draw' && !drewSomething) || (sigMode==='upload' && !sigImgFile)} style={buttonStyle}>
                 <span style={{ display:'inline-flex', gap:6, alignItems:'center' }}><IconSave /> {busy ? 'Processando…' : 'Assinar & Salvar'}</span>
               </button>
-              <button onClick={()=>router.push('/dashboard')} disabled={busy}>Voltar à Dashboard</button>
+              <button onClick={()=>router.push('/dashboard')} disabled={busy} style={{...buttonStyle, background:'#fff', color:'#111', border:'1px solid #e5e7eb'}}>Voltar à Dashboard</button>
             </div>
             {info && <p style={{ marginTop: 8 }}>{info}</p>}
           </Card>
