@@ -1,68 +1,44 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { supabase } from '@/lib/supabaseClient'
 
-export default function AuthCallback() {
-  const router = useRouter();
-  const search = useSearchParams();
-  const [msg, setMsg] = useState('Autenticando…');
+export default function AuthCallbackPage() {
+  const router = useRouter()
+  const sp = useSearchParams()
+  const code = sp.get('code')
+  const next = sp.get('next') || '/dashboard'
+  const error = sp.get('error_description')
+  const [msg, setMsg] = useState('Finalizando login…')
 
   useEffect(() => {
     const run = async () => {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-
-      // 1) Fluxo PKCE (code)
-      const code = search.get('code');
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!error) {
-          setMsg('Tudo certo! Redirecionando…');
-          router.replace('/dashboard');
-          return;
-        }
+      if (error) {
+        setMsg('Erro ao autenticar: ' + error)
+        return
       }
-
-      // 2) Fluxo magic link (token_hash)
-      const token_hash =
-        search.get('token_hash') ||
-        search.get('token') ||
-        search.get('verification_token') ||
-        undefined;
-
-      const typeParam = search.get('type');
-      const type =
-        (typeParam as 'magiclink' | 'signup' | 'recovery' | 'invite' | null) ??
-        'magiclink';
-
-      if (token_hash) {
-        const { error } = await supabase.auth.verifyOtp({ token_hash, type });
-        if (!error) {
-          setMsg('Tudo certo! Redirecionando…');
-          router.replace('/dashboard');
-          return;
-        }
+      if (!code) {
+        setMsg('Código ausente na URL. Abra o link enviado novamente.')
+        return
       }
-
-      setMsg('Link inválido ou expirado. Peça um novo no login.');
-    };
-
-    run();
-  }, [router, search]);
+      const { error: exErr } = await supabase.auth.exchangeCodeForSession({ code })
+      if (exErr) {
+        setMsg('Falha ao concluir o login: ' + exErr.message)
+        return
+      }
+      router.replace(next)
+    }
+    run()
+  }, [code, error, next, router])
 
   return (
-    <div className="max-w-xl mx-auto py-24">
-      <h1 className="text-2xl font-semibold mb-2">Autenticando…</h1>
-      <p className="text-slate-600">{msg}</p>
-      {msg.startsWith('Link inválido') && (
-        <a className="text-indigo-600 underline mt-4 inline-block" href="/login">
-          Voltar para o login
-        </a>
-      )}
+    <div style={{ maxWidth: 520, margin: '24px auto', padding: 16 }}>
+      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Entrando…</h1>
+      <p>{msg}</p>
+      <p style={{ fontSize: 12, color: '#6b7280' }}>
+        Se isso demorar, feche e clique no link do e-mail novamente. Verifique também se o domínio do e-mail é o mesmo do site.
+      </p>
     </div>
-  );
+  )
 }
