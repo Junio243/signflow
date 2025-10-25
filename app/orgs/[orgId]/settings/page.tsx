@@ -1,227 +1,208 @@
-// app/orgs/[orgId]/settings/page.tsx
+// app/orgs/[orgId]/templates/page.tsx
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import { useRouter } from 'next/navigation';
 
-type OrgRow = {
+type TemplateRow = {
   id: string;
   name: string;
-  slug?: string;
-  logo_url?: string;
-  primary_color?: string;
-  secondary_color?: string;
-  footer_template?: string;
-  dpo_contact?: string;
-  address?: string;
+  file_url?: string;
+  placeholders?: any;
+  storage_path?: string | null;
+  created_at?: string;
 };
 
-export default function OrgSettings({ params }: { params: { orgId: string } }) {
+export default function OrgTemplates({ params }: { params: { orgId: string } }) {
   const orgId = params.orgId;
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [org, setOrg] = useState<OrgRow | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [info, setInfo] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
 
-  // form fields
-  const [name, setName] = useState('');
-  const [slug, setSlug] = useState('');
-  const [primaryColor, setPrimaryColor] = useState('#2563eb');
-  const [secondaryColor, setSecondaryColor] = useState('#111827');
-  const [footerTemplate, setFooterTemplate] = useState('');
-  const [dpoContact, setDpoContact] = useState('');
-  const [address, setAddress] = useState('Brasília/DF — Plano Piloto');
-
-  // logo upload
+  const nameRef = useRef<HTMLInputElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const placeholdersRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const placeholdersExample = '[{"name":"nome","label":"Nome"}]';
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const { data: orgData, error: orgErr } = await supabase
-          .from('organizations')
+        const { data } = await supabase
+          .from('templates')
           .select('*')
-          .eq('id', orgId)
-          .single();
-        if (orgErr) {
-          setInfo('Organização não encontrada ou sem permissão.');
-          setLoading(false);
-          return;
-        }
-        setOrg(orgData);
-        setName(orgData.name || '');
-        setSlug(orgData.slug || '');
-        setPrimaryColor(orgData.primary_color || '#2563eb');
-        setSecondaryColor(orgData.secondary_color || '#111827');
-        setFooterTemplate(orgData.footer_template || '');
-        setDpoContact(orgData.dpo_contact || '');
-        setAddress(orgData.address || 'Brasília/DF — Plano Piloto');
-
-        // check membership role
-        const { data: members } = await supabase
-          .from('organization_members')
-          .select('role')
           .eq('org_id', orgId)
-          .eq('user_id', (await supabase.auth.getSession()).data?.session?.user?.id)
-          .single();
-        setIsAdmin(Boolean(members && (members as any).role === 'admin'));
+          .order('created_at', { ascending: false });
+        setTemplates((data || []) as TemplateRow[]);
       } catch (e) {
         console.error(e);
-        setInfo('Erro ao carregar organização.');
+        setInfo('Erro ao carregar templates.');
       } finally {
         setLoading(false);
       }
     })();
   }, [orgId]);
 
-  async function uploadLogo(file: File) {
-    if (!file) return;
-    setBusy(true); setInfo(null);
+  async function handleUpload() {
+    const name = nameRef.current?.value?.trim() || '';
+    const file = fileRef.current?.files?.[0] || null;
+    const placeholdersTxt = placeholdersRef.current?.value || '[]';
+    if (!name) {
+      setInfo('Informe o nome do template.');
+      return;
+    }
+    if (!file) {
+      setInfo('Selecione um arquivo PDF.');
+      return;
+    }
+
+    setBusy(true);
+    setInfo(null);
+
     try {
-      const path = `${orgId}/logo-${Date.now()}-${file.name.replace(/\s+/g,'-')}`;
-      const { error: upErr } = await supabase.storage.from('signflow-logos').upload(path, file, { upsert: true });
+      const safeName = name.replace(/\s+/g, '-').toLowerCase();
+      const path = `${orgId}/${Date.now()}-${safeName}.pdf`;
+
+      const { error: upErr } = await supabase.storage
+        .from('signflow-templates')
+        .upload(path, file, { upsert: true });
+
       if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from('signflow-logos').getPublicUrl(path);
+
+      const { data: pub } = supabase.storage.from('signflow-templates').getPublicUrl(path);
       const fileUrl = pub?.publicUrl ?? null;
-      // update organization
-      const { error: upd } = await supabase.from('organizations').update({ logo_url: fileUrl }).eq('id', orgId);
-      if (upd) throw upd;
-      setOrg({...org!, logo_url: fileUrl});
-      setInfo('Logo atualizado.');
-    } catch (err:any) {
-      console.error(err);
-      setInfo('Erro ao enviar logo: ' + (err?.message ?? 'desconhecido'));
-    } finally {
-      setBusy(false);
-    }
-  }
 
-  async function handleSaveOrg() {
-    if (!isAdmin) return setInfo('Apenas administradores podem editar.');
-    setBusy(true); setInfo(null);
-    try {
-      const payload = {
-        name, slug, primary_color: primaryColor, secondary_color: secondaryColor,
-        footer_template: footerTemplate, dpo_contact: dpoContact, address
-      };
-      const { error } = await supabase.from('organizations').update(payload).eq('id', orgId);
-      if (error) throw error;
-      setInfo('Organização salva.');
-      router.refresh();
-    } catch (e:any) {
-      console.error(e);
-      setInfo('Erro ao salvar: ' + (e?.message ?? 'desconhecido'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleCreateMember() {
-    // simple UI to invite current user as admin (for initial bootstrap)
-    const uid = (await supabase.auth.getSession()).data?.session?.user?.id;
-    if (!uid) return setInfo('Faça login.');
-    setBusy(true); setInfo(null);
-    try {
-      // try RPC first
-      const { error } = await supabase.rpc('add_org_member', { p_org: orgId, p_user: uid, p_role: 'admin' });
-      if (error) {
-        // fallback upsert
-        const { error: iErr } = await supabase.from('organization_members').upsert({ org_id: orgId, user_id: uid, role: 'admin' });
-        if (iErr) {
-          setInfo('Erro ao criar membro: ' + iErr.message);
-        } else {
-          setInfo('Você foi adicionado como admin.');
-          setIsAdmin(true);
-        }
-      } else {
-        setInfo('Você foi adicionado como admin.');
-        setIsAdmin(true);
+      // parse placeholders JSON safely
+      let placeholders = [];
+      try {
+        placeholders = JSON.parse(placeholdersTxt);
+        if (!Array.isArray(placeholders)) placeholders = [];
+      } catch (err) {
+        placeholders = [];
       }
-    } catch (e:any) {
-      console.error(e);
-      setInfo('Erro ao criar membro: ' + (e?.message ?? 'desconhecido'));
+
+      const createdBy = (await supabase.auth.getSession()).data?.session?.user?.id ?? null;
+
+      const { data: ins, error: insErr } = await supabase
+        .from('templates')
+        .insert({
+          org_id: orgId,
+          name,
+          storage_path: path,
+          file_url: fileUrl,
+          placeholders,
+          created_by: createdBy
+        })
+        .select()
+        .single();
+
+      if (insErr) throw insErr;
+
+      setTemplates(prev => [ins as TemplateRow, ...prev]);
+      setInfo('Template criado.');
+      if (fileRef.current) fileRef.current.value = '';
+      if (nameRef.current) nameRef.current.value = '';
+      if (placeholdersRef.current) placeholdersRef.current.value = '[]';
+    } catch (err: any) {
+      console.error(err);
+      setInfo('Erro ao criar template: ' + (err?.message ?? 'desconhecido'));
     } finally {
       setBusy(false);
     }
   }
 
-  if (loading) return <p style={{ padding: 16 }}>Carregando…</p>;
-  if (!org) return <p style={{ padding: 16 }}>Organização não encontrada.</p>;
+  async function handleDelete(t: TemplateRow) {
+    if (!confirm('Remover template?')) return;
+    setBusy(true);
+    setInfo(null);
+    try {
+      // attempt to remove storage object if we have storage_path
+      if (t.storage_path) {
+        const { error: delErr } = await supabase.storage.from('signflow-templates').remove([t.storage_path]);
+        if (delErr) console.warn('Erro ao remover arquivo do storage:', delErr);
+      }
+      const { error } = await supabase.from('templates').delete().eq('id', t.id);
+      if (error) throw error;
+      setTemplates(prev => prev.filter(x => x.id !== t.id));
+      setInfo('Template removido.');
+    } catch (err: any) {
+      console.error(err);
+      setInfo('Erro ao remover: ' + (err?.message ?? 'desconhecido'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) {
+    return <p style={{ padding: 16 }}>Carregando…</p>;
+  }
 
   return (
     <div style={{ maxWidth: 980, margin: '24px auto', padding: 16 }}>
-      <h1 style={{ fontSize: 22, marginBottom: 8 }}>Configurações da organização</h1>
+      <h1 style={{ fontSize: 22 }}>Templates da organização</h1>
 
-      {!isAdmin && (
-        <div style={{ padding: 12, border: '1px solid #f3f4f6', borderRadius:8, marginBottom:12 }}>
-          <div style={{ fontWeight:600 }}>Atenção</div>
-          <div>Você não é administrador desta organização. As configurações são somente leitura.</div>
-        </div>
-      )}
-
-      <section style={{ display:'grid', gap:12 }}>
-        <div style={{ display:'flex', gap:16 }}>
-          <div style={{ width:140, height:80, border:'1px solid #e5e7eb', display:'flex', alignItems:'center', justifyContent:'center', background:'#fff' }}>
-            {org.logo_url ? <img src={org.logo_url} alt="logo" style={{ maxWidth:'100%', maxHeight:'100%' }} /> : <div style={{ color:'#9ca3af' }}>Sem logo</div>}
-          </div>
-          <div style={{ flex:1 }}>
-            <label style={{ display:'block', marginBottom:6 }}>Logo (PNG/SVG)</label>
-            <input type="file" ref={fileRef} accept="image/png,image/svg+xml,image/jpeg" onChange={e=> uploadLogo(e.target.files?.[0] as File)} disabled={!isAdmin || busy} />
-            <div style={{ fontSize:13, color:'#6b7280', marginTop:6 }}>Envie a logo da organização. Recomendado PNG/SVG com fundo transparente.</div>
-          </div>
-        </div>
-
-        <div>
-          <label>Nome da organização</label>
-          <input value={name} onChange={e=>setName(e.target.value)} disabled={!isAdmin} style={{ width:'100%', padding:8, border:'1px solid #e5e7eb', borderRadius:8 }} />
-        </div>
-
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+      <section style={{ marginTop: 12, marginBottom: 20 }}>
+        <h3 style={{ marginBottom: 8 }}>Criar template</h3>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <input
+            ref={nameRef}
+            placeholder="Nome do template"
+            style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 8 }}
+          />
+          <input type="file" accept="application/pdf" ref={fileRef} />
+          <label style={{ fontSize: 13, color: '#6b7280' }}>
+            Placeholders (JSON) — ex: <span style={{ fontFamily: 'monospace' }}>{placeholdersExample}</span>
+          </label>
+          <textarea
+            ref={placeholdersRef}
+            defaultValue={'[]'}
+            style={{ minHeight: 120, padding: 8, border: '1px solid #e5e7eb', borderRadius: 8 }}
+          />
           <div>
-            <label>Slug (url)</label>
-            <input value={slug} onChange={e=>setSlug(e.target.value)} disabled={!isAdmin} style={{ width:'100%', padding:8, border:'1px solid #e5e7eb', borderRadius:8 }} />
+            <button
+              onClick={handleUpload}
+              disabled={busy}
+              style={{ padding: '8px 12px', borderRadius: 8, background: '#2563eb', color: '#fff' }}
+            >
+              {busy ? 'Enviando…' : 'Criar template'}
+            </button>
           </div>
-          <div>
-            <label>Endereço</label>
-            <input value={address} onChange={e=>setAddress(e.target.value)} disabled={!isAdmin} style={{ width:'100%', padding:8, border:'1px solid #e5e7eb', borderRadius:8 }} />
-          </div>
-        </div>
-
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-          <div>
-            <label>Cor primária</label>
-            <input type="color" value={primaryColor} onChange={e=>setPrimaryColor(e.target.value)} disabled={!isAdmin} style={{ width:80, height:40, border:'none', background:'none' }} />
-          </div>
-          <div>
-            <label>Cor secundária</label>
-            <input type="color" value={secondaryColor} onChange={e=>setSecondaryColor(e.target.value)} disabled={!isAdmin} style={{ width:80, height:40, border:'none', background:'none' }} />
-          </div>
-        </div>
-
-        <div>
-          <label>Rodapé (template)</label>
-          <textarea value={footerTemplate} onChange={e=>setFooterTemplate(e.target.value)} disabled={!isAdmin} style={{ width:'100%', minHeight:120, padding:8, border:'1px solid #e5e7eb', borderRadius:8 }} />
-          <div style={{ fontSize:13, color:'#6b7280', marginTop:6 }}>Use placeholders como <code>{'{{name}}'}</code>, <code>{'{{org}}'}</code>, <code>{'{{dpo_contact}}'}</code>.</div>
-        </div>
-
-        <div>
-          <label>Contato DPO</label>
-          <input value={dpoContact} onChange={e=>setDpoContact(e.target.value)} disabled={!isAdmin} style={{ width:'100%', padding:8, border:'1px solid #e5e7eb', borderRadius:8 }} />
-        </div>
-
-        <div>
-          <button onClick={handleSaveOrg} disabled={!isAdmin || busy} style={{ padding:'8px 12px', borderRadius:8, background:'#2563eb', color:'#fff' }}>
-            {busy ? 'Salvando…' : 'Salvar organização'}
-          </button>
-          {!isAdmin && <button onClick={handleCreateMember} style={{ marginLeft:8, padding:'6px 10px' }}>Pedir ingresso como admin</button>}
         </div>
       </section>
 
-      {info && <div style={{ marginTop:12 }}>{info}</div>}
+      <section>
+        <h3>Templates existentes</h3>
+        {templates.length === 0 && <div style={{ color: '#6b7280' }}>Nenhum template ainda.</div>}
+        <div style={{ display: 'grid', gap: 10 }}>
+          {templates.map(t => (
+            <div key={t.id} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 8, border: '1px solid #eaeaea', borderRadius: 8 }}>
+              <div style={{ width: 120, height: 80, border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: '#fff' }}>
+                {t.file_url ? (
+                  <iframe src={t.file_url} title={t.name} style={{ width: '100%', height: '100%', border: 0 }} />
+                ) : (
+                  <div style={{ color: '#9ca3af' }}>Sem preview</div>
+                )}
+              </div>
+
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600 }}>{t.name}</div>
+                <div style={{ fontSize: 13, color: '#6b7280' }}>{t.created_at ? new Date(t.created_at).toLocaleString() : ''}</div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <a href={t.file_url} target="_blank" rel="noreferrer" style={{ padding: '6px 10px', borderRadius: 8, background: '#fff', border: '1px solid #e5e7eb' }}>Abrir</a>
+                <button onClick={() => handleDelete(t)} disabled={busy} style={{ padding: '6px 10px', borderRadius: 8, background: '#fff', border: '1px solid #e5e7eb' }}>Remover</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {info && <div style={{ marginTop: 12 }}>{info}</div>}
     </div>
   );
 }
