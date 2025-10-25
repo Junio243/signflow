@@ -1,10 +1,9 @@
 'use client'
-/* Editor sem CDNs:
-   - Pré-visualização com <object> (nativo do browser)
-   - Assinatura em canvas (pointer events) sem libs externas
-   - Clique para posicionar assinatura + QR (overlay)
-   - Assina TODAS as páginas com pdf-lib
-   - Gera QR com 'qrcode', salva no Supabase e vai para /validate/{id}
+/* Editor FINAL (sem CDNs, login obrigatório p/ salvar):
+   - Prévia com <object> (nativo do navegador)
+   - Assinatura em canvas (pointer events)
+   - Clique para posicionar assinatura + QR (aplica em TODAS as páginas)
+   - Gera QR (qrcode) -> assina (pdf-lib) -> salva no Supabase -> /validate/{id}
 */
 
 import { useEffect, useRef, useState } from 'react'
@@ -12,8 +11,6 @@ import { useRouter } from 'next/navigation'
 import { PDFDocument } from 'pdf-lib'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabaseClient'
-
-type PageSize = { width: number; height: number }
 
 export default function EditorPage() {
   const router = useRouter()
@@ -26,12 +23,11 @@ export default function EditorPage() {
   // Assinatura (canvas puro)
   const signCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const [drawing, setDrawing] = useState(false)
+  const [drewSomething, setDrewSomething] = useState(false)
 
-  // Posição normalizada escolhida (0..1)
+  // Posição normalizada (0..1) escolhida na prévia
   const [normX, setNormX] = useState<number | null>(null)
   const [normY, setNormY] = useState<number | null>(null)
-
-  // Marcador visual na prévia
   const previewBoxRef = useRef<HTMLDivElement | null>(null)
 
   const [busy, setBusy] = useState(false)
@@ -64,7 +60,6 @@ export default function EditorPage() {
 
   // Desenho livre (assinatura)
   const getCanvasCtx = () => signCanvasRef.current!.getContext('2d')!
-  const canvasToPNGDataUrl = () => signCanvasRef.current!.toDataURL('image/png')
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     setDrawing(true)
@@ -79,6 +74,7 @@ export default function EditorPage() {
 
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!drawing) return
+    setDrewSomething(true)
     const rect = (e.target as HTMLCanvasElement).getBoundingClientRect()
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
@@ -96,6 +92,7 @@ export default function EditorPage() {
     const cvs = signCanvasRef.current!
     const ctx = cvs.getContext('2d')!
     ctx.clearRect(0, 0, cvs.width, cvs.height)
+    setDrewSomething(false)
   }
 
   // Seleção e prévia do PDF (sem dependências)
@@ -111,10 +108,10 @@ export default function EditorPage() {
     const url = URL.createObjectURL(f)
     setPdfUrl(url)
     setPdfBytes(await f.arrayBuffer())
-    setInfo('Clique na prévia para posicionar assinatura/QR (será aplicado em todas as páginas).')
+    setInfo('Clique na prévia para posicionar assinatura/QR (aplicado em todas as páginas).')
   }
 
-  // Clique para posição
+  // Clique para posição (overlay)
   const onPreviewClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const box = previewBoxRef.current!
     const rect = box.getBoundingClientRect()
@@ -124,7 +121,7 @@ export default function EditorPage() {
     setNormY(Math.max(0, Math.min(1, y / rect.height)))
   }
 
-  // Marcador visual (pontinho vermelho) na posição selecionada
+  // Marcador visual (pontinho vermelho) na posição escolhida
   const Marker = () => {
     if (normX === null || normY === null) return null
     return (
@@ -136,20 +133,21 @@ export default function EditorPage() {
           transform: 'translate(-50%, -50%)',
           width: 12, height: 12,
           borderRadius: 999, background: '#e11d48',
-          border: '2px solid white', boxShadow: '0 0 0 1px #e11d48'
+          border: '2px solid white', boxShadow: '0 0 0 1px #e11d48',
+          pointerEvents: 'none'
         }}
         title="Posição escolhida"
       />
     )
   }
 
-  // Util: dataURL -> Blob
+  // Util: DataURL -> Blob
   const dataUrlToBlob = async (dataUrl: string) => {
     const res = await fetch(dataUrl)
     return await res.blob()
   }
 
-  // Util: baixa local (plano B)
+  // Util: baixar local
   const baixarBlob = (blob: Blob, nome = 'documento-assinado.pdf') => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -165,28 +163,37 @@ export default function EditorPage() {
     try {
       setBusy(true); setInfo(null)
 
-      if (!pdfBytes) { setInfo('Envie um PDF primeiro.'); return }
-      // Checar se tem assinatura desenhada
-      const emptySig = signCanvasRef.current!.toDataURL() === canvasToPNGDataUrl() // truque simples
-      // (acima não detecta 100%, mas ajuda)
-      // Melhor: verificar alguns pixels — simplificando por hora
+      // 0) Exige login (evita RLS bloquear INSERT/Storage)
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession()
+      if (sessionErr) { setInfo('Não consegui validar sua sessão. Entre novamente.'); return }
+      if (!sessionData?.session) {
+        setInfo('Faça login para salvar no Signflow.')
+        window.location.href = '/login?next=/editor'
+        return
+      }
 
-      // 1) Cria registro e pega id
+      if (!pdfBytes) { setInfo('Envie um PDF primeiro.'); return }
+      if (!drewSomething) { setInfo('Desenhe sua assinatura no quadro.'); return }
+
+      // 1) Cria registro rascunho e pega id
       const { data: inserted, error: insErr } = await supabase
         .from('documents').insert({ status: 'draft' }).select('id').single()
-      if (insErr || !inserted?.id) { setInfo('Falha ao criar registro no banco.'); return }
+      if (insErr || !inserted?.id) {
+        console.error('SUPABASE INSERT ERROR:', insErr)
+        setInfo('Erro ao criar registro: ' + (insErr?.message ?? 'desconhecido'))
+        return
+      }
       const id: string = inserted.id
 
-      // 2) Gera QR -> dataURL
-      const base = typeof window !== 'undefined'
-        ? window.location.origin
-        : (process.env.NEXT_PUBLIC_SITE_URL ?? '')
+      // 2) Gera QR apontando para /validate/{id}
+      const base = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL ?? '')
       const validateUrl = `${base}/validate/${id}`
       const qrDataUrl = await QRCode.toDataURL(validateUrl, { width: 256, margin: 1 })
 
-      // 3) Monta PDF com pdf-lib
+      // 3) Monta PDF com pdf-lib (todas as páginas)
       const pdfDoc = await PDFDocument.load(pdfBytes)
-      const sigDataUrl = canvasToPNGDataUrl()
+
+      const sigDataUrl = signCanvasRef.current!.toDataURL('image/png')
       const sigPng = await pdfDoc.embedPng(await (await fetch(sigDataUrl)).arrayBuffer())
       const qrPng = await pdfDoc.embedPng(await (await fetch(qrDataUrl)).arrayBuffer())
 
@@ -199,11 +206,11 @@ export default function EditorPage() {
       pages.forEach((page: any) => {
         const { width, height } = page.getSize()
 
-        // posição default: canto inferior direito
+        // default: canto inferior direito
         let px = width - sigWidth - 36
         let py = 36
 
-        // se usuário escolheu posição, usa normalizada (origem do pdf-lib é em baixo)
+        // se usuário escolheu posição, usa (origem PDF: canto inferior esquerdo)
         if (normX !== null && normY !== null) {
           px = (normX as number) * width
           py = height - (normY as number) * height
@@ -216,7 +223,7 @@ export default function EditorPage() {
         // assinatura
         page.drawImage(sigPng, { x: px, y: py, width: sigWidth, height: sigHeight, opacity: 0.95 })
 
-        // qr à esquerda da assinatura
+        // qr à esquerda
         const qx = Math.max(12, px - qrSize - 12)
         const qy = py
         page.drawImage(qrPng, { x: qx, y: qy, width: qrSize, height: qrSize, opacity: 0.98 })
@@ -225,7 +232,7 @@ export default function EditorPage() {
       const outBytes = await pdfDoc.save()
       const outBlob = new Blob([outBytes], { type: 'application/pdf' })
 
-      // 4) Upload no Storage e update do registro
+      // 4) Upload no Storage
       const pdfPath = `${id}/signed.pdf`
       const qrPath = `${id}/qr.png`
 
@@ -242,6 +249,7 @@ export default function EditorPage() {
       const pubPdf = await supabase.storage.from('signflow').getPublicUrl(pdfPath)
       const pubQr = await supabase.storage.from('signflow').getPublicUrl(qrPath)
 
+      // 5) Update do registro e redireciona
       const { error: updErr } = await supabase
         .from('documents')
         .update({
@@ -251,7 +259,11 @@ export default function EditorPage() {
         })
         .eq('id', id)
 
-      if (updErr) { setInfo('Arquivo salvo, mas não consegui atualizar o registro.'); return }
+      if (updErr) {
+        console.error('SUPABASE UPDATE ERROR:', updErr)
+        setInfo('Arquivo salvo, mas não consegui atualizar o registro.')
+        return
+      }
 
       router.push(`/validate/${id}`)
     } catch (e) {
@@ -266,9 +278,10 @@ export default function EditorPage() {
     try {
       setBusy(true); setInfo(null)
       if (!pdfBytes) { setInfo('Envie um PDF primeiro.'); return }
+      if (!drewSomething) { setInfo('Desenhe sua assinatura no quadro.'); return }
 
       const pdfDoc = await PDFDocument.load(pdfBytes)
-      const sigDataUrl = canvasToPNGDataUrl()
+      const sigDataUrl = signCanvasRef.current!.toDataURL('image/png')
       const sigPng = await pdfDoc.embedPng(await (await fetch(sigDataUrl)).arrayBuffer())
 
       const sigWidth = 160
@@ -302,7 +315,7 @@ export default function EditorPage() {
 
   return (
     <div style={{ maxWidth: 980, margin: '24px auto', padding: 16 }}>
-      <h1 style={{ fontWeight: 700, fontSize: 22, marginBottom: 8 }}>Editor — todas as páginas + QR + Supabase (sem CDNs)</h1>
+      <h1 style={{ fontWeight: 700, fontSize: 22, marginBottom: 8 }}>Editor — todas as páginas + QR + Supabase</h1>
       <ol style={{ margin: 0, paddingLeft: 18 }}>
         <li>Envie o PDF</li>
         <li>Desenhe sua assinatura</li>
@@ -324,7 +337,7 @@ export default function EditorPage() {
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={() => setDrawing(false)}
-            style={{ width: '100%', maxWidth: 640, height: 180, border: '1px dashed #888', borderRadius: 8, background: '#fff' }}
+            style={{ width: '100%', maxWidth: 640, height: 180, border: '1px dashed #888', borderRadius: 8, background: '#fff', touchAction: 'none' }}
           />
           <div style={{ marginTop: 8 }}>
             <button onClick={clearSignature} disabled={busy}>Limpar assinatura</button>
@@ -335,15 +348,25 @@ export default function EditorPage() {
           <label><strong>3) Prévia (clique para posicionar)</strong></label><br />
           <div
             ref={previewBoxRef}
-            onClick={onPreviewClick}
-            style={{ position: 'relative', width: '100%', maxWidth: 820, height: 520, border: '1px solid #ddd', borderRadius: 8, overflow: 'hidden', cursor: 'crosshair' }}
-            title="Clique para escolher a posição"
+            style={{ position: 'relative', width: '100%', maxWidth: 820, height: 520, border: '1px solid #ddd', borderRadius: 8, overflow: 'hidden' }}
           >
             {pdfUrl ? (
               <>
-                <object data={pdfUrl} type="application/pdf" width="100%" height="100%">
+                <object
+                  data={pdfUrl}
+                  type="application/pdf"
+                  width="100%"
+                  height="100%"
+                  style={{ position: 'absolute', inset: 0 }}
+                >
                   <p style={{ padding: 12 }}>Não foi possível exibir a pré-visualização. (Você ainda pode assinar e salvar.)</p>
                 </object>
+                {/* Overlay que captura o clique por cima do <object> */}
+                <div
+                  onClick={onPreviewClick}
+                  title="Clique para escolher a posição"
+                  style={{ position: 'absolute', inset: 0, cursor: 'crosshair', background: 'transparent' }}
+                />
                 <Marker />
               </>
             ) : (
@@ -353,10 +376,10 @@ export default function EditorPage() {
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          <button onClick={assinarESalvar} disabled={busy || !pdfBytes}>
+          <button onClick={assinarESalvar} disabled={busy || !pdfBytes || !drewSomething}>
             {busy ? 'Processando…' : 'Assinar & Salvar (com QR)'}
           </button>
-          <button onClick={baixarLocal} disabled={busy || !pdfBytes}>
+          <button onClick={baixarLocal} disabled={busy || !pdfBytes || !drewSomething}>
             {busy ? 'Gerando…' : 'Apenas baixar (plano B)'}
           </button>
           <button onClick={() => router.push('/')}>Voltar</button>
