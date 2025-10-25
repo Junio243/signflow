@@ -1,12 +1,12 @@
 'use client'
 
-/* Editor com:
-   - Layout mais clean (cards)
-   - Assinatura: desenhar OU importar imagem (PNG/JPG)
-   - Slider de tamanho: assinatura e QR
-   - Posição por clique (todas as páginas)
-   - Seleção de Perfil de Validação (salvo no Supabase)
-   - Gera QR, assina com pdf-lib, salva Storage, atualiza documents e redireciona
+/* Editor bonito com:
+   - Layout em cards, ícones inline (sem libs)
+   - Assinatura: desenhar OU importar PNG/JPG
+   - Sliders: tamanho da assinatura e do QR
+   - Clique na prévia para posicionar (aplica em TODAS as páginas)
+   - Perfis de validação (Médico/Faculdade/Genérico) -> salva snapshot no documento
+   - Gera QR, assina com pdf-lib, salva no Storage, atualiza record e redireciona
 */
 
 import { useEffect, useRef, useState } from 'react'
@@ -15,7 +15,17 @@ import { PDFDocument } from 'pdf-lib'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabaseClient'
 
-type Profile = { id: string; name: string; type: string }
+type Profile = { id: string; name: string; type: 'medico'|'faculdade'|'generico'; theme: any }
+
+const IconUpload = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0l-4 4m4-4l4 4M6 20h12" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+)
+const IconDraw = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M16 3l5 5L8 21H3v-5L16 3z" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+)
+const IconSave = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M19 21H5a2 2 0 01-2-2V5h13l3 3v11a2 2 0 01-2 2z" stroke="#111" strokeWidth="2"/><path d="M7 3v6h8V3" stroke="#111" strokeWidth="2"/></svg>
+)
 
 export default function EditorPage() {
   const router = useRouter()
@@ -35,25 +45,25 @@ export default function EditorPage() {
 
   // Tamanhos
   const [sigWidth, setSigWidth] = useState<number>(180) // px
-  const [qrSize, setQrSize] = useState<number>(110) // px
+  const [qrSize, setQrSize] = useState<number>(120) // px
 
   // Posição normalizada 0..1
   const [normX, setNormX] = useState<number | null>(null)
   const [normY, setNormY] = useState<number | null>(null)
-  const previewBoxRef = useRef<HTMLDivElement | null>(null)
+  const previewRef = useRef<HTMLDivElement | null>(null)
 
-  // Perfis de validação
+  // Perfis (com theme)
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [profileId, setProfileId] = useState<string | null>(null)
 
   const [busy, setBusy] = useState(false)
   const [info, setInfo] = useState<string | null>(null)
 
-  // ====== UI helpers ======
+  // ====== UI helper ======
   const Card: React.FC<React.PropsWithChildren<{title?: string; right?: React.ReactNode}>> = ({ title, right, children }) => (
-    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,.03)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: title ? 12 : 0 }}>
-        {title && <h2 style={{ margin: 0, fontSize: 16 }}>{title}</h2>}
+    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, padding:16, boxShadow:'0 1px 2px rgba(0,0,0,.03)' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: title ? 12 : 0 }}>
+        {title && <h2 style={{ margin:0, fontSize:16 }}>{title}</h2>}
         {right}
       </div>
       {children}
@@ -85,20 +95,20 @@ export default function EditorPage() {
     return () => window.removeEventListener('resize', resize)
   }, [])
 
-  const getCtx = () => signCanvasRef.current!.getContext('2d')!
+  const ctx = () => signCanvasRef.current!.getContext('2d')!
   const onPD = (e: React.PointerEvent<HTMLCanvasElement>) => {
     setDrawing(true)
     const r = (e.target as HTMLCanvasElement).getBoundingClientRect()
-    getCtx().beginPath()
-    getCtx().moveTo(e.clientX - r.left, e.clientY - r.top)
+    ctx().beginPath()
+    ctx().moveTo(e.clientX - r.left, e.clientY - r.top)
     ;(e.target as HTMLCanvasElement).setPointerCapture(e.pointerId)
   }
   const onPM = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!drawing) return
     setDrewSomething(true)
     const r = (e.target as HTMLCanvasElement).getBoundingClientRect()
-    getCtx().lineTo(e.clientX - r.left, e.clientY - r.top)
-    getCtx().stroke()
+    ctx().lineTo(e.clientX - r.left, e.clientY - r.top)
+    ctx().stroke()
   }
   const onPU = (e: React.PointerEvent<HTMLCanvasElement>) => {
     setDrawing(false)
@@ -107,8 +117,8 @@ export default function EditorPage() {
   const clearSignature = () => {
     if (sigMode === 'draw') {
       const cvs = signCanvasRef.current!
-      const ctx = cvs.getContext('2d')!
-      ctx.clearRect(0, 0, cvs.width, cvs.height)
+      const c = cvs.getContext('2d')!
+      c.clearRect(0, 0, cvs.width, cvs.height)
       setDrewSomething(false)
     } else {
       setSigImgFile(null)
@@ -124,10 +134,10 @@ export default function EditorPage() {
     if (!f) { setPdfUrl(null); setPdfBytes(null); return }
     setPdfUrl(URL.createObjectURL(f))
     setPdfBytes(await f.arrayBuffer())
-    setInfo('Clique na prévia para posicionar (assina todas as páginas).')
+    setInfo('Clique na prévia para posicionar assinatura/QR (aplica em todas as páginas).')
   }
   const onPreviewClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const box = previewBoxRef.current!
+    const box = previewRef.current!
     const r = box.getBoundingClientRect()
     setNormX(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)))
     setNormY(Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)))
@@ -140,18 +150,17 @@ export default function EditorPage() {
     }}/>
   )
 
-  // ====== Perfis de validação ======
+  // ====== Perfis (com theme) ======
   useEffect(() => {
-    const load = async () => {
+    (async () => {
       const s = await supabase.auth.getSession()
       if (!s.data?.session) return
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('validation_profiles')
-        .select('id, name, type')
+        .select('id, name, type, theme')
         .order('created_at', { ascending: false })
-      if (!error) setProfiles(data || [])
-    }
-    load()
+      setProfiles((data || []) as Profile[])
+    })()
   }, [])
 
   // ====== Utils ======
@@ -172,7 +181,6 @@ export default function EditorPage() {
       // valida assinatura
       let signatureBytes: ArrayBuffer | null = null
       if (sigMode === 'draw') {
-        // precisa ter algo desenhado
         if (!drewSomething) { setInfo('Desenhe sua assinatura.'); return }
         signatureBytes = await fetch(canvasToDataURL()).then(r=>r.arrayBuffer())
       } else {
@@ -180,13 +188,26 @@ export default function EditorPage() {
         signatureBytes = await sigImgFile.arrayBuffer()
       }
 
-      // cria rascunho no banco (inclui nome + expiração)
+      // perfil e snapshot (para a página de validação mostrar sem depender de SELECT público em profiles)
+      let themeSnapshot: any = null
+      if (profileId) {
+        const p = profiles.find(x => x.id === profileId)
+        if (p?.theme) themeSnapshot = p.theme
+      }
+
+      // cria rascunho
       const originalName = pdfFile.name || 'upload.pdf'
       const expiresAt = new Date(Date.now() + 30*24*60*60*1000).toISOString().slice(0,10)
 
       const { data: inserted, error: insErr } = await supabase
         .from('documents')
-        .insert({ status:'draft', original_pdf_name: originalName, expires_at: expiresAt, validation_profile_id: profileId })
+        .insert({
+          status:'draft',
+          original_pdf_name: originalName,
+          expires_at: expiresAt,
+          validation_profile_id: profileId,
+          validation_theme_snapshot: themeSnapshot
+        })
         .select('id')
         .single()
       if (insErr || !inserted?.id) { setInfo('Erro ao criar registro: '+(insErr?.message??'desconhecido')); return }
@@ -195,14 +216,13 @@ export default function EditorPage() {
       // gera QR
       const base = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL ?? '')
       const validateUrl = `${base}/validate/${id}`
-      const qrDataUrl = await QRCode.toDataURL(validateUrl, { width: Math.max(64, Math.min(300, qrSize)), margin: 1 })
+      const clampedQR = Math.max(64, Math.min(320, qrSize))
+      const qrDataUrl = await QRCode.toDataURL(validateUrl, { width: clampedQR, margin: 1 })
 
       // monta PDF
       const pdfDoc = await PDFDocument.load(pdfBytes)
 
-      // embed assinatura (png/jpg)
-      const mime = sigMode==='upload' ? (sigImgFile?.type||'image/png') : 'image/png'
-      const isJpg = mime.includes('jpeg') || mime.includes('jpg')
+      const isJpg = sigMode==='upload' ? (sigImgFile?.type||'').includes('jpg') || (sigImgFile?.type||'').includes('jpeg') : false
       const sigImg = isJpg
         ? await pdfDoc.embedJpg(signatureBytes!)
         : await pdfDoc.embedPng(signatureBytes!)
@@ -212,11 +232,10 @@ export default function EditorPage() {
 
       const sigW = sigWidth
       const sigH = (sigW / sigImg.width) * sigImg.height
-      const qrW = Math.max(64, Math.min(300, qrSize))
-      const qrH = qrW
+      const qrW = clampedQR
+      const qrH = clampedQR
 
-      const pages = pdfDoc.getPages()
-      pages.forEach((page:any) => {
+      pdfDoc.getPages().forEach((page:any) => {
         const { width, height } = page.getSize()
         let px = width - sigW - 36
         let py = 36
@@ -228,7 +247,6 @@ export default function EditorPage() {
         py = Math.max(12, Math.min(height - sigH - 12, py))
 
         page.drawImage(sigImg, { x:px, y:py, width:sigW, height:sigH, opacity:0.98 })
-
         const qx = Math.max(12, px - qrW - 12)
         const qy = py
         page.drawImage(qrImg, { x: qx, y: qy, width: qrW, height: qrH, opacity: 0.98 })
@@ -237,7 +255,7 @@ export default function EditorPage() {
       const outBytes = await pdfDoc.save()
       const outBlob = new Blob([outBytes], { type:'application/pdf' })
 
-      // upload
+      // uploads
       const pdfPath = `${id}/signed.pdf`
       const qrPath = `${id}/qr.png`
 
@@ -256,8 +274,7 @@ export default function EditorPage() {
         .update({
           status:'signed',
           signed_pdf_url: pubPdf.data?.publicUrl ?? null,
-          qr_code_url:    pubQr.data?.publicUrl ?? null,
-          validation_profile_id: profileId ?? null
+          qr_code_url:    pubQr.data?.publicUrl ?? null
         })
         .eq('id', id)
       if (updErr) { setInfo('Arquivo salvo, mas não consegui atualizar o registro.'); return }
@@ -271,17 +288,16 @@ export default function EditorPage() {
     }
   }
 
-  // ====== Render ======
   return (
     <div style={{ maxWidth: 1100, margin: '24px auto', padding: 16 }}>
       <h1 style={{ fontWeight: 700, fontSize: 22, marginBottom: 12 }}>Editor de Documento</h1>
       <p style={{ marginTop: -6, color: '#6b7280' }}>Envie o PDF, escolha a assinatura (desenhar ou importar), clique na prévia para posicionar, ajuste o tamanho do QR e salve.</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16 }}>
-        {/* Coluna esquerda: Prévia */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: 16 }}>
+        {/* Prévia */}
         <Card title="Prévia do PDF (clique para posicionar)">
           <div
-            ref={previewBoxRef}
+            ref={previewRef}
             style={{ position:'relative', width:'100%', height:560, border:'1px solid #e5e7eb', borderRadius:10, overflow:'hidden', background:'#fafafa' }}
           >
             {pdfUrl ? (
@@ -296,16 +312,20 @@ export default function EditorPage() {
           </div>
         </Card>
 
-        {/* Coluna direita: Controles */}
+        {/* Controles */}
         <div style={{ display:'grid', gap:16 }}>
-          <Card title="1) Envio do PDF">
+          <Card title="1) PDF">
             <input type="file" accept="application/pdf" onChange={onPdfChange} />
           </Card>
 
           <Card title="2) Assinatura" right={
-            <div style={{ display:'flex', gap:8 }}>
-              <label><input type="radio" checked={sigMode==='draw'} onChange={() => setSigMode('draw')} /> Desenhar</label>
-              <label><input type="radio" checked={sigMode==='upload'} onChange={() => setSigMode('upload')} /> Importar</label>
+            <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+              <label style={{ display:'flex', gap:6, alignItems:'center', cursor:'pointer' }}>
+                <IconDraw /> <input type="radio" checked={sigMode==='draw'} onChange={() => setSigMode('draw')} /> Desenhar
+              </label>
+              <label style={{ display:'flex', gap:6, alignItems:'center', cursor:'pointer' }}>
+                <IconUpload /> <input type="radio" checked={sigMode==='upload'} onChange={() => setSigMode('upload')} /> Importar
+              </label>
             </div>
           }>
             {sigMode === 'draw' ? (
@@ -344,17 +364,17 @@ export default function EditorPage() {
           <Card title="3) Tamanhos">
             <div style={{ display:'grid', gap:8 }}>
               <label>Assinatura: {sigWidth}px
-                <input type="range" min={100} max={320} value={sigWidth} onChange={e=>setSigWidth(parseInt(e.target.value))} />
+                <input type="range" min={100} max={340} value={sigWidth} onChange={e=>setSigWidth(parseInt(e.target.value))} />
               </label>
               <label>QR Code: {qrSize}px
-                <input type="range" min={64} max={300} value={qrSize} onChange={e=>setQrSize(parseInt(e.target.value))} />
+                <input type="range" min={64} max={320} value={qrSize} onChange={e=>setQrSize(parseInt(e.target.value))} />
               </label>
             </div>
           </Card>
 
           <Card title="4) Perfil de Validação" right={<a href="/appearance" style={{ textDecoration:'underline' }}>Gerenciar perfis</a>}>
             {profiles.length === 0 ? (
-              <div style={{ color:'#6b7280' }}>Nenhum perfil ainda. Clique em <a href="/appearance" style={{ textDecoration:'underline' }}>Gerenciar perfis</a> para criar “Médico/Faculdade/Genérico”.</div>
+              <div style={{ color:'#6b7280' }}>Nenhum perfil ainda. Crie em <a href="/appearance" style={{ textDecoration:'underline' }}>Aparência</a>.</div>
             ) : (
               <select value={profileId ?? ''} onChange={(e)=>setProfileId(e.target.value || null)} style={{ width:'100%', padding:10, border:'1px solid #e5e7eb', borderRadius:8 }}>
                 <option value="">(Sem perfil)</option>
@@ -366,7 +386,7 @@ export default function EditorPage() {
           <Card>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
               <button onClick={assinarESalvar} disabled={busy || !pdfBytes || (sigMode==='draw' && !drewSomething) || (sigMode==='upload' && !sigImgFile)}>
-                {busy ? 'Processando…' : 'Assinar & Salvar'}
+                <span style={{ display:'inline-flex', gap:6, alignItems:'center' }}><IconSave /> {busy ? 'Processando…' : 'Assinar & Salvar'}</span>
               </button>
               <button onClick={()=>router.push('/dashboard')} disabled={busy}>Voltar à Dashboard</button>
             </div>
