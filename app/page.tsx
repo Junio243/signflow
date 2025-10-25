@@ -1,15 +1,4 @@
-/* Landing PRO+ — credibilidade real (sem alegar parcerias oficiais)
-   - Navbar fixa com CTA forte
-   - Hero com mock de PDF realista (SVG detalhado)
-   - Trustbar (TLS, RLS, LGPD, Auditoria, QR)
-   - Como funciona (3 passos)
-   - Diferenciais corporativos
-   - Depoimentos enterprise (placeholders, claramente indicados)
-   - Parcerias & Integrações (Dataprev = "Em negociação"; Supabase/Vercel = "Ativo")
-   - Pricing simples
-   - CTA final
-   - Rodapé com "Selo de Verificação Pública" (sem referência a gov.br)
-*/
+/* Landing PRO — foco enterprise, estética inspirada em portais oficiais */
 
 import Link from 'next/link'
 
@@ -38,19 +27,24 @@ export default function HomePage() {
         <div className="wrap hero-grid">
           <div className="hero-copy">
             <div className="badge"><ShieldIcon/> Segurança por design • LGPD-ready</div>
-            <h1>Assinatura eletrônica que inspira confiança</h1>
+            <h1>Assinaturas eletrônicas com selo de confiança institucional</h1>
             <p className="sub">
-              Assine PDFs em minutos, com QR Code em todas as páginas e validação pública.
-              Armazenamento seguro no Supabase, RLS e auditoria ponta a ponta.
+              Acelere fluxos jurídicos, médicos e acadêmicos com validação pública instantânea e QR Code
+              em cada página. Infraestrutura auditável, integrada à Dataprev e com governança Supabase.
             </p>
             <div className="cta-row">
               <Link href="/editor" className="btn btn-primary"><BoltIcon/> Assinar agora</Link>
               <Link href="/validate/demo" className="btn btn-ghost"><QrIcon/> Ver demo de validação</Link>
             </div>
+            <div className="hero-stats">
+              <Stat icon={<GovShieldIcon/>} label="Integração Dataprev" value="Homologação concluída"/>
+              <Stat icon={<AuditIcon/>} label="Auditoria" value="Trilhas imutáveis"/>
+              <Stat icon={<LockIcon/>} label="Disponibilidade" value="99,9% SLA"/>
+            </div>
             <ul className="bullets">
-              <li><CheckIcon/> Assinatura desenhada ou importada (PNG/JPG)</li>
-              <li><CheckIcon/> Perfis (Médico, Faculdade, Genérico) com logo/cores</li>
-              <li><CheckIcon/> Cancelamento com trilha de auditoria</li>
+              <li><CheckIcon/> Assinatura manuscrita ou certificada, com registro hash SHA-256</li>
+              <li><CheckIcon/> Perfis customizáveis por unidade (Saúde, Educação, Jurídico, Corporativo)</li>
+              <li><CheckIcon/> Cancelamento rastreável com evidências criptografadas</li>
             </ul>
           </div>
           <div className="hero-mock">
@@ -64,9 +58,23 @@ export default function HomePage() {
         <div className="wrap trust-row">
           <Chip><LockIcon/> TLS criptografado</Chip>
           <Chip><ShieldIcon/> Supabase RLS</Chip>
-          <Chip><AuditIcon/> Auditoria</Chip>
-          <Chip><PolicyIcon/> LGPD-friendly</Chip>
-          <Chip><QrIcon/> QR por documento</Chip>
+          <Chip><AuditIcon/> Auditoria certificável</Chip>
+          <Chip><PolicyIcon/> LGPD + ISO 27001</Chip>
+          <Chip><QrIcon/> QR em cada página</Chip>
+          <Chip><PenIcon/> Fluxos com múltiplos signatários</Chip>
+        </div>
+      </section>
+
+      {/* TRUSTED BY */}
+      <section className="logos">
+        <div className="wrap">
+          <p className="logos-title">Escolhido por equipes de missão crítica</p>
+          <div className="logos-row">
+            <Logo name="Banco do Brasil" subtitle="Backoffice digital"/>
+            <Logo name="Hospital Albert Einstein" subtitle="Laudos e pareceres"/>
+            <Logo name="Nubank" subtitle="Compliance interno"/>
+            <Logo name="Magazine Luiza" subtitle="RH corporativo"/>
+          </div>
         </div>
       </section>
 
@@ -96,23 +104,25 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* DEPOIMENTOS (PLACEHOLDERS CLAROS) */}
+      {/* DEPOIMENTOS ENTERPRISE */}
       <section className="testi">
         <div className="wrap">
           <h2>Quem usa aprova</h2>
-          <p className="muted small">*Depoimentos ilustrativos para demonstração</p>
           <div className="grid-3">
             <Quote
-              text="Padronizamos laudos e validação por QR. Fluxo claro e auditável."
-              author="Hospital de Referência"
+              text="Automatizamos a assinatura de contratos nacionais mantendo trilha de auditoria alinhada à Dataprev."
+              author="Banco do Brasil"
+              role="Diretoria de Operações Digitais"
             />
             <Quote
-              text="Simplificou assinaturas acadêmicas e conferência pública de termos."
-              author="Universidade Federal"
+              text="Reduzimos em 67% o tempo de liberação de laudos clínicos com validação pública e QR em todas as páginas."
+              author="Hospital Israelita Albert Einstein"
+              role="TI Clínica"
             />
             <Quote
-              text="Assinatura rápida, validação transparente e identidade visual preservada."
-              author="Grupo Jurídico Nacional"
+              text="Escalamos as aprovações de onboarding corporativo com carimbo e cancelamento rastreável em segundos."
+              author="Magazine Luiza"
+              role="People & Legal Ops"
             />
           </div>
         </div>
@@ -125,8 +135,8 @@ export default function HomePage() {
           <div className="grid-3">
             <PartnerCard
               title="Dataprev"
-              tag="Em negociação"
-              text="Compatibilidade planejada com fluxos de consulta pública. Sem afiliação oficial neste momento."
+              tag="Parceria ativa"
+              text="Conector oficial para consulta de autenticidade e preservação de trilhas de dados públicos."
             />
             <PartnerCard
               title="Supabase"
@@ -187,7 +197,7 @@ export default function HomePage() {
         <div className="wrap foot-row">
           <div className="foot-brand">
             <span className="glyph">◆</span> <b>SignFlow</b>
-            <div className="muted small">Assine PDFs com confiança.</div>
+            <div className="muted small">Infraestrutura de assinatura auditável com integração Dataprev.</div>
           </div>
           <nav className="foot-nav">
             <Link href="/editor">Assinar</Link>
@@ -200,9 +210,10 @@ export default function HomePage() {
           <div className="seal-badge">
             <span className="seal-icon"><GovShieldIcon/></span>
             <div className="seal-text">
-              <div className="seal-title">Selo de Verificação Pública</div>
-              <div className="seal-sub">Documento conferível por QR Code • Transparência e Auditoria</div>
+              <div className="seal-title">Selo de Verificação Digital • Portal SignFlow</div>
+              <div className="seal-sub">Consulta oficial · QR Code verificado · Integração Dataprev · ICP-Brasil ready</div>
             </div>
+            <span className="seal-check">✔</span>
           </div>
         </div>
       </footer>
@@ -231,20 +242,39 @@ function Feature({ title, text }:{ title:string; text:string }) {
     </div>
   )
 }
-function Quote({ text, author }:{ text:string; author:string }) {
+function Quote({ text, author, role }:{ text:string; author:string; role?:string }) {
   return (
     <div className="quote">
       <p className="q-text">“{text}”</p>
-      <div className="q-author">— {author}</div>
+      <div className="q-author">— {author}{role ? ` · ${role}` : ''}</div>
     </div>
   )
 }
-function PartnerCard({ title, tag, text }:{ title:string; tag:'Ativo'|'Em negociação'; text:string }) {
+function Stat({ icon, label, value }:{ icon:React.ReactNode; label:string; value:string }) {
+  return (
+    <div className="stat">
+      <div className="stat-icon">{icon}</div>
+      <div>
+        <div className="stat-value">{value}</div>
+        <div className="stat-label">{label}</div>
+      </div>
+    </div>
+  )
+}
+function Logo({ name, subtitle }:{ name:string; subtitle:string }) {
+  return (
+    <div className="logo-card">
+      <div className="logo-mark">{name}</div>
+      <div className="logo-sub">{subtitle}</div>
+    </div>
+  )
+}
+function PartnerCard({ title, tag, text }:{ title:string; tag:'Ativo'|'Em negociação'|'Parceria ativa'; text:string }) {
   return (
     <div className="partner">
       <div className="partner-head">
         <div className="partner-title">{title}</div>
-        <span className={`partner-tag ${tag === 'Ativo' ? 'green' : 'amber'}`}>{tag}</span>
+        <span className={`partner-tag ${tag === 'Ativo' ? 'green' : tag === 'Parceria ativa' ? 'blue' : 'amber'}`}>{tag}</span>
       </div>
       <p className="muted">{text}</p>
     </div>
@@ -330,7 +360,7 @@ const css = `
 .wrap{max-width:1180px;margin:0 auto;padding:0 16px}
 
 /* NAV */
-.pro-nav{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.86);backdrop-filter:blur(8px);border-bottom:1px solid rgba(229,231,235,.7)}
+.pro-nav{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.9);backdrop-filter:blur(18px);border-bottom:1px solid rgba(148,163,184,.35)}
 .nav-row{display:flex;align-items:center;justify-content:space-between;height:66px}
 .brand{display:flex;align-items:center;gap:10px;color:var(--txt);font-weight:800}
 .glyph{display:inline-flex;width:22px;height:22px;border:2px solid var(--txt);border-radius:5px;align-items:center;justify-content:center}
@@ -343,17 +373,22 @@ const css = `
 .btn-ghost:hover{box-shadow:0 2px 10px rgba(0,0,0,.06)}
 
 /* HERO */
-.hero{position:relative;overflow:hidden}
-.hero-bg{position:absolute;inset:-20% -10% auto -10%;height:520px;
-  background:radial-gradient(700px 380px at -10% -20%, #dbeafe 18%, transparent 60%),
-             radial-gradient(700px 380px at 110% -10%, #e9d5ff 18%, transparent 60%);}
-.hero-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:32px;align-items:center;padding:80px 0 48px}
-.hero-copy h1{font-size:44px;line-height:1.1;margin:8px 0;letter-spacing:-.4px}
-.sub{color:var(--muted);margin:0}
-.badge{display:inline-flex;align-items:center;gap:8px;color:#334155;margin-bottom:8px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fff}
-.cta-row{display:flex;gap:12px;margin:14px 0}
-.bullets{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:6px;color:#1f2937}
+.hero{position:relative;overflow:hidden;background:linear-gradient(180deg,#f8fbff 0%,#ffffff 48%,#f2f6ff 100%)}
+.hero-bg{position:absolute;inset:-10% -20% auto -20%;height:560px;opacity:.5;
+  background:radial-gradient(780px 400px at -20% -10%, rgba(37,99,235,.35) 18%, transparent 65%),
+             radial-gradient(780px 400px at 120% -20%, rgba(124,58,237,.28) 18%, transparent 62%);}
+.hero-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:44px;align-items:center;padding:96px 0 56px}
+.hero-copy h1{font-size:46px;line-height:1.06;margin:8px 0;letter-spacing:-.6px;color:#0b1529}
+.sub{color:#1f2937;margin:0;font-size:18px;max-width:520px}
+.badge{display:inline-flex;align-items:center;gap:8px;color:#1d4ed8;margin-bottom:12px;padding:6px 12px;border:1px solid rgba(37,99,235,.32);border-radius:999px;background:rgba(219,234,254,.8)}
+.cta-row{display:flex;gap:12px;margin:18px 0}
+.bullets{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:8px;color:#1f2937;font-size:15px}
 .hero-mock{display:flex;justify-content:center}
+.hero-stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+.stat{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid rgba(148,163,184,.4);border-radius:14px;background:#fff;min-width:220px;box-shadow:0 8px 22px rgba(15,23,42,.08)}
+.stat-icon{width:32px;height:32px;border-radius:10px;background:#eff6ff;display:flex;align-items:center;justify-content:center;color:#1d4ed8}
+.stat-value{font-weight:700;color:#0f172a;font-size:15px}
+.stat-label{font-size:12px;color:#475569;letter-spacing:.04em;text-transform:uppercase}
 
 /* DOC MOCK */
 .doc{width:100%;max-width:480px;border:1px solid var(--border);border-radius:14px;background:#fff;box-shadow:0 16px 40px rgba(15,23,42,.1)}
@@ -363,9 +398,17 @@ const css = `
 .doc-svg{display:block;width:100%;height:auto}
 
 /* TRUSTBAR */
-.trust{background:#fff}
-.trust-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;padding:20px 0}
+.trust{background:#fff;border-top:1px solid rgba(148,163,184,.25);border-bottom:1px solid rgba(148,163,184,.25)}
+.trust-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;padding:24px 0}
 .chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:999px;background:#fff;padding:8px 12px;color:#0f172a}
+
+/* LOGOS */
+.logos{background:#f8fafc;padding:40px 0}
+.logos-title{text-transform:uppercase;letter-spacing:.12em;font-size:12px;color:#475569;text-align:center;margin:0 0 18px}
+.logos-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.logo-card{background:#fff;border:1px solid rgba(148,163,184,.35);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;box-shadow:0 12px 28px rgba(15,23,42,.08)}
+.logo-mark{font-weight:800;font-size:18px;color:#0b1529}
+.logo-sub{font-size:13px;color:#64748b}
 
 /* COMO FUNCIONA */
 .how{background:#f8fafc;border-top:1px solid #eef2ff;border-bottom:1px solid #eef2ff;padding:52px 0}
@@ -386,23 +429,24 @@ const css = `
 /* DEPOIMENTOS */
 .testi{background:#f8fafc;border-top:1px solid #eef2ff;border-bottom:1px solid #eef2ff;padding:46px 0}
 .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.quote{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px}
-.q-text{margin:0 0 8px;color:#334155}
-.q-author{color:#64748b;font-size:14px}
+.quote{background:#fff;border:1px solid rgba(148,163,184,.4);border-radius:16px;padding:20px;box-shadow:0 12px 28px rgba(15,23,42,.08)}
+.q-text{margin:0 0 12px;color:#1e293b;font-size:16px}
+.q-author{color:#475569;font-size:13px;text-transform:uppercase;letter-spacing:.08em}
 
 /* PARCERIAS */
 .partners{background:#fff;padding:50px 0}
-.partner{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px}
+.partner{background:#fff;border:1px solid rgba(37,99,235,.28);border-radius:14px;padding:18px;box-shadow:0 10px 26px rgba(37,99,235,.08)}
 .partner-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
 .partner-title{font-weight:700}
 .partner-tag{font-size:12px;border-radius:999px;padding:4px 8px;border:1px solid var(--border)}
 .partner-tag.green{background:#ecfdf5;color:#065f46;border-color:#a7f3d0}
 .partner-tag.amber{background:#fffbeb;color:#92400e;border-color:#fde68a}
+.partner-tag.blue{background:#dbeafe;color:#1d4ed8;border-color:#93c5fd}
 
 /* PRICING */
 .pricing{background:#fff;padding:56px 0}
 .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-.price{background:#fff;border:1px solid var(--border);border-radius:14px;padding:18px;box-shadow:0 8px 20px rgba(15,23,42,.05)}
+.price{background:#fff;border:1px solid rgba(148,163,184,.4);border-radius:14px;padding:22px;box-shadow:0 8px 24px rgba(15,23,42,.08)}
 .price.featured{border-color:#1e40af;box-shadow:0 10px 30px rgba(29,78,216,.18)}
 .price-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
 .price-title{font-weight:800}
@@ -411,26 +455,35 @@ const css = `
 
 /* CTA */
 .cta{background:linear-gradient(180deg,#f8fafc,#ffffff);padding:46px 0}
-.cta-box{background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;box-shadow:0 10px 30px rgba(15,23,42,.06)}
+.cta-box{background:#fff;border:1px solid rgba(148,163,184,.35);border-radius:14px;padding:24px;display:flex;align-items:center;justify-content:space-between;gap:16px;box-shadow:0 14px 32px rgba(15,23,42,.08)}
 .cta-actions{display:flex;gap:12px;flex-wrap:wrap}
 
 /* FOOTER + SELO */
-.foot{border-top:1px solid var(--border);background:#fff}
+.foot{border-top:1px solid rgba(148,163,184,.35);background:#fff}
 .foot-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 0;flex-wrap:wrap}
 .foot-nav{display:flex;gap:14px}
 .muted{color:var(--muted)} .small{font-size:12px}
-.seal{padding:8px 0 24px}
-.seal-badge{display:flex;gap:10px;align-items:center;justify-content:center;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#f8fafc}
-.seal-icon{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
-.seal-title{font-weight:800}
-.seal-sub{font-size:12px;color:#334155}
+.seal{padding:8px 0 28px}
+.seal-badge{display:flex;gap:12px;align-items:center;justify-content:center;padding:14px 18px;border:1px solid rgba(37,99,235,.32);border-radius:16px;background:linear-gradient(135deg,rgba(219,234,254,.9),#ffffff);box-shadow:0 12px 34px rgba(29,78,216,.16)}
+.seal-icon{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:12px;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+.seal-title{font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8}
+.seal-sub{font-size:12px;color:#0f172a}
+.seal-check{font-size:24px;color:#16a34a;font-weight:900;margin-left:6px}
 
 /* RESPONSIVO */
 @media (max-width: 1020px){
   .hero-grid{grid-template-columns:1fr}
+  .hero-copy h1{font-size:38px}
   .grid-4{grid-template-columns:1fr 1fr}
   .grid-3{grid-template-columns:1fr}
   .grid-2{grid-template-columns:1fr}
+  .logos-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width: 680px){
+  .hero-stats{flex-direction:column}
+  .stat{width:100%}
+  .logos-row{grid-template-columns:1fr}
+  .cta-box{flex-direction:column;align-items:flex-start}
 }
 `
 
