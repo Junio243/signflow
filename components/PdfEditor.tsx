@@ -16,51 +16,92 @@ type Props = {
   onDocumentLoaded?: (meta: { pages: number }) => void;
 };
 
-export default function PdfEditor({ file, signatureUrl, positions, onPositions, page: controlledPage, onPageChange, onDocumentLoaded }: Props){
+export default function PdfEditor({
+  file,
+  signatureUrl,
+  positions,
+  onPositions,
+  page: controlledPage,
+  onPageChange,
+  onDocumentLoaded
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [pdf, setPdf] = useState<any>(null);
   const [page, setPage] = useState(1);
   const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
-  const [drag, setDrag] = useState<{x:number,y:number}|null>(null);
+  const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // throttle refs
   const rafRef = useRef(false);
-  const latestPosRef = useRef<{nx:number, ny:number} | null>(null);
+  const latestPosRef = useRef<{ nx: number; ny: number } | null>(null);
 
-  useEffect(()=>{
+  useEffect(() => {
     let cancelled = false;
     let task: any;
-    (async()=>{
+    let blobUrl: string | null = null;
+
+    (async () => {
       if (!file) {
         setPdf(null);
         setError(null);
         return;
       }
+
       try {
         setLoading(true);
         setError(null);
-        const ab = await file.arrayBuffer();
-        task = (pdfjsLib as any).getDocument({
-          data: ab,
-          disableWorker: true,
-          useWorkerFetch: false,
-        });
-        const doc = await task.promise;
-        if (cancelled) {
-          await doc?.destroy?.();
+
+        // tenta primeiro com Uint8Array (mais confiável com pdfjs)
+        try {
+          const ab = await file.arrayBuffer();
+          const uint8 = new Uint8Array(ab);
+          task = (pdfjsLib as any).getDocument({
+            data: uint8,
+            disableWorker: true,
+            useWorkerFetch: false,
+          });
+          const doc = await task.promise;
+          if (cancelled) {
+            await doc?.destroy?.();
+            return;
+          }
+          setPdf(doc);
+          if (controlledPage === undefined) setPage(1);
+          onDocumentLoaded?.({ pages: doc.numPages || 1 });
+          onPageChange?.(1);
           return;
+        } catch (firstErr) {
+          console.warn('pdfjs getDocument using Uint8Array failed - trying blob URL fallback', firstErr);
+          // continue to fallback
         }
-        setPdf(doc);
-        if (controlledPage === undefined) {
-          setPage(1);
+
+        // fallback: usar blob URL (às vezes resolve problemas de bundle/compatibilidade)
+        try {
+          blobUrl = URL.createObjectURL(file);
+          task = (pdfjsLib as any).getDocument({
+            url: blobUrl,
+            disableWorker: true,
+            useWorkerFetch: false,
+          });
+          const doc = await task.promise;
+          if (cancelled) {
+            await doc?.destroy?.();
+            return;
+          }
+          setPdf(doc);
+          if (controlledPage === undefined) setPage(1);
+          onDocumentLoaded?.({ pages: doc.numPages || 1 });
+          onPageChange?.(1);
+          return;
+        } catch (secondErr) {
+          // ambos falharam -> lança para o catch geral
+          throw secondErr;
         }
-        onDocumentLoaded?.({ pages: doc.numPages || 1 });
-        onPageChange?.(1);
-      } catch (err) {
-        console.error('Falha ao carregar PDF para prévia', err);
+      } catch (err: any) {
+        console.error('Falha ao carregar PDF para prévia:', err?.name, err?.message, err);
         if (!cancelled) {
           setPdf(null);
           setError('Não foi possível carregar a prévia do PDF.');
@@ -71,25 +112,29 @@ export default function PdfEditor({ file, signatureUrl, positions, onPositions, 
         }
       }
     })();
+
     return () => {
       cancelled = true;
-      task?.destroy?.();
+      try { task?.destroy?.(); } catch (_) {}
+      if (blobUrl) {
+        try { URL.revokeObjectURL(blobUrl); } catch (_) {}
+      }
     };
   }, [file, controlledPage, onDocumentLoaded, onPageChange]);
 
-  useEffect(()=>{
+  useEffect(() => {
     setSigDataUrl(signatureUrl);
   }, [signatureUrl]);
 
-  useEffect(()=>{
+  useEffect(() => {
     if (controlledPage !== undefined) {
       setPage(controlledPage);
     }
   }, [controlledPage]);
 
-  useEffect(()=>{ renderPage(); }, [pdf, page, scale, positions, sigDataUrl]);
+  useEffect(() => { renderPage(); }, [pdf, page, scale, positions, sigDataUrl]);
 
-  async function renderPage(){
+  async function renderPage() {
     const canvas = canvasRef.current; if (!canvas || !pdf) return;
     try {
       const p = await pdf.getPage(page);
@@ -98,44 +143,44 @@ export default function PdfEditor({ file, signatureUrl, positions, onPositions, 
       const ctx = canvas.getContext('2d')!;
       await p.render({ canvasContext: ctx, viewport }).promise;
 
-      const pos = positions.find(ps=>ps.page===page);
-      if (pos && sigDataUrl){
+      const pos = positions.find(ps => ps.page === page);
+      if (pos && sigDataUrl) {
         const img = new Image(); img.src = sigDataUrl; await img.decode();
         const w = 240 * pos.scale; const h = w * 0.35;
         const cw = canvas.width, ch = canvas.height;
-        const x = (pos.nx||0.5) * cw; const y = (pos.ny||0.5) * ch;
+        const x = (pos.nx || 0.5) * cw; const y = (pos.ny || 0.5) * ch;
         ctx.save();
         ctx.translate(x, y);
-        ctx.rotate((pos.rotation||0) * Math.PI/180);
-        ctx.drawImage(img, -w/2, -h/2, w, h);
+        ctx.rotate((pos.rotation || 0) * Math.PI / 180);
+        ctx.drawImage(img, -w / 2, -h / 2, w, h);
         ctx.restore();
       }
       setError(null);
-    } catch (err) {
-      console.error('Falha ao renderizar página do PDF', err);
+    } catch (err: any) {
+      console.error('Falha ao renderizar página do PDF:', err?.name, err?.message, err);
       setError('Não foi possível renderizar esta página do PDF.');
     }
   }
 
-  function onClick(e: React.MouseEvent){
+  function onClick(e: React.MouseEvent) {
     const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
     const x = e.clientX - rect.left; const y = e.clientY - rect.top;
-    const existing = positions.filter(p=>p.page!==page);
+    const existing = positions.filter(p => p.page !== page);
     const cw = rect.width || 1; const ch = rect.height || 1;
     const nx = x / cw; const ny = y / ch;
     onPositions([...existing, { page, nx, ny, scale: 1, rotation: 0 }]);
   }
 
-  function onWheel(e: React.WheelEvent){ setScale(s=>Math.max(0.5, Math.min(3, s + (e.deltaY>0?-0.1:0.1)))); }
+  function onWheel(e: React.WheelEvent) { setScale(s => Math.max(0.5, Math.min(3, s + (e.deltaY > 0 ? -0.1 : 0.1)))); }
 
-  function onPointerDown(e: React.PointerEvent){
+  function onPointerDown(e: React.PointerEvent) {
     if (!sigDataUrl) return;
     const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
-    setDrag({x: e.clientX - rect.left, y: e.clientY - rect.top});
+    setDrag({ x: e.clientX - rect.left, y: e.clientY - rect.top });
   }
 
-  function onPointerMove(e: React.PointerEvent){
-    if(!drag) return;
+  function onPointerMove(e: React.PointerEvent) {
+    if (!drag) return;
     if (!sigDataUrl) return;
     const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
     const x = e.clientX - rect.left; const y = e.clientY - rect.top;
@@ -144,27 +189,27 @@ export default function PdfEditor({ file, signatureUrl, positions, onPositions, 
     latestPosRef.current = { nx, ny };
     if (!rafRef.current) {
       rafRef.current = true;
-      requestAnimationFrame(()=>{
+      requestAnimationFrame(() => {
         rafRef.current = false;
-        const pos = positions.find(p=>p.page===page); if(!pos) return;
-        const others = positions.filter(p=>p.page!==page);
+        const pos = positions.find(p => p.page === page); if (!pos) return;
+        const others = positions.filter(p => p.page !== page);
         onPositions([...others, { ...pos, nx: latestPosRef.current!.nx, ny: latestPosRef.current!.ny }]);
       });
     }
   }
 
-  function onPointerUp(){ setDrag(null); }
+  function onPointerUp() { setDrag(null); }
 
-  useEffect(()=>{
+  useEffect(() => {
     if (controlledPage === undefined) {
       onPageChange?.(page);
     }
   }, [page, controlledPage, onPageChange]);
 
-  const currentPos = positions.find(p=>p.page===page);
+  const currentPos = positions.find(p => p.page === page);
   const totalPages = pdf?.numPages || 1;
 
-  function changePage(next: number){
+  function changePage(next: number) {
     const clamped = Math.max(1, Math.min(totalPages, next));
     if (controlledPage === undefined) {
       setPage(clamped);
@@ -175,19 +220,19 @@ export default function PdfEditor({ file, signatureUrl, positions, onPositions, 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <button className="btn" onClick={()=>changePage(page-1)} disabled={page<=1}>◀</button>
+        <button className="btn" onClick={() => changePage(page - 1)} disabled={page <= 1}>◀</button>
         <div>p. {page} / {totalPages}</div>
-        <button className="btn" onClick={()=>changePage(page+1)} disabled={page>=totalPages}>▶</button>
+        <button className="btn" onClick={() => changePage(page + 1)} disabled={page >= totalPages}>▶</button>
         <div className="ml-auto flex items-center gap-2">
           <label className="label m-0">Tamanho</label>
-          <input type="range" min={0.5} max={3} step={0.1} value={currentPos?.scale||1} onChange={e=>{
+          <input type="range" min={0.5} max={3} step={0.1} value={currentPos?.scale || 1} onChange={e => {
             const v = Number(e.target.value);
-            if(!currentPos) return; onPositions([...positions.filter(p=>p.page!==page), {...currentPos, scale:v}]);
+            if (!currentPos) return; onPositions([...positions.filter(p => p.page !== page), { ...currentPos, scale: v }]);
           }} />
           <label className="label m-0">Rotação</label>
-          <input type="range" min={-45} max={45} step={1} value={currentPos?.rotation||0} onChange={e=>{
+          <input type="range" min={-45} max={45} step={1} value={currentPos?.rotation || 0} onChange={e => {
             const v = Number(e.target.value);
-            if(!currentPos) return; onPositions([...positions.filter(p=>p.page!==page), {...currentPos, rotation:v}]);
+            if (!currentPos) return; onPositions([...positions.filter(p => p.page !== page), { ...currentPos, rotation: v }]);
           }} />
         </div>
       </div>
