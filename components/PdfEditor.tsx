@@ -4,8 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import 'pdfjs-dist/web/pdf_viewer.css';
 
-(pdfjsLib as any).GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.js`;
-
 type Pos = { page: number; nx: number; ny: number; scale: number; rotation: number };
 
 type Props = {
@@ -25,24 +23,58 @@ export default function PdfEditor({ file, signatureUrl, positions, onPositions, 
   const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [drag, setDrag] = useState<{x:number,y:number}|null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // throttle refs
   const rafRef = useRef(false);
   const latestPosRef = useRef<{nx:number, ny:number} | null>(null);
 
   useEffect(()=>{
+    let cancelled = false;
+    let task: any;
     (async()=>{
-      if (!file) return;
-      const ab = await file.arrayBuffer();
-      const loadingTask = (pdfjsLib as any).getDocument({data: ab});
-      const doc = await loadingTask.promise;
-      setPdf(doc);
-      if (controlledPage === undefined) {
-        setPage(1);
+      if (!file) {
+        setPdf(null);
+        setError(null);
+        return;
       }
-      onDocumentLoaded?.({ pages: doc.numPages || 1 });
-      onPageChange?.(1);
+      try {
+        setLoading(true);
+        setError(null);
+        const ab = await file.arrayBuffer();
+        task = (pdfjsLib as any).getDocument({
+          data: ab,
+          disableWorker: true,
+          useWorkerFetch: false,
+        });
+        const doc = await task.promise;
+        if (cancelled) {
+          await doc?.destroy?.();
+          return;
+        }
+        setPdf(doc);
+        if (controlledPage === undefined) {
+          setPage(1);
+        }
+        onDocumentLoaded?.({ pages: doc.numPages || 1 });
+        onPageChange?.(1);
+      } catch (err) {
+        console.error('Falha ao carregar PDF para prévia', err);
+        if (!cancelled) {
+          setPdf(null);
+          setError('Não foi possível carregar a prévia do PDF.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     })();
+    return () => {
+      cancelled = true;
+      task?.destroy?.();
+    };
   }, [file, controlledPage, onDocumentLoaded, onPageChange]);
 
   useEffect(()=>{
@@ -59,28 +91,33 @@ export default function PdfEditor({ file, signatureUrl, positions, onPositions, 
 
   async function renderPage(){
     const canvas = canvasRef.current; if (!canvas || !pdf) return;
-    const p = await pdf.getPage(page);
-    const viewport = p.getViewport({ scale });
-    canvas.width = viewport.width; canvas.height = viewport.height;
-    const ctx = canvas.getContext('2d')!;
-    await p.render({ canvasContext: ctx, viewport }).promise;
+    try {
+      const p = await pdf.getPage(page);
+      const viewport = p.getViewport({ scale });
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d')!;
+      await p.render({ canvasContext: ctx, viewport }).promise;
 
-    const pos = positions.find(ps=>ps.page===page);
-    if (pos && sigDataUrl){
-      const img = new Image(); img.src = sigDataUrl; await img.decode();
-      const w = 240 * pos.scale; const h = w * 0.35;
-      const cw = canvas.width, ch = canvas.height;
-      const x = (pos.nx||0.5) * cw; const y = (pos.ny||0.5) * ch;
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate((pos.rotation||0) * Math.PI/180);
-      ctx.drawImage(img, -w/2, -h/2, w, h);
-      ctx.restore();
+      const pos = positions.find(ps=>ps.page===page);
+      if (pos && sigDataUrl){
+        const img = new Image(); img.src = sigDataUrl; await img.decode();
+        const w = 240 * pos.scale; const h = w * 0.35;
+        const cw = canvas.width, ch = canvas.height;
+        const x = (pos.nx||0.5) * cw; const y = (pos.ny||0.5) * ch;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate((pos.rotation||0) * Math.PI/180);
+        ctx.drawImage(img, -w/2, -h/2, w, h);
+        ctx.restore();
+      }
+      setError(null);
+    } catch (err) {
+      console.error('Falha ao renderizar página do PDF', err);
+      setError('Não foi possível renderizar esta página do PDF.');
     }
   }
 
   function onClick(e: React.MouseEvent){
-    // usar bounding rect para normalizar (CSS pixels) => consistente com preview logic
     const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
     const x = e.clientX - rect.left; const y = e.clientY - rect.top;
     const existing = positions.filter(p=>p.page!==page);
@@ -154,15 +191,27 @@ export default function PdfEditor({ file, signatureUrl, positions, onPositions, 
           }} />
         </div>
       </div>
-      <canvas
-        ref={canvasRef}
-        className="rounded-lg border bg-white max-w-full"
-        onClick={onClick}
-        onWheel={onWheel}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-      />
+      <div className="relative">
+        <canvas
+          ref={canvasRef}
+          className="rounded-lg border bg-white max-w-full"
+          onClick={onClick}
+          onWheel={onWheel}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+        />
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center rounded-lg border bg-white/80 text-sm text-slate-600">
+            Carregando prévia...
+          </div>
+        )}
+        {error && !loading && (
+          <div className="absolute inset-0 flex items-center justify-center rounded-lg border bg-white/90 text-sm text-red-600 text-center px-6">
+            {error}
+          </div>
+        )}
+      </div>
       <p className="text-xs text-slate-500">
         {sigDataUrl
           ? 'Clique para posicionar. Arraste para mover. Use os sliders para ajustar tamanho e rotação.'
