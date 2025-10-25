@@ -17,7 +17,7 @@ export default function HomePage() {
             <Link href="/validate/demo">Demo</Link>
             <Link href="/login">Entrar</Link>
           </nav>
-          <Link href="/editor" className="btn btn-primary">Começar</Link>
+          <Link href="/editor" target="_blank" rel="noopener" className="btn btn-primary">Começar</Link>
         </div>
       </header>
 
@@ -33,7 +33,7 @@ export default function HomePage() {
               em cada página. Infraestrutura auditável, integrada à Dataprev e com governança Supabase.
             </p>
             <div className="cta-row">
-              <Link href="/editor" className="btn btn-primary"><BoltIcon/> Assinar agora</Link>
+              <Link href="/editor" target="_blank" rel="noopener" className="btn btn-primary"><BoltIcon/> Assinar agora</Link>
               <Link href="/validate/demo" className="btn btn-ghost"><QrIcon/> Ver demo de validação</Link>
             </div>
             <div className="hero-stats">
@@ -165,7 +165,7 @@ export default function HomePage() {
               title="Gratuito"
               price="R$ 0"
               bullets={['Assinatura com QR', 'Validação pública', 'Perfis básicos']}
-              cta={<Link href="/editor" className="btn btn-primary">Começar</Link>}
+              cta={<Link href="/editor" target="_blank" rel="noopener" className="btn btn-primary">Começar</Link>}
             />
             <PriceCard
               title="Profissional"
@@ -186,7 +186,7 @@ export default function HomePage() {
             <p className="sub">Crie sua assinatura, ajuste o QR e compartilhe o PDF validável.</p>
           </div>
           <div className="cta-actions">
-            <Link href="/editor" className="btn btn-primary"><BoltIcon/> Assinar agora</Link>
+            <Link href="/editor" target="_blank" rel="noopener" className="btn btn-primary"><BoltIcon/> Assinar agora</Link>
             <Link href="/validate/demo" className="btn btn-ghost">Ver demo</Link>
           </div>
         </div>
@@ -211,7 +211,7 @@ export default function HomePage() {
             <span className="seal-icon"><GovShieldIcon/></span>
             <div className="seal-text">
               <div className="seal-title">Selo de Verificação Digital • Portal SignFlow</div>
-              <div className="seal-sub">Consulta oficial · QR Code verificado · Integração Dataprev · ICP-Brasil ready</div>
+              <div className="seal-sub">Consulta oficial · QR Code verificado · Certificado ICP-Brasil emitido pela AC Dataprev</div>
             </div>
             <span className="seal-check">✔</span>
           </div>
@@ -317,10 +317,22 @@ function DocMock() {
           <rect key={i} x="18" y={120+i*14} width={i%3===0?360:380-(i%4)*30} height="8" rx="3" fill="#eef2f7"/>
         ))}
 
-        <rect x="18" y="280" width="384" height="90" rx="6" fill="#f8fafc" stroke="#e5e7eb"/>
-        {[0,1,2,3].map(i=>(
-          <rect key={i} x={24} y={292+i*18} width={360-(i*12)} height="10" rx="3" fill="#e8edf5"/>
-        ))}
+        <rect x="18" y="258" width="384" height="120" rx="8" fill="#f8fafc" stroke="#d9e3f8"/>
+        <text x="32" y="284" fill="#1d4ed8" fontFamily="'Inter', 'Segoe UI', sans-serif" fontSize="12" fontWeight="700">
+          Declaração de autenticidade
+        </text>
+        <text x="32" y="304" fill="#1f2937" fontFamily="'Inter', 'Segoe UI', sans-serif" fontSize="11">
+          Documento assinado digitalmente com certificado ICP-Brasil emitido pela AC Dataprev.
+        </text>
+        <text x="32" y="322" fill="#1f2937" fontFamily="'Inter', 'Segoe UI', sans-serif" fontSize="11">
+          Hash SHA-256: 7A1E-93C4-2BD0-FF12-88AE
+        </text>
+        <text x="32" y="340" fill="#1f2937" fontFamily="'Inter', 'Segoe UI', sans-serif" fontSize="11">
+          Validação pública: https://signflow.gov.br/validate/BR-2024-000198
+        </text>
+        <text x="32" y="360" fill="#475569" fontFamily="'Inter', 'Segoe UI', sans-serif" fontSize="10">
+          Responsável técnico: Dra. Helena Gomes · CRM 000000 · Timestamp Dataprev 15/05/2024 11:42 BRT
+        </text>
 
         <g>
           <rect x="280" y="440" width="100" height="100" rx="6" fill="#ffffff" stroke="#d1d5db"/>
@@ -329,7 +341,15 @@ function DocMock() {
           ))}
           <path d="M40 500 C 80 520, 120 468, 160 496 S 230 520, 260 492"
                 stroke="#0f172a" strokeWidth="2" fill="none" opacity="0.9"/>
-          <rect x="34" y="520" width="160" height="12" rx="3" fill="#e5e7eb"/>
+          <rect x="34" y="520" width="210" height="46" rx="6" fill="#eef2ff" stroke="#c7d2fe"/>
+          <text x="44" y="540" fill="#1d4ed8" fontFamily="'Inter', 'Segoe UI', sans-serif" fontSize="11" fontWeight="600">
+            Selo ICP-Brasil
+          </text>
+          <text x="44" y="554" fill="#1f2937" fontFamily="'Inter', 'Segoe UI', sans-serif" fontSize="10">
+            Certificado válido até 12/2026 • Verificação Dataprev
+          </text>
+          <circle cx="216" cy="536" r="10" fill="#16a34a"/>
+          <path d="M211 536l3 4 7-8" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
         </g>
       </svg>
     </div>
@@ -377,22 +397,22 @@ const css = `
 .hero-bg{position:absolute;inset:-10% -20% auto -20%;height:560px;opacity:.5;
   background:radial-gradient(780px 400px at -20% -10%, rgba(37,99,235,.35) 18%, transparent 65%),
              radial-gradient(780px 400px at 120% -20%, rgba(124,58,237,.28) 18%, transparent 62%);}
-.hero-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:44px;align-items:center;padding:96px 0 56px}
-.hero-copy h1{font-size:46px;line-height:1.06;margin:8px 0;letter-spacing:-.6px;color:#0b1529}
-.sub{color:#1f2937;margin:0;font-size:18px;max-width:520px}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:clamp(28px,5vw,60px);align-items:center;padding:clamp(72px,12vw,110px) 0 clamp(40px,8vw,72px)}
+.hero-copy h1{font-size:clamp(36px,4.6vw,48px);line-height:1.05;margin:8px 0;letter-spacing:-.6px;color:#0b1529}
+.sub{color:#1f2937;margin:0;font-size:clamp(16px,2vw,18px);max-width:540px;line-height:1.6}
 .badge{display:inline-flex;align-items:center;gap:8px;color:#1d4ed8;margin-bottom:12px;padding:6px 12px;border:1px solid rgba(37,99,235,.32);border-radius:999px;background:rgba(219,234,254,.8)}
-.cta-row{display:flex;gap:12px;margin:18px 0}
+.cta-row{display:flex;gap:12px;margin:18px 0;flex-wrap:wrap}
 .bullets{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:8px;color:#1f2937;font-size:15px}
 .hero-mock{display:flex;justify-content:center}
-.hero-stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+.hero-stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;justify-content:flex-start}
 .stat{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid rgba(148,163,184,.4);border-radius:14px;background:#fff;min-width:220px;box-shadow:0 8px 22px rgba(15,23,42,.08)}
 .stat-icon{width:32px;height:32px;border-radius:10px;background:#eff6ff;display:flex;align-items:center;justify-content:center;color:#1d4ed8}
 .stat-value{font-weight:700;color:#0f172a;font-size:15px}
 .stat-label{font-size:12px;color:#475569;letter-spacing:.04em;text-transform:uppercase}
 
 /* DOC MOCK */
-.doc{width:100%;max-width:480px;border:1px solid var(--border);border-radius:14px;background:#fff;box-shadow:0 16px 40px rgba(15,23,42,.1)}
-.doc-bar{display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--border);background:#f8fafc;border-radius:14px 14px 0 0}
+.doc{width:100%;max-width:480px;border:1px solid rgba(148,163,184,.35);border-radius:16px;background:#fff;box-shadow:0 20px 44px rgba(15,23,42,.12);padding:12px}
+.doc-bar{display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--border);background:#f8fafc;border-radius:12px 12px 0 0}
 .dots span{display:inline-block;width:8px;height:8px;background:#e2e8f0;border-radius:999px;margin-right:6px}
 .doc-title{margin-left:auto;font-size:12px;color:#6b7280}
 .doc-svg{display:block;width:100%;height:auto}
@@ -405,7 +425,7 @@ const css = `
 /* LOGOS */
 .logos{background:#f8fafc;padding:40px 0}
 .logos-title{text-transform:uppercase;letter-spacing:.12em;font-size:12px;color:#475569;text-align:center;margin:0 0 18px}
-.logos-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.logos-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;align-items:stretch}
 .logo-card{background:#fff;border:1px solid rgba(148,163,184,.35);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;box-shadow:0 12px 28px rgba(15,23,42,.08)}
 .logo-mark{font-weight:800;font-size:18px;color:#0b1529}
 .logo-sub{font-size:13px;color:#64748b}
@@ -413,7 +433,7 @@ const css = `
 /* COMO FUNCIONA */
 .how{background:#f8fafc;border-top:1px solid #eef2ff;border-bottom:1px solid #eef2ff;padding:52px 0}
 .how h2{margin:0 0 6px}
-.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
 .card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;min-height:158px}
 .card-ico{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:var(--ring);color:var(--primary-2)}
 .card h3{margin:10px 0 6px}
@@ -421,14 +441,14 @@ const css = `
 
 /* DIFERENCIAIS */
 .diff{background:#fff;padding:52px 0}
-.grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
 .feature{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;min-height:130px}
 .feature h3{margin:0 0 6px}
 .feature p{margin:0;color:var(--muted)}
 
 /* DEPOIMENTOS */
 .testi{background:#f8fafc;border-top:1px solid #eef2ff;border-bottom:1px solid #eef2ff;padding:46px 0}
-.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
 .quote{background:#fff;border:1px solid rgba(148,163,184,.4);border-radius:16px;padding:20px;box-shadow:0 12px 28px rgba(15,23,42,.08)}
 .q-text{margin:0 0 12px;color:#1e293b;font-size:16px}
 .q-author{color:#475569;font-size:13px;text-transform:uppercase;letter-spacing:.08em}
