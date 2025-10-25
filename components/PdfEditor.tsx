@@ -1,17 +1,14 @@
 // components/PdfEditor.tsx
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
+// usar a build legacy evita diversos problemas com bundlers/Next.js
+import pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 import 'pdfjs-dist/web/pdf_viewer.css';
-
-if (typeof window !== 'undefined') {
-  (pdfjsLib as any).GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs`;
-}
 
 type Pos = { page: number; nx: number; ny: number; scale: number; rotation: number };
 
 type Props = {
-  pdfBytes: ArrayBuffer | null;
+  file: File | null;
   signatureUrl: string | null;
   positions: Pos[];
   onPositions: (p: Pos[]) => void;
@@ -20,8 +17,19 @@ type Props = {
   onDocumentLoaded?: (meta: { pages: number }) => void;
 };
 
+if (typeof window !== 'undefined') {
+  try {
+    const ver = (pdfjsLib as any).version || 'latest';
+    // aponta o worker para a mesma versão do pdfjs via CDN (unpkg)
+    (pdfjsLib as any).GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${ver}/build/pdf.worker.min.js`;
+    // console.info('pdfjs version:', ver, 'workerSrc set to', (pdfjsLib as any).GlobalWorkerOptions.workerSrc);
+  } catch (e) {
+    console.warn('Não foi possível configurar GlobalWorkerOptions.workerSrc automaticamente:', e);
+  }
+}
+
 export default function PdfEditor({
-  pdfBytes,
+  file,
   signatureUrl,
   positions,
   onPositions,
@@ -43,61 +51,81 @@ export default function PdfEditor({
   const latestPosRef = useRef<{ nx: number; ny: number } | null>(null);
 
   useEffect(() => {
-    let cancelled = false
-    let task: any
+    let cancelled = false;
+    let task: any;
+    let blobUrl: string | null = null;
+
     (async () => {
-      if (!pdfBytes) {
-        setPdf(null)
-        setError(null)
-        return
+      if (!file) {
+        setPdf(null);
+        setError(null);
+        return;
       }
+
       try {
-        setLoading(true)
-        setError(null)
-        task = (pdfjsLib as any).getDocument({ data: pdfBytes })
-        const doc = await task.promise
-        if (cancelled) {
-          await doc?.destroy?.()
-          return
+        setLoading(true);
+        setError(null);
+
+        // 1) tentar com Uint8Array (recomendado)
+        try {
+          const ab = await file.arrayBuffer();
+          const uint8 = new Uint8Array(ab);
+
+          // NÃO definimos disableWorker aqui — deixamos o worker carregado pelo GlobalWorkerOptions
+          task = (pdfjsLib as any).getDocument({
+            data: uint8
+          });
+          const doc = await task.promise;
+          if (cancelled) { await doc?.destroy?.(); return; }
+          setPdf(doc);
+          if (controlledPage === undefined) setPage(1);
+          onDocumentLoaded?.({ pages: doc.numPages || 1 });
+          onPageChange?.(1);
+          return;
+        } catch (firstErr) {
+          console.warn('pdfjs getDocument usando Uint8Array falhou — tentando fallback por blob URL', firstErr);
         }
-        setPdf(doc)
-        if (controlledPage === undefined) setPage(1)
-        onDocumentLoaded?.({ pages: doc.numPages || 1 })
-        onPageChange?.(1)
+
+        // 2) fallback: usar blob URL (às vezes corrige problemas de compatibilidade/bundling)
+        try {
+          blobUrl = URL.createObjectURL(file);
+          task = (pdfjsLib as any).getDocument({
+            url: blobUrl
+          });
+          const doc = await task.promise;
+          if (cancelled) { await doc?.destroy?.(); return; }
+          setPdf(doc);
+          if (controlledPage === undefined) setPage(1);
+          onDocumentLoaded?.({ pages: doc.numPages || 1 });
+          onPageChange?.(1);
+          return;
+        } catch (secondErr) {
+          console.warn('pdfjs getDocument via blob URL também falhou', secondErr);
+          throw secondErr;
+        }
       } catch (err: any) {
-        console.error(
-          'Falha ao carregar PDF para prévia:',
-          err?.name,
-          err?.message,
-          err
-        )
+        console.error('Falha ao carregar PDF para prévia:', err?.name, err?.message, err);
         if (!cancelled) {
-          setPdf(null)
-          setError('Não foi possível carregar a prévia do PDF.')
+          setPdf(null);
+          setError('Não foi possível carregar a prévia do PDF.');
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
+        if (!cancelled) setLoading(false);
       }
-    })()
+    })();
+
     return () => {
-      cancelled = true
-      try {
-        task?.destroy?.()
-      } catch (_) {}
-    }
-  }, [pdfBytes, controlledPage, onDocumentLoaded, onPageChange])
+      cancelled = true;
+      try { task?.destroy?.(); } catch (_) {}
+      if (blobUrl) {
+        try { URL.revokeObjectURL(blobUrl); } catch (_) {}
+      }
+    };
+  }, [file, controlledPage, onDocumentLoaded, onPageChange]);
 
-  useEffect(() => {
-    setSigDataUrl(signatureUrl);
-  }, [signatureUrl]);
+  useEffect(() => { setSigDataUrl(signatureUrl); }, [signatureUrl]);
 
-  useEffect(() => {
-    if (controlledPage !== undefined) {
-      setPage(controlledPage);
-    }
-  }, [controlledPage]);
+  useEffect(() => { if (controlledPage !== undefined) setPage(controlledPage); }, [controlledPage]);
 
   useEffect(() => { renderPage(); }, [pdf, page, scale, positions, sigDataUrl]);
 
@@ -168,9 +196,7 @@ export default function PdfEditor({
   function onPointerUp() { setDrag(null); }
 
   useEffect(() => {
-    if (controlledPage === undefined) {
-      onPageChange?.(page);
-    }
+    if (controlledPage === undefined) onPageChange?.(page);
   }, [page, controlledPage, onPageChange]);
 
   const currentPos = positions.find(p => p.page === page);
@@ -178,9 +204,7 @@ export default function PdfEditor({
 
   function changePage(next: number) {
     const clamped = Math.max(1, Math.min(totalPages, next));
-    if (controlledPage === undefined) {
-      setPage(clamped);
-    }
+    if (controlledPage === undefined) setPage(clamped);
     onPageChange?.(clamped);
   }
 
