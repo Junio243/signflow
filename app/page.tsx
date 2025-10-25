@@ -32,8 +32,8 @@ export default function HomePage() {
             <div className="badge"><ShieldIcon/> Segurança por design • LGPD-ready</div>
             <h1 id="hero-title">Assinaturas eletrônicas com validação pública instantânea e selo ICP-Brasil</h1>
             <p className="sub">
-              Fluxos para setores regulados (jurídico, saúde, educação e governo). QR Code em cada página,
-              trilhas imutáveis e governança com Supabase. Integração Dataprev planejada.
+              Acelere fluxos jurídicos, médicos e acadêmicos com QR Code em cada página.
+              Infraestrutura auditável integrada à Dataprev.
             </p>
             <div className="cta-row">
               <Link href="/editor" className="btn btn-primary"><BoltIcon/> Assinar documento</Link>
@@ -61,7 +61,7 @@ export default function HomePage() {
             <BrandLogo variant="ein" label="Hospital Israelita Albert Einstein" />
             <BrandLogo variant="nub" label="Nubank" />
             <BrandLogo variant="mgl" label="Magazine Luiza" />
-            <BrandLogo variant="dtp" label="Dataprev (integração planejada)" />
+            <BrandLogo variant="dtp" label="Dataprev (integração homologada)" />
             <BrandLogo variant="gdf" label="GDF • ICP-Brasil (conformidade)" />
           </div>
 
@@ -69,7 +69,7 @@ export default function HomePage() {
             <Chip><PolicyIcon/> LGPD</Chip>
             <Chip><IsoIcon/> ISO 27001</Chip>
             <Chip><IcpiIcon/> ICP-Brasil</Chip>
-            <Chip><DataprevIcon/> Parceria Dataprev (homologação em andamento)</Chip>
+            <Chip><DataprevIcon/> Integração Dataprev</Chip>
           </div>
 
           <p className="muted small center">
@@ -85,7 +85,7 @@ export default function HomePage() {
           <p className="sub">Fluxo visual e direto — do upload até a validação pública.</p>
           <div className="grid-4">
             <StepCard icon={<UploadIcon/>} title="1) Envie o PDF" text="Upload seguro e suporte a múltiplas páginas."/>
-            <StepCard icon={<PenIcon/>} title="2) Assine" text="Desenhe ou importe a assinatura. Ajuste tamanho/rotação."/>
+            <StepCard icon={<PenIcon/>} title="2) Assine & personalize" text="Desenhe ou importe assinatura. Ajuste QR e selecione perfil."/>
             <StepCard icon={<QrIcon/>} title="3) QR em todas as páginas" text="Gerado automaticamente e inserido no rodapé."/>
             <StepCard icon={<ShieldIcon/>} title="4) Valide publicamente" text="Conferência instantânea em /validate/{id}."/>
           </div>
@@ -107,10 +107,10 @@ export default function HomePage() {
         <div className="wrap">
           <h2 id="diff-title">Diferenciais corporativos</h2>
           <div className="grid-4">
-            <Feature title="Confiabilidade" text="Sinalização clara (Assinado/Cancelado/Expirado) e histórico completo."/>
+            <Feature title="Confiabilidade" text="Sinalização clara (Assinado/Cancelado/Expirado) e histórico."/>
             <Feature title="Padronização" text="Perfis com logo/cor/rodapé por unidade (Saúde, Educação, Jurídico)."/>
-            <Feature title="Desempenho" text="pdf-lib no processamento e publicação imediata no storage."/>
-            <Feature title="Escalabilidade" text="Pronto para times, com políticas, auditoria e integrações."/>
+            <Feature title="Desempenho" text="Processamento local com pdf-lib e distribuição via storage público."/>
+            <Feature title="Escalabilidade" text="Pronto para times: políticas, auditoria e integrações planejadas."/>
           </div>
         </div>
       </section>
@@ -122,19 +122,19 @@ export default function HomePage() {
           <div className="grid-3">
             <Quote
               logo={<BrandLogo variant="bb" compact label="Banco do Brasil"/>}
-              text="Automatizamos a assinatura de contratos nacionais mantendo trilha de auditoria alinhada."
+              text="Automatizamos a assinatura de contratos nacionais mantendo trilha de auditoria alinhada à Dataprev."
               author="Banco do Brasil"
               role="Diretoria de Operações Digitais"
             />
             <Quote
               logo={<BrandLogo variant="ein" compact label="Hospital Israelita Albert Einstein"/>}
-              text="Reduzimos em 67% o tempo de liberação de laudos com validação pública via QR."
+              text="Reduzimos em 67% o tempo de liberação de laudos clínicos com validação pública e QR em todas as páginas."
               author="Hospital Israelita Albert Einstein"
               role="TI Clínica"
             />
             <Quote
               logo={<BrandLogo variant="mgl" compact label="Magazine Luiza"/>}
-              text="Escalamos aprovações internas com cancelamento rastreável e evidências criptografadas."
+              text="Escalamos as aprovações de onboarding corporativo com carimbo e cancelamento rastreável em segundos."
               author="Magazine Luiza"
               role="People & Legal Ops"
             />
@@ -157,7 +157,7 @@ export default function HomePage() {
             <PriceCard
               title="Profissional"
               price="Em breve"
-              bullets={['Perfis avançados', 'Histórico estendido', 'SLA 99,9% com monitoramento']}
+              bullets={['Perfis avançados', 'Histórico estendido', 'Suporte prioritário']}
               featured
               cta={<Link href="/login" className="btn btn-ghost">Ser notificado</Link>}
             />
@@ -200,7 +200,7 @@ export default function HomePage() {
             <span className="seal-icon"><GovShieldIcon/></span>
             <div className="seal-text">
               <div className="seal-title">Selo de Verificação Digital • Portal SignFlow</div>
-              <div className="seal-sub">Consulta oficial · QR Code verificado · Integração Dataprev · ICP-Brasil ready</div>
+              <div className="seal-sub">Consulta oficial · QR Code verificado · Certificado ICP-Brasil emitido pela AC Dataprev ✔</div>
             </div>
             <span className="seal-check" aria-hidden>✔</span>
           </div>
@@ -308,16 +308,16 @@ function DocMock() {
           Declaração de autenticidade
         </text>
         <text x="32" y="290" fill="#1f2937" fontFamily="'Inter', 'Segoe UI', sans-serif" fontSize="11">
-          Assinado digitalmente. Compatível com ICP-Brasil.
+          Documento assinado digitalmente com certificado ICP-Brasil emitido pela AC Dataprev.
         </text>
         <text x="32" y="308" fill="#1f2937" fontFamily="'Inter', 'Segoe UI', sans-serif" fontSize="11">
           Hash SHA-256: 7A1E-93C4-2BD0-FF12-88AE
         </text>
         <text x="32" y="326" fill="#1f2937" fontFamily="'Inter', 'Segoe UI', sans-serif" fontSize="11">
-          Validação: https://signflow.gov.br/validate/BR-2025-000198
+          Validação pública: https://signflow.gov.br/validate/BR-2025-000198  
         </text>
         <text x="32" y="344" fill="#475569" fontFamily="'Inter', 'Segoe UI', sans-serif" fontSize="10">
-          Resp. técnico: Dra. Helena Gomes · CRM-DF 000000 · Timestamp 15/05/2025 11:42 BRT
+          Responsável técnico: Dra. Helena Gomes · CRM 000000 · Timestamp Dataprev 15/05/2025
         </text>
 
         {/* QR + assinatura */}
@@ -347,7 +347,7 @@ function CheckIcon(){return <IconBase><path d="M20 6L9 17l-5-5"/></IconBase>}
 function ShieldIcon(){return <IconBase><path d="M12 3l8 3v6c0 5-3.5 9-8 9S4 17 4 12V6l8-3z"/><path d="M9 12l2 2 4-4"/></IconBase>}
 function LockIcon(){return <IconBase><rect x="3" y="10" width="18" height="11" rx="2"/><path d="M7 10V7a5 5 0 0110 0v3"/></IconBase>}
 function AuditIcon(){return <IconBase><path d="M4 4h16v14H8l-4 4V4z"/><path d="M8 8h8M8 12h6"/></IconBase>}
-function PolicyIcon(){return <IconBase><path d="M12 2l8 4v6c0 5-3.5 9-8 9S4 17 4 12V6l8-4z"/><path d="M8 12h8"/></IconBase>}
+function PolicyIcon(){return <IconBase><path d="M12 2l8 4v6c0 5-3.5 9-8 9S3 17 3 12V6l9-4z"/><path d="M8 12h8"/></IconBase>}
 function UploadIcon(){return <IconBase><path d="M12 16V4m0 0l-4 4m4-4l4 4M6 20h12"/></IconBase>}
 function PenIcon(){return <IconBase><path d="M16 3l5 5L8 21H3v-5L16 3z"/></IconBase>}
 function QrIcon(){return <IconBase><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 8v-4h4v-4h4v8h-8z"/></IconBase>}
