@@ -1,3 +1,4 @@
+// components/PdfEditor.tsx
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -21,6 +22,10 @@ export default function PdfEditor({ file, signature, positions, onPositions }: P
   const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [drag, setDrag] = useState<{x:number,y:number}|null>(null);
+
+  // throttle refs
+  const rafRef = useRef(false);
+  const latestPosRef = useRef<{nx:number, ny:number} | null>(null);
 
   useEffect(()=>{
     (async()=>{
@@ -64,10 +69,11 @@ export default function PdfEditor({ file, signature, positions, onPositions }: P
   }
 
   function onClick(e: React.MouseEvent){
+    // usar bounding rect para normalizar (CSS pixels) => consistente com preview logic
     const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
     const x = e.clientX - rect.left; const y = e.clientY - rect.top;
     const existing = positions.filter(p=>p.page!==page);
-    const cw = canvasRef.current?.width || 1; const ch = canvasRef.current?.height || 1;
+    const cw = rect.width || 1; const ch = rect.height || 1;
     const nx = x / cw; const ny = y / ch;
     onPositions([...existing, { page, nx, ny, scale: 1, rotation: 0 }]);
   }
@@ -78,16 +84,25 @@ export default function PdfEditor({ file, signature, positions, onPositions }: P
     const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
     setDrag({x: e.clientX - rect.left, y: e.clientY - rect.top});
   }
+
   function onPointerMove(e: React.PointerEvent){
     if(!drag) return;
     const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
     const x = e.clientX - rect.left; const y = e.clientY - rect.top;
-    const pos = positions.find(p=>p.page===page); if(!pos) return;
-    const others = positions.filter(p=>p.page!==page);
-    const cw = (e.target as HTMLCanvasElement).width; const ch = (e.target as HTMLCanvasElement).height;
+    const cw = rect.width || 1; const ch = rect.height || 1;
     const nx = x / cw; const ny = y / ch;
-    onPositions([...others, { ...pos, nx, ny }]);
+    latestPosRef.current = { nx, ny };
+    if (!rafRef.current) {
+      rafRef.current = true;
+      requestAnimationFrame(()=>{
+        rafRef.current = false;
+        const pos = positions.find(p=>p.page===page); if(!pos) return;
+        const others = positions.filter(p=>p.page!==page);
+        onPositions([...others, { ...pos, nx: latestPosRef.current!.nx, ny: latestPosRef.current!.ny }]);
+      });
+    }
   }
+
   function onPointerUp(){ setDrag(null); }
 
   const pos = positions.find(p=>p.page===page);
@@ -111,8 +126,15 @@ export default function PdfEditor({ file, signature, positions, onPositions }: P
           }} />
         </div>
       </div>
-      <canvas ref={canvasRef} className="rounded-lg border bg-white max-w-full" onClick={onClick} onWheel={onWheel}
-        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} />
+      <canvas
+        ref={canvasRef}
+        className="rounded-lg border bg-white max-w-full"
+        onClick={onClick}
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      />
       <p className="text-xs text-slate-500">Clique para posicionar. Arraste para mover. Use os sliders para tamanho/rotação.</p>
     </div>
   );
