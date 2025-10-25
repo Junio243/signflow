@@ -481,7 +481,7 @@ export default function EditorPage() {
           {pdfFile ? (
             <div style={{ border:'1px solid #e5e7eb', borderRadius:12, padding:12, background:'#f8fafc' }}>
               <PdfEditor
-                file={pdfFile}
+                pdfBytes={pdfBytes}
                 signatureUrl={signaturePreviewUrl}
                 positions={positions}
                 onPositions={setPositions}

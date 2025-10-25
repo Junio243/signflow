@@ -11,7 +11,7 @@ if (typeof window !== 'undefined') {
 type Pos = { page: number; nx: number; ny: number; scale: number; rotation: number };
 
 type Props = {
-  file: File | null;
+  pdfBytes: ArrayBuffer | null;
   signatureUrl: string | null;
   positions: Pos[];
   onPositions: (p: Pos[]) => void;
@@ -21,7 +21,7 @@ type Props = {
 };
 
 export default function PdfEditor({
-  file,
+  pdfBytes,
   signatureUrl,
   positions,
   onPositions,
@@ -43,84 +43,51 @@ export default function PdfEditor({
   const latestPosRef = useRef<{ nx: number; ny: number } | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    let task: any;
-    let blobUrl: string | null = null;
-
+    let cancelled = false
+    let task: any
     (async () => {
-      if (!file) {
-        setPdf(null);
-        setError(null);
-        return;
+      if (!pdfBytes) {
+        setPdf(null)
+        setError(null)
+        return
       }
-
       try {
-        setLoading(true);
-        setError(null);
-
-        // tenta primeiro com Uint8Array (mais confiável com pdfjs)
-        try {
-          const ab = await file.arrayBuffer();
-          const uint8 = new Uint8Array(ab);
-          task = (pdfjsLib as any).getDocument({
-            data: uint8,
-          });
-          const doc = await task.promise;
-          if (cancelled) {
-            await doc?.destroy?.();
-            return;
-          }
-          setPdf(doc);
-          if (controlledPage === undefined) setPage(1);
-          onDocumentLoaded?.({ pages: doc.numPages || 1 });
-          onPageChange?.(1);
-          return;
-        } catch (firstErr) {
-          console.warn('pdfjs getDocument using Uint8Array failed - trying blob URL fallback', firstErr);
-          // continue to fallback
+        setLoading(true)
+        setError(null)
+        task = (pdfjsLib as any).getDocument({ data: pdfBytes })
+        const doc = await task.promise
+        if (cancelled) {
+          await doc?.destroy?.()
+          return
         }
-
-        // fallback: usar blob URL (às vezes resolve problemas de bundle/compatibilidade)
-        try {
-          blobUrl = URL.createObjectURL(file);
-          task = (pdfjsLib as any).getDocument({
-            url: blobUrl,
-          });
-          const doc = await task.promise;
-          if (cancelled) {
-            await doc?.destroy?.();
-            return;
-          }
-          setPdf(doc);
-          if (controlledPage === undefined) setPage(1);
-          onDocumentLoaded?.({ pages: doc.numPages || 1 });
-          onPageChange?.(1);
-          return;
-        } catch (secondErr) {
-          // ambos falharam -> lança para o catch geral
-          throw secondErr;
-        }
+        setPdf(doc)
+        if (controlledPage === undefined) setPage(1)
+        onDocumentLoaded?.({ pages: doc.numPages || 1 })
+        onPageChange?.(1)
       } catch (err: any) {
-        console.error('Falha ao carregar PDF para prévia:', err?.name, err?.message, err);
+        console.error(
+          'Falha ao carregar PDF para prévia:',
+          err?.name,
+          err?.message,
+          err
+        )
         if (!cancelled) {
-          setPdf(null);
-          setError('Não foi possível carregar a prévia do PDF.');
+          setPdf(null)
+          setError('Não foi possível carregar a prévia do PDF.')
         }
       } finally {
         if (!cancelled) {
-          setLoading(false);
+          setLoading(false)
         }
       }
-    })();
-
+    })()
     return () => {
-      cancelled = true;
-      try { task?.destroy?.(); } catch (_) {}
-      if (blobUrl) {
-        try { URL.revokeObjectURL(blobUrl); } catch (_) {}
-      }
-    };
-  }, [file, controlledPage, onDocumentLoaded, onPageChange]);
+      cancelled = true
+      try {
+        task?.destroy?.()
+      } catch (_) {}
+    }
+  }, [pdfBytes, controlledPage, onDocumentLoaded, onPageChange])
 
   useEffect(() => {
     setSigDataUrl(signatureUrl);
