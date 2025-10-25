@@ -10,12 +10,15 @@ type Pos = { page: number; nx: number; ny: number; scale: number; rotation: numb
 
 type Props = {
   file: File | null;
-  signature: File | null;
+  signatureUrl: string | null;
   positions: Pos[];
   onPositions: (p: Pos[]) => void;
+  page?: number;
+  onPageChange?: (page: number) => void;
+  onDocumentLoaded?: (meta: { pages: number }) => void;
 };
 
-export default function PdfEditor({ file, signature, positions, onPositions }: Props){
+export default function PdfEditor({ file, signatureUrl, positions, onPositions, page: controlledPage, onPageChange, onDocumentLoaded }: Props){
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [pdf, setPdf] = useState<any>(null);
   const [page, setPage] = useState(1);
@@ -32,17 +35,25 @@ export default function PdfEditor({ file, signature, positions, onPositions }: P
       if (!file) return;
       const ab = await file.arrayBuffer();
       const loadingTask = (pdfjsLib as any).getDocument({data: ab});
-      setPdf(await loadingTask.promise);
-      setPage(1);
+      const doc = await loadingTask.promise;
+      setPdf(doc);
+      if (controlledPage === undefined) {
+        setPage(1);
+      }
+      onDocumentLoaded?.({ pages: doc.numPages || 1 });
+      onPageChange?.(1);
     })();
-  }, [file]);
+  }, [file, controlledPage, onDocumentLoaded, onPageChange]);
 
   useEffect(()=>{
-    if (!signature) return setSigDataUrl(null);
-    const fr = new FileReader();
-    fr.onload = ()=> setSigDataUrl(String(fr.result));
-    fr.readAsDataURL(signature);
-  }, [signature]);
+    setSigDataUrl(signatureUrl);
+  }, [signatureUrl]);
+
+  useEffect(()=>{
+    if (controlledPage !== undefined) {
+      setPage(controlledPage);
+    }
+  }, [controlledPage]);
 
   useEffect(()=>{ renderPage(); }, [pdf, page, scale, positions, sigDataUrl]);
 
@@ -81,12 +92,14 @@ export default function PdfEditor({ file, signature, positions, onPositions }: P
   function onWheel(e: React.WheelEvent){ setScale(s=>Math.max(0.5, Math.min(3, s + (e.deltaY>0?-0.1:0.1)))); }
 
   function onPointerDown(e: React.PointerEvent){
+    if (!sigDataUrl) return;
     const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
     setDrag({x: e.clientX - rect.left, y: e.clientY - rect.top});
   }
 
   function onPointerMove(e: React.PointerEvent){
     if(!drag) return;
+    if (!sigDataUrl) return;
     const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
     const x = e.clientX - rect.left; const y = e.clientY - rect.top;
     const cw = rect.width || 1; const ch = rect.height || 1;
@@ -105,24 +118,39 @@ export default function PdfEditor({ file, signature, positions, onPositions }: P
 
   function onPointerUp(){ setDrag(null); }
 
-  const pos = positions.find(p=>p.page===page);
+  useEffect(()=>{
+    if (controlledPage === undefined) {
+      onPageChange?.(page);
+    }
+  }, [page, controlledPage, onPageChange]);
+
+  const currentPos = positions.find(p=>p.page===page);
+  const totalPages = pdf?.numPages || 1;
+
+  function changePage(next: number){
+    const clamped = Math.max(1, Math.min(totalPages, next));
+    if (controlledPage === undefined) {
+      setPage(clamped);
+    }
+    onPageChange?.(clamped);
+  }
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <button className="btn" onClick={()=>setPage(p=>Math.max(1,p-1))}>◀</button>
-        <div>p. {page}</div>
-        <button className="btn" onClick={()=>setPage(p=>Math.min(pdf?.numPages||1,p+1))}>▶</button>
+        <button className="btn" onClick={()=>changePage(page-1)} disabled={page<=1}>◀</button>
+        <div>p. {page} / {totalPages}</div>
+        <button className="btn" onClick={()=>changePage(page+1)} disabled={page>=totalPages}>▶</button>
         <div className="ml-auto flex items-center gap-2">
           <label className="label m-0">Tamanho</label>
-          <input type="range" min={0.5} max={3} step={0.1} value={pos?.scale||1} onChange={e=>{
+          <input type="range" min={0.5} max={3} step={0.1} value={currentPos?.scale||1} onChange={e=>{
             const v = Number(e.target.value);
-            if(!pos) return; onPositions([...positions.filter(p=>p.page!==page), {...pos, scale:v}]);
+            if(!currentPos) return; onPositions([...positions.filter(p=>p.page!==page), {...currentPos, scale:v}]);
           }} />
           <label className="label m-0">Rotação</label>
-          <input type="range" min={-45} max={45} step={1} value={pos?.rotation||0} onChange={e=>{
+          <input type="range" min={-45} max={45} step={1} value={currentPos?.rotation||0} onChange={e=>{
             const v = Number(e.target.value);
-            if(!pos) return; onPositions([...positions.filter(p=>p.page!==page), {...pos, rotation:v}]);
+            if(!currentPos) return; onPositions([...positions.filter(p=>p.page!==page), {...currentPos, rotation:v}]);
           }} />
         </div>
       </div>
@@ -135,7 +163,11 @@ export default function PdfEditor({ file, signature, positions, onPositions }: P
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
       />
-      <p className="text-xs text-slate-500">Clique para posicionar. Arraste para mover. Use os sliders para tamanho/rotação.</p>
+      <p className="text-xs text-slate-500">
+        {sigDataUrl
+          ? 'Clique para posicionar. Arraste para mover. Use os sliders para ajustar tamanho e rotação.'
+          : 'Envie ou desenhe uma assinatura para visualizar aqui. Ainda é possível definir posições clicando nas páginas.'}
+      </p>
     </div>
   );
 }
