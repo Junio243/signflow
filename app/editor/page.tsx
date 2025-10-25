@@ -8,6 +8,7 @@ import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabaseClient'
 
 type Profile = { id: string; name: string; type: 'medico'|'faculdade'|'generico'; theme: any }
+type Pos = { page: number; nx: number; ny: number; scale: number; rotation: number };
 
 const IconUpload = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0l-4 4m4-4l4 4M6 20h12" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -39,10 +40,13 @@ export default function EditorPage() {
   const [sigWidth, setSigWidth] = useState<number>(180) // px
   const [qrSize, setQrSize] = useState<number>(120) // px
 
-  // Posição normalizada 0..1
+  // Posição normalizada 0..1 (legacy)
   const [normX, setNormX] = useState<number | null>(null)
   const [normY, setNormY] = useState<number | null>(null)
   const previewRef = useRef<HTMLDivElement | null>(null)
+
+  // NOVO: positions array (para presets/multi-page)
+  const [positions, setPositions] = useState<Pos[]>([])
 
   // Perfis (com theme)
   const [profiles, setProfiles] = useState<Profile[]>([])
@@ -50,6 +54,13 @@ export default function EditorPage() {
 
   const [busy, setBusy] = useState(false)
   const [info, setInfo] = useState<string | null>(null)
+
+  // Sessão / organização (para salvar presets)
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null)
+  const [currentOrgId, setCurrentOrgId] = useState<string | null>(null) // se usar orgs, preencha; por enquanto null
+
+  // Presets local state
+  const [presets, setPresets] = useState<any[]>([])
 
   // ====== NOVOS: guardar traços do desenho para não sumirem ======
   const strokesRef = useRef<Array<Array<{x:number,y:number}>>>([]);
@@ -174,12 +185,25 @@ export default function EditorPage() {
     setPdfBytes(await f.arrayBuffer())
     setInfo('Clique na prévia para posicionar assinatura/QR (aplica em todas as páginas).')
   }
+
   const onPreviewClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const box = previewRef.current!
     const r = box.getBoundingClientRect()
-    setNormX(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)))
-    setNormY(Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)))
+    const nx = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))
+    const ny = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height))
+    setNormX(nx)
+    setNormY(ny)
+
+    // ====== Atualiza positions array (para presets) ======
+    setPositions(prev => {
+      // replace existing position for page 1 or add
+      const others = prev.filter(p => p.page !== 1);
+      return [...others, { page: 1, nx, ny, scale: 1, rotation: 0 }];
+    });
+
+    setInfo('Posição atualizada.');
   }
+
   const Marker = () => (normX===null||normY===null)?null:(
     <div style={{
       position:'absolute', left:`${normX*100}%`, top:`${normY*100}%`,
@@ -193,6 +217,7 @@ export default function EditorPage() {
     (async () => {
       const s = await supabase.auth.getSession()
       if (!s.data?.session) return
+      setSessionUserId(s.data.session.user.id ?? null)
       const { data } = await supabase
         .from('validation_profiles')
         .select('id, name, type, theme')
@@ -204,6 +229,69 @@ export default function EditorPage() {
   // ====== Utils ======
   const dataUrlToBlob = async (dataUrl: string) => fetch(dataUrl).then(r => r.blob())
   const canvasToDataURL = () => signCanvasRef.current!.toDataURL('image/png')
+
+  // ====== Presets: save / fetch / apply ======
+  async function savePreset(name?: string) {
+    if (!sessionUserId) { setInfo('Faça login antes.'); return; }
+    if (!name) {
+      name = prompt('Nome do preset (ex: Rodapé direito)') || '';
+      if (!name) return;
+    }
+    if (!positions || positions.length === 0) { setInfo('Nenhuma posição a salvar. Clique na pré-visualização para escolher.'); return; }
+    setBusy(true); setInfo(null);
+    try {
+      const payload = {
+        org_id: currentOrgId ?? null,
+        user_id: sessionUserId,
+        name,
+        positions
+      };
+      const { error } = await supabase.from('position_presets').insert(payload);
+      if (error) throw error;
+      setInfo('Preset salvo.');
+      await fetchPresets();
+    } catch (e:any) {
+      console.error(e);
+      setInfo('Erro ao salvar preset: ' + (e?.message ?? 'desconhecido'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function fetchPresets() {
+    if (!sessionUserId) { setInfo('Faça login antes.'); return; }
+    setBusy(true); setInfo(null);
+    try {
+      let data;
+      if (currentOrgId) {
+        // fetch presets either user-owned or org-owned
+        const orStr = `user_id.eq.${sessionUserId},org_id.eq.${currentOrgId}`;
+        const res = await supabase.from('position_presets').select('*').or(orStr).order('created_at', { ascending: false });
+        data = res.data;
+      } else {
+        const res = await supabase.from('position_presets').select('*').eq('user_id', sessionUserId).order('created_at', { ascending: false });
+        data = res.data;
+      }
+      setPresets(data || []);
+      setInfo('Presets carregados.');
+    } catch (e:any) {
+      console.error(e);
+      setInfo('Erro ao carregar presets: ' + (e?.message ?? 'desconhecido'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function applyPreset(preset: any) {
+    if (!preset || !preset.positions) { setInfo('Preset inválido'); return; }
+    setPositions(preset.positions);
+    // também atualiza normX/normY para manter preview coerente (usa a posição da página 1 se houver)
+    const p1 = (preset.positions || []).find((p:Pos)=>p.page===1);
+    if (p1) {
+      setNormX(p1.nx); setNormY(p1.ny);
+    }
+    setInfo('Preset aplicado.');
+  }
 
   // ====== Core: assinar & salvar ======
   const assinarESalvar = async () => {
@@ -277,7 +365,12 @@ export default function EditorPage() {
         const { width, height } = page.getSize()
         let px = width - sigW - 36
         let py = 36
-        if (normX!==null && normY!==null) {
+        // if positions array has entry for this page, use it, otherwise fallback to normX/normY
+        const posForPage = positions.find(p=>p.page === (page.pageNumber ?? page.index ?? 1)) // defensive
+        if (posForPage) {
+          px = Math.max(12, Math.min(width - sigW - 12, posForPage.nx * width))
+          py = Math.max(12, Math.min(height - sigH - 12, (1 - posForPage.ny) * height))
+        } else if (normX!==null && normY!==null) {
           px = normX * width
           py = height - normY * height
         }
@@ -420,6 +513,32 @@ export default function EditorPage() {
                 {profiles.map(p => <option key={p.id} value={p.id}>{p.name} — {p.type}</option>)}
               </select>
             )}
+          </Card>
+
+          {/* ===== NOVO: Presets de posição ===== */}
+          <Card title="Presets de posição">
+            <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
+              <button onClick={()=>savePreset()} disabled={busy} style={{ padding:'8px 12px', borderRadius:8, background:'#2563eb', color:'#fff' }}>Salvar preset</button>
+              <button onClick={()=>fetchPresets()} disabled={busy} style={{ padding:'8px 12px', borderRadius:8, background:'#fff', border:'1px solid #e5e7eb' }}>Carregar presets</button>
+            </div>
+            <div style={{ fontSize:13, color:'#6b7280', marginBottom:8 }}>
+              Clique na pré-visualização para definir a posição, depois clique em <strong>Salvar preset</strong> para gravar.
+            </div>
+
+            <div style={{ display:'grid', gap:8 }}>
+              {presets.length === 0 && <div style={{ color:'#6b7280' }}>Nenhum preset salvo.</div>}
+              {presets.map(p => (
+                <div key={p.id} style={{ display:'flex', justifyContent:'space-between', gap:8, alignItems:'center', padding:8, border:'1px solid #eaeaea', borderRadius:8 }}>
+                  <div>
+                    <div style={{ fontWeight:600 }}>{p.name}</div>
+                    <div style={{ fontSize:13, color:'#6b7280' }}>{p.created_at ? new Date(p.created_at).toLocaleString() : ''}</div>
+                  </div>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button onClick={()=>applyPreset(p)} style={{ padding:'6px 10px', borderRadius:8, background:'#fff', border:'1px solid #e5e7eb' }}>Aplicar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </Card>
 
           <Card>
