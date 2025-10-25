@@ -118,7 +118,6 @@ export default function PdfEditor({ file, signatureUrl, positions, onPositions, 
   }
 
   function onClick(e: React.MouseEvent){
-    // usar bounding rect para normalizar (CSS pixels) => consistente com preview logic
     const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
     const x = e.clientX - rect.left; const y = e.clientY - rect.top;
     const existing = positions.filter(p=>p.page!==page);
