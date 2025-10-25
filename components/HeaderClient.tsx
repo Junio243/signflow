@@ -1,96 +1,220 @@
 // components/HeaderClient.tsx
 'use client'
 
+import type { ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import classNames from 'classnames'
+import { Building2, ChevronDown, LayoutDashboard, LogIn, LogOut, Menu, Settings, UserRound } from 'lucide-react'
+
 import { supabase } from '@/lib/supabaseClient'
-import { useRouter } from 'next/navigation'
+
+type SessionUser = {
+  email?: string
+  user_metadata?: {
+    full_name?: string
+  }
+}
+
+const NAV_LINKS = [
+  { href: '/dashboard', label: 'Dashboard' },
+  { href: '/settings', label: 'Configurações' },
+  { href: '/orgs', label: 'Organizações' },
+  { href: '/contato', label: 'Contato' },
+]
 
 export default function HeaderClient() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const pathname = usePathname()
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [user, setUser] = useState<SessionUser | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  const fetchSession = useCallback(async () => {
+    const { data } = await supabase.auth.getSession()
+    setUser(data?.session?.user ?? null)
+  }, [])
 
   useEffect(() => {
-    let mounted = true
+    let isMounted = true
 
-    ;(async () => {
-      const { data } = await supabase.auth.getSession()
-      if (!mounted) return
-      setUser(data?.session?.user ?? null)
-    })()
+    fetchSession()
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return
       setUser(session?.user ?? null)
     })
 
-    return () => {
-      mounted = false
-      // cleanup subscription: supabase v2 returns subscription or { subscription }
-      if (subscription?.subscription?.unsubscribe) subscription.subscription.unsubscribe()
-      if ((subscription as any)?.unsubscribe) (subscription as any).unsubscribe()
-    }
-  }, [])
-
-  async function handleAuth() {
-    if (user) {
-      // sign out
-      await supabase.auth.signOut()
-      setUser(null)
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!dropdownRef.current) return
+      if (dropdownRef.current.contains(event.target as Node)) return
       setMenuOpen(false)
-      // rota de retorno
-      router.refresh()
-    } else {
-      router.push('/login?next=/dashboard')
     }
-  }
+
+    window.addEventListener('click', handleClickOutside)
+
+    return () => {
+      isMounted = false
+      window.removeEventListener('click', handleClickOutside)
+      const maybeSubscription: any = subscription
+      maybeSubscription?.subscription?.unsubscribe?.()
+      maybeSubscription?.unsubscribe?.()
+    }
+  }, [fetchSession])
+
+  useEffect(() => {
+    setMenuOpen(false)
+    setMobileOpen(false)
+  }, [pathname])
+
+  const displayName = useMemo(() => {
+    if (!user) return null
+    return user.user_metadata?.full_name || user.email || 'Usuário'
+  }, [user])
+
+  const handleAuth = useCallback(async () => {
+    if (user) {
+      await supabase.auth.signOut()
+      setMenuOpen(false)
+      router.refresh()
+      return
+    }
+
+    const next = encodeURIComponent('/dashboard')
+    router.push(`/login?next=${next}`)
+  }, [router, user])
 
   return (
-    <header className="border-b bg-white/70 backdrop-blur sticky top-0 z-50">
-      <div className="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between">
-        <Link href="/" className="font-semibold tracking-tight">
-          <span className="text-indigo-600">Sign</span>Flow
-        </Link>
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 lg:px-6">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="inline-flex items-center justify-center rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:border-brand-500 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 md:hidden"
+            aria-label="Abrir menu"
+            onClick={() => setMobileOpen(v => !v)}
+          >
+            <Menu className="h-5 w-5" aria-hidden />
+          </button>
+          <Link href="/" className="flex items-center gap-2 text-base font-semibold tracking-tight text-slate-900" aria-label="SignFlow - página inicial">
+            <span className="rounded-md border border-slate-900 px-1.5 py-0.5 text-xs font-bold uppercase">Sign</span>
+            Flow
+          </Link>
+        </div>
 
-        <nav className="flex items-center gap-4 text-sm">
-          <Link className="hover:text-indigo-600" href="/dashboard">Dashboard</Link>
+        <nav aria-label="Principal" className="hidden items-center gap-3 text-sm font-medium text-slate-700 md:flex">
+          {NAV_LINKS.map(link => {
+            const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`)
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={classNames(
+                  'rounded-lg px-3 py-2 transition hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2',
+                  isActive && 'bg-slate-100 text-slate-900'
+                )}
+              >
+                {link.label}
+              </Link>
+            )
+          })}
+        </nav>
 
-          {/* link rápido para configurações do usuário */}
-          <Link className="hover:text-indigo-600" href="/settings">Configurações</Link>
-
+        <div className="flex items-center gap-3">
           {user ? (
-            <div style={{ position: 'relative' }}>
+            <div className="relative" ref={dropdownRef}>
               <button
+                type="button"
                 onClick={() => setMenuOpen(v => !v)}
-                style={{ display: 'inline-flex', alignItems:'center', gap:8, padding:'6px 10px', borderRadius:8, background:'#fff', border:'1px solid #e5e7eb', cursor:'pointer' }}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-brand-500 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+                aria-haspopup="menu"
                 aria-expanded={menuOpen}
               >
-                <span style={{ fontSize:13 }}>{user.email ?? user.user_metadata?.full_name ?? 'Usuário'}</span>
-                <span style={{ fontSize:12, opacity:0.7 }}>▾</span>
+                <UserRound className="h-4 w-4" aria-hidden />
+                <span className="max-w-[150px] truncate text-left sm:max-w-[200px]">{displayName}</span>
+                <ChevronDown className="h-4 w-4" aria-hidden />
               </button>
 
               {menuOpen && (
-                <div style={{
-                  position:'absolute', right:0, marginTop:8, background:'#fff', border:'1px solid #e5e7eb', borderRadius:8, boxShadow:'0 6px 18px rgba(0,0,0,0.08)', minWidth:180, zIndex:60
-                }}>
-                  <div style={{ padding:8, display:'grid', gap:6 }}>
-                    <Link href="/settings" style={{ padding:'8px 10px', borderRadius:6, textDecoration:'none', color:'#111' }}>Meu perfil</Link>
-                    <Link href="/dashboard" style={{ padding:'8px 10px', borderRadius:6, textDecoration:'none', color:'#111' }}>Meus documentos</Link>
-                    <Link href="/orgs" style={{ padding:'8px 10px', borderRadius:6, textDecoration:'none', color:'#111' }}>Organizações</Link>
-                    <button onClick={handleAuth} style={{ padding:'8px 10px', borderRadius:6, background:'#fff', border:'1px solid #e5e7eb', cursor:'pointer' }}>
-                      Sair
-                    </button>
-                  </div>
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 text-sm shadow-xl"
+                >
+                  <HeaderMenuLink href="/dashboard" icon={<LayoutDashboard className="h-4 w-4" aria-hidden />}>Meus documentos</HeaderMenuLink>
+                  <HeaderMenuLink href="/settings" icon={<Settings className="h-4 w-4" aria-hidden />}>Meu perfil</HeaderMenuLink>
+                  <HeaderMenuLink href="/orgs" icon={<Building2 className="h-4 w-4" aria-hidden />}>Organizações</HeaderMenuLink>
+                  <button
+                    type="button"
+                    onClick={handleAuth}
+                    className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+                    role="menuitem"
+                  >
+                    <LogOut className="h-4 w-4" aria-hidden />
+                    Sair
+                  </button>
                 </div>
               )}
             </div>
           ) : (
-            <button onClick={handleAuth} style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'8px 12px', borderRadius:8, background:'#fff', border:'1px solid #e5e7eb' }}>
+            <button
+              type="button"
+              onClick={handleAuth}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-brand-500 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+            >
+              <LogIn className="h-4 w-4" aria-hidden />
               Entrar
             </button>
           )}
-        </nav>
+        </div>
       </div>
+
+      {mobileOpen && (
+        <nav className="border-t border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 md:hidden" aria-label="Menu móvel">
+          <ul className="flex flex-col gap-2">
+            {NAV_LINKS.map(link => {
+              const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`)
+              return (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className={classNames(
+                      'flex items-center justify-between rounded-lg px-3 py-2 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
+                      isActive && 'bg-slate-100 text-slate-900'
+                    )}
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              )
+            })}
+            <li>
+              <button
+                type="button"
+                onClick={handleAuth}
+                className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-slate-700 transition hover:border-brand-500 hover:text-brand-600"
+              >
+                {user ? 'Sair' : 'Entrar'}
+                {user ? <LogOut className="h-4 w-4" aria-hidden /> : <LogIn className="h-4 w-4" aria-hidden />}
+              </button>
+            </li>
+          </ul>
+        </nav>
+      )}
     </header>
+  )
+}
+
+function HeaderMenuLink({ href, icon, children }: { href: string; icon: ReactNode; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      role="menuitem"
+      className="flex items-center gap-2 rounded-lg px-3 py-2 text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+    >
+      {icon}
+      <span>{children}</span>
+    </Link>
   )
 }

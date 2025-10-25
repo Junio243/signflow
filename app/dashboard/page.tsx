@@ -1,17 +1,59 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import {
+  AlertCircle,
+  Ban,
+  CheckCircle2,
+  Clock3,
+  Copy,
+  Download,
+  FileText,
+  Filter,
+  Link2,
+  Loader2,
+  LogIn,
+  RefreshCcw,
+  ShieldCheck,
+  Timer,
+  XCircle,
+} from 'lucide-react'
+
 import { supabase } from '@/lib/supabaseClient'
 
-const IconPlus = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#111" strokeWidth="2" strokeLinecap="round"/></svg>)
-const IconExit = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M10 17l5-5-5-5M3 12h12" stroke="#111" strokeWidth="2" strokeLinecap="round"/></svg>)
-const IconDownload = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M6 21h12" stroke="#111" strokeWidth="2" strokeLinecap="round"/></svg>)
-const IconTrash = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6l1-2h6l1 2m-1 0-1 14H9L8 6" stroke="#b91c1c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>)
-const IconCheck = () => (<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#065f46" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>)
-const IconClock = () => (<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 8v5l3 2" stroke="#1f2937" strokeWidth="2" strokeLinecap="round"/><circle cx="12" cy="12" r="9" stroke="#1f2937" strokeWidth="2" fill="none"/></svg>)
-const IconBan = () => (<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#7f1d1d" strokeWidth="2" fill="none"/><path d="M6 6l12 12" stroke="#7f1d1d" strokeWidth="2"/></svg>)
-const IconExpired = () => (<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 6v6l4 2" stroke="#92400e" strokeWidth="2" strokeLinecap="round"/><circle cx="12" cy="12" r="9" stroke="#92400e" strokeWidth="2" fill="none"/></svg>)
+const STATUS_META = {
+  signed: {
+    label: 'Assinado',
+    icon: CheckCircle2,
+    badge: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  },
+  draft: {
+    label: 'Rascunho',
+    icon: Clock3,
+    badge: 'bg-slate-100 text-slate-700 ring-slate-200',
+  },
+  canceled: {
+    label: 'Cancelado',
+    icon: Ban,
+    badge: 'bg-rose-50 text-rose-700 ring-rose-200',
+  },
+  expired: {
+    label: 'Expirado',
+    icon: Timer,
+    badge: 'bg-amber-50 text-amber-700 ring-amber-200',
+  },
+  default: {
+    label: '—',
+    icon: FileText,
+    badge: 'bg-slate-100 text-slate-600 ring-slate-200',
+  },
+} as const
+
+type StatusKey = keyof typeof STATUS_META
+
+type StatusFilter = 'all' | Exclude<StatusKey, 'default'>
 
 type Doc = {
   id: string
@@ -23,15 +65,13 @@ type Doc = {
   canceled_at?: string | null
 }
 
-function statusPt(status?: string | null) {
-  switch ((status || '').toLowerCase()) {
-    case 'signed': return { label: 'Assinado', icon: <IconCheck/>, color: '#065f46', bg: '#ecfdf5' }
-    case 'draft': return { label: 'Rascunho', icon: <IconClock/>, color: '#1f2937', bg: '#f3f4f6' }
-    case 'canceled': return { label: 'Cancelado', icon: <IconBan/>, color: '#7f1d1d', bg: '#fef2f2' }
-    case 'expired': return { label: 'Expirado', icon: <IconExpired/>, color: '#92400e', bg: '#fffbeb' }
-    default: return { label: status || '—', icon: null, color: '#374151', bg: '#f3f4f6' }
-  }
-}
+const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
+  { value: 'all', label: 'Todos' },
+  { value: 'signed', label: 'Assinados' },
+  { value: 'draft', label: 'Rascunhos' },
+  { value: 'canceled', label: 'Cancelados' },
+  { value: 'expired', label: 'Expirados' },
+]
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -41,170 +81,450 @@ export default function DashboardPage() {
   const [isLogged, setIsLogged] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [actionBusyId, setActionBusyId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [feedback, setFeedback] = useState<string | null>(null)
 
-  const fetchSession = async () => {
+  const fetchSession = useCallback(async () => {
     const { data } = await supabase.auth.getSession()
-    const s = data?.session ?? null
-    setIsLogged(!!s)
-    setUserEmail(s?.user?.email ?? null)
-    return s
-  }
+    const session = data?.session ?? null
+    setIsLogged(!!session)
+    setUserEmail(session?.user?.email ?? null)
+    return session
+  }, [])
 
-  const fetchDocs = async () => {
+  const fetchDocs = useCallback(async () => {
     setErrorMsg(null)
     let { data, error } = await supabase
       .from('documents')
       .select('id, status, created_at, signed_pdf_url, qr_code_url, original_pdf_name, canceled_at')
       .order('created_at', { ascending: false })
       .limit(200)
+
     if (error) {
-      const msg = String(error.message || '')
-      const missing = msg.includes('column') && (msg.includes('does not exist') || msg.includes('não existe'))
-      if (missing) {
+      const message = String(error.message || '')
+      const missingColumn = message.includes('does not exist') || message.includes('não existe')
+      if (missingColumn) {
         const retry = await supabase
           .from('documents')
           .select('id, status, created_at, signed_pdf_url, qr_code_url, original_pdf_name')
-          .order('created_at', { ascending: false }).limit(200)
+          .order('created_at', { ascending: false })
+          .limit(200)
         data = retry.data
         error = retry.error
       }
     }
-    if (error) { setErrorMsg(error.message ?? 'erro desconhecido'); return }
+
+    if (error) {
+      setErrorMsg(error.message ?? 'Erro desconhecido ao consultar documentos.')
+      return
+    }
+
     setDocs((data ?? []) as Doc[])
-  }
+  }, [])
 
   useEffect(() => {
+    let active = true
     setLoading(true)
-    fetchSession().then(() => fetchDocs().finally(() => setLoading(false)))
 
-    const chan = supabase.channel('realtime-docs')
+    fetchSession().then(() =>
+      fetchDocs()
+        .catch(err => setErrorMsg(err instanceof Error ? err.message : String(err)))
+        .finally(() => {
+          if (active) setLoading(false)
+        }),
+    )
+
+    const channel = supabase
+      .channel('realtime-docs')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => fetchDocs())
       .subscribe()
 
-    return () => { supabase.removeChannel(chan) }
-  }, [])
+    return () => {
+      active = false
+      supabase.removeChannel(channel)
+    }
+  }, [fetchDocs, fetchSession])
+
+  useEffect(() => {
+    if (!feedback) return
+    const timeout = setTimeout(() => setFeedback(null), 4000)
+    return () => clearTimeout(timeout)
+  }, [feedback])
+
+  const handleRefresh = async () => {
+    setLoading(true)
+    await fetchDocs()
+    setLoading(false)
+  }
 
   const handleNew = async () => {
     const { data } = await supabase.auth.getSession()
-    if (!data?.session) { router.push('/login?next=/editor'); return }
+    if (!data?.session) {
+      router.push(`/login?next=${encodeURIComponent('/editor')}`)
+      return
+    }
     router.push('/editor')
   }
 
-  const handleAuth = async () => {
-    const { data } = await supabase.auth.getSession()
-    if (data?.session) { await supabase.auth.signOut(); router.refresh() }
-    else { router.push('/login?next=/dashboard') }
-  }
-
   const cancelDoc = async (doc: Doc) => {
-    if (!isLogged) { router.push('/login?next=/dashboard'); return }
-    if (!confirm('Tem certeza que deseja CANCELAR este documento? Essa ação marca como inválido para validação.')) return
+    if (!isLogged) {
+      router.push(`/login?next=${encodeURIComponent('/dashboard')}`)
+      return
+    }
+
+    const confirmed = window.confirm(
+      'Tem certeza que deseja CANCELAR este documento? Ele passará a ser inválido para validação pública.',
+    )
+    if (!confirmed) return
+
     try {
       setActionBusyId(doc.id)
       const { error } = await supabase
         .from('documents')
         .update({ status: 'canceled', canceled_at: new Date().toISOString() })
         .eq('id', doc.id)
-      if (error) alert('Erro ao cancelar: ' + error.message)
-      else await fetchDocs()
+      if (error) {
+        setFeedback(`Erro ao cancelar: ${error.message}`)
+      } else {
+        setFeedback('Documento cancelado com sucesso.')
+        await fetchDocs()
+      }
     } finally {
       setActionBusyId(null)
     }
   }
 
-  if (loading) return <p style={{ padding:16 }}>Carregando…</p>
+  const handleCopyLink = async (docId: string) => {
+    const url = `${window.location.origin}/validate/${docId}`
+    try {
+      await navigator.clipboard.writeText(url)
+      setFeedback('Link de validação copiado.')
+    } catch (err) {
+      setFeedback('Não foi possível copiar automaticamente. Utilize o botão "Validar" e copie manualmente.')
+    }
+  }
 
-  const btn = (children: React.ReactNode, style: any = {}) => (
-    <button style={{
-      display:'inline-flex', alignItems:'center', gap:6,
-      padding:'8px 12px', border:'1px solid #e5e7eb', borderRadius:8, background:'#fff',
-      boxShadow:'0 1px 1px rgba(0,0,0,.02)', cursor:'pointer'
-    , ...style}}>{children}</button>
-  )
+  const filteredDocs = useMemo(() => {
+    const normalizedFilter = statusFilter === 'all' ? null : statusFilter
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+
+    return docs.filter(doc => {
+      const status = (doc.status ?? '').toLowerCase() as StatusKey
+      const matchesStatus = normalizedFilter ? status === normalizedFilter : true
+
+      if (!matchesStatus) return false
+      if (!normalizedSearch) return true
+
+      const idMatch = doc.id.toLowerCase().includes(normalizedSearch)
+      const nameMatch = (doc.original_pdf_name ?? '').toLowerCase().includes(normalizedSearch)
+      const statusMatch = status.includes(normalizedSearch)
+      return idMatch || nameMatch || statusMatch
+    })
+  }, [docs, searchTerm, statusFilter])
+
+  const totalsByStatus = useMemo(() => {
+    return docs.reduce(
+      (acc, doc) => {
+        const status = (doc.status ?? 'default').toLowerCase() as StatusKey
+        acc.total += 1
+        if (status in acc) acc[status as Exclude<StatusKey, 'default'>] += 1
+        return acc
+      },
+      { total: 0, signed: 0, draft: 0, canceled: 0, expired: 0 } as Record<'total' | Exclude<StatusKey, 'default'>, number>,
+    )
+  }, [docs])
+
+  const statusOptions = useMemo(() => STATUS_FILTERS, [])
 
   return (
-    <div style={{ maxWidth: 980, margin:'24px auto', padding:16 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <h1 style={{ fontSize:22, margin:0, fontWeight:700 }}>Dashboard</h1>
-        <div style={{ display:'flex', gap:8 }}>
-          {btn(<><IconPlus/> Novo</>, {})}
-          <div onClick={handleNew} style={{ position:'relative', marginLeft:'-86px', width:86, height:34 }} />
-          {btn(<>{isLogged ? <IconExit/> : null}{isLogged ? 'Sair' : 'Entrar'}</>)}
-          <div onClick={handleAuth} style={{ position:'relative', marginLeft:'-78px', width:78, height:34 }} />
+    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+      <header className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white/70 p-6 shadow-sm sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
+          <p className="text-sm text-slate-500">Acompanhe documentos, status de assinatura e ações rápidas.</p>
+          {isLogged && (
+            <p className="mt-2 text-xs text-slate-400">Logado como: {userEmail}</p>
+          )}
         </div>
-      </div>
-      {isLogged && <div style={{ fontSize:12, opacity:.8, marginTop:4 }}>Logado como: {userEmail}</div>}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleNew}
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+          >
+            <ShieldCheck className="h-4 w-4" aria-hidden />
+            Novo documento
+          </button>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-brand-500 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+          >
+            <RefreshCcw className="h-4 w-4" aria-hidden />
+            Atualizar
+          </button>
+        </div>
+      </header>
 
-      {errorMsg && (
-        <div style={{ marginTop:12, padding:12, border:'1px solid #fca5a5', background:'#fef2f2', borderRadius:8 }}>
-          <div style={{ fontWeight:600, color:'#991b1b' }}>Não consegui listar documentos agora.</div>
-          <div style={{ fontSize:12, marginTop:4, color:'#7f1d1d' }}>{errorMsg}</div>
-          {btn('Recarregar')}
-          <div onClick={()=>window.location.reload()} style={{ position:'relative', marginTop:'-34px', width:96, height:34 }} />
+      {!isLogged && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+          <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
+          <div>
+            <p className="font-semibold">Você ainda não está autenticado.</p>
+            <p className="mt-1 text-amber-700/80">
+              Entre para criar, assinar ou cancelar documentos. O acesso é protegido com Supabase Auth.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push(`/login?next=${encodeURIComponent('/dashboard')}`)}
+              className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white shadow hover:bg-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2"
+            >
+              <LogIn className="h-4 w-4" aria-hidden />
+              Fazer login
+            </button>
+          </div>
         </div>
       )}
 
-      {!errorMsg && (
-        <>
-          <div style={{ margin:'12px 0', fontSize:12, opacity:.8 }}>{docs.length} documento(s) encontrado(s).</div>
-          <div style={{ border:'1px solid #e5e7eb', borderRadius:8, overflow:'hidden', background:'#fff' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-              <thead style={{ background:'#f9fafb' }}>
+      {feedback && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+          {feedback}
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
+            <div>
+              <p className="font-semibold">Não foi possível listar os documentos agora.</p>
+              <p className="mt-1 text-rose-700/80">{errorMsg}</p>
+              <button
+                type="button"
+                onClick={handleRefresh}
+                className="mt-3 inline-flex items-center gap-2 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-400"
+              >
+                <RefreshCcw className="h-3.5 w-3.5" aria-hidden />
+                Tentar novamente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          title="Documentos"
+          value={totalsByStatus.total}
+          description="Total cadastrados"
+          icon={<FileText className="h-5 w-5 text-brand-600" aria-hidden />}
+        />
+        <StatCard
+          title="Assinados"
+          value={totalsByStatus.signed}
+          description="Disponíveis para validação"
+          icon={<CheckCircle2 className="h-5 w-5 text-emerald-600" aria-hidden />}
+        />
+        <StatCard
+          title="Rascunhos"
+          value={totalsByStatus.draft}
+          description="Pendentes de assinatura"
+          icon={<Clock3 className="h-5 w-5 text-slate-600" aria-hidden />}
+        />
+        <StatCard
+          title="Cancelados / Expirados"
+          value={totalsByStatus.canceled + totalsByStatus.expired}
+          description="Indisponíveis"
+          icon={<XCircle className="h-5 w-5 text-rose-600" aria-hidden />}
+        />
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            <Filter className="h-4 w-4" aria-hidden />
+            Filtros rápidos
+          </div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex flex-wrap gap-2">
+              {statusOptions.map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setStatusFilter(option.value)}
+                  className={[
+                    'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition',
+                    statusFilter === option.value
+                      ? 'border-brand-500 bg-brand-50 text-brand-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300',
+                  ].join(' ')}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <label className="relative block text-xs text-slate-400">
+              <span className="sr-only">Buscar documento</span>
+              <input
+                value={searchTerm}
+                onChange={event => setSearchTerm(event.target.value)}
+                className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm text-slate-700 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-600"
+                placeholder="Buscar por ID, nome ou status"
+              />
+              <SearchIcon />
+            </label>
+          </div>
+        </div>
+
+        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th scope="col" className="px-4 py-3 text-left font-semibold">ID</th>
+                <th scope="col" className="px-4 py-3 text-left font-semibold">Nome</th>
+                <th scope="col" className="px-4 py-3 text-left font-semibold">Status</th>
+                <th scope="col" className="px-4 py-3 text-left font-semibold">Criado em</th>
+                <th scope="col" className="px-4 py-3 text-left font-semibold">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {loading && (
                 <tr>
-                  <th style={{ textAlign:'left', padding:'10px 12px', borderBottom:'1px solid #e5e7eb' }}>ID</th>
-                  <th style={{ textAlign:'left', padding:'10px 12px', borderBottom:'1px solid #e5e7eb' }}>Nome</th>
-                  <th style={{ textAlign:'left', padding:'10px 12px', borderBottom:'1px solid #e5e7eb' }}>Status</th>
-                  <th style={{ textAlign:'left', padding:'10px 12px', borderBottom:'1px solid #e5e7eb' }}>Criado em</th>
-                  <th style={{ textAlign:'left', padding:'10px 12px', borderBottom:'1px solid #e5e7eb' }}>Ações</th>
+                  <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
+                    <Loader2 className="mx-auto h-6 w-6 animate-spin text-brand-600" aria-hidden />
+                    <p className="mt-2 text-sm">Carregando documentos…</p>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {docs.map(d => {
-                  const S = statusPt(d.status)
+              )}
+
+              {!loading && filteredDocs.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
+                    <p className="font-medium">Nenhum documento encontrado com os filtros aplicados.</p>
+                    <p className="mt-2 text-sm">Altere os filtros ou crie um novo documento.</p>
+                    <button
+                      type="button"
+                      onClick={handleNew}
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-brand-700"
+                    >
+                      <ShieldCheck className="h-4 w-4" aria-hidden />
+                      Criar documento
+                    </button>
+                  </td>
+                </tr>
+              )}
+
+              {!loading &&
+                filteredDocs.map(doc => {
+                  const statusKey = (doc.status ?? 'default').toLowerCase() as StatusKey
+                  const meta = STATUS_META[statusKey] ?? STATUS_META.default
+                  const Icon = meta.icon
                   return (
-                    <tr key={d.id}>
-                      <td style={{ padding:'10px 12px', borderBottom:'1px solid #f3f4f6', fontFamily:'monospace' }}>{d.id.slice(0,8)}…</td>
-                      <td style={{ padding:'10px 12px', borderBottom:'1px solid #f3f4f6' }}>{d.original_pdf_name ?? '—'}</td>
-                      <td style={{ padding:'10px 12px', borderBottom:'1px solid #f3f4f6' }}>
-                        <span style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 8px', borderRadius:999, color:S.color, background:S.bg }}>
-                          {S.icon}{S.label}
+                    <tr key={doc.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-mono text-xs text-slate-500">{doc.id.slice(0, 8)}…</td>
+                      <td className="px-4 py-3 text-slate-700">{doc.original_pdf_name ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${meta.badge}`}>
+                          <Icon className="h-3.5 w-3.5" aria-hidden />
+                          {meta.label}
                         </span>
                       </td>
-                      <td style={{ padding:'10px 12px', borderBottom:'1px solid #f3f4f6' }}>{new Date(d.created_at).toLocaleString()}</td>
-                      <td style={{ padding:'10px 12px', borderBottom:'1px solid #f3f4f6', display:'flex', gap:8, alignItems:'center' }}>
-                        <a href={`/validate/${d.id}`} style={{ textDecoration:'underline' }}>Validar</a>
-                        {d.signed_pdf_url ? (
-                          <a href={d.signed_pdf_url} target="_blank" style={{ display:'inline-flex', gap:6, alignItems:'center', textDecoration:'underline' }}>
-                            <IconDownload/> Baixar
-                          </a>
-                        ) : <span style={{ opacity:.6 }}>Sem PDF</span>}
-                        {/* Cancelar: só mostra se não estiver cancelado */}
-                        {(d.status || '').toLowerCase() !== 'canceled' && (
-                          <button
-                            onClick={()=>cancelDoc(d)}
-                            disabled={actionBusyId===d.id}
-                            style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 10px', border:'1px solid #fecaca', background:'#fff', color:'#b91c1c', borderRadius:8 }}
+                      <td className="px-4 py-3 text-slate-600">{formatDate(doc.created_at)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            href={`/validate/${doc.id}`}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-brand-500 hover:text-brand-600"
                           >
-                            <IconTrash/>{actionBusyId===d.id ? 'Cancelando…' : 'Cancelar'}
+                            <Link2 className="h-3.5 w-3.5" aria-hidden />
+                            Validar
+                          </Link>
+                          {doc.signed_pdf_url ? (
+                            <a
+                              href={doc.signed_pdf_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-brand-500 hover:text-brand-600"
+                            >
+                              <Download className="h-3.5 w-3.5" aria-hidden />
+                              Baixar
+                            </a>
+                          ) : (
+                            <span className="rounded-lg border border-dashed border-slate-200 px-2.5 py-1.5 text-xs text-slate-400">
+                              Sem PDF
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleCopyLink(doc.id)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-brand-500 hover:text-brand-600"
+                          >
+                            <Copy className="h-3.5 w-3.5" aria-hidden />
+                            Copiar link
                           </button>
-                        )}
+                          {(doc.status ?? '').toLowerCase() !== 'canceled' && (
+                            <button
+                              type="button"
+                              onClick={() => cancelDoc(doc)}
+                              disabled={actionBusyId === doc.id}
+                              className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition hover:border-rose-300 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <Ban className="h-3.5 w-3.5" aria-hidden />
+                              {actionBusyId === doc.id ? 'Cancelando…' : 'Cancelar'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
                 })}
-                {docs.length === 0 && (
-                  <tr>
-                    <td colSpan={5} style={{ padding:16, textAlign:'center', color:'#6b7280' }}>
-                      Nenhum documento ainda. Clique em{' '}
-                      <button onClick={handleNew} style={{ textDecoration:'underline' }}>Novo</button>.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   )
+}
+
+function formatDate(value: string) {
+  try {
+    const date = new Date(value)
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date)
+  } catch (error) {
+    return value
+  }
+}
+
+function StatCard({
+  title,
+  value,
+  description,
+  icon,
+}: {
+  title: string
+  value: number
+  description: string
+  icon: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between text-sm text-slate-500">
+        <span>{title}</span>
+        {icon}
+      </div>
+      <p className="text-2xl font-semibold text-slate-900">{value}</p>
+      <p className="text-xs text-slate-400">{description}</p>
+    </div>
+  )
+}
+
+function SearchIcon() {
+  return <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
 }
