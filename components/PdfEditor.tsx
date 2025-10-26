@@ -7,9 +7,12 @@ import 'pdfjs-dist/web/pdf_viewer.css';
 
 type Pos = { page: number; nx: number; ny: number; scale: number; rotation: number };
 
+type SignatureSize = { width: number; height: number } | null;
+
 type Props = {
   file: File | null;
   signatureUrl: string | null;
+  signatureSize?: SignatureSize;
   positions: Pos[];
   onPositions: (p: Pos[]) => void;
   page?: number;
@@ -29,6 +32,7 @@ if (typeof window !== 'undefined') {
 export default function PdfEditor({
   file,
   signatureUrl,
+  signatureSize = null,
   positions,
   onPositions,
   page: controlledPage,
@@ -130,7 +134,7 @@ export default function PdfEditor({
   useEffect(() => { setSigDataUrl(signatureUrl); }, [signatureUrl]);
   useEffect(() => { if (controlledPage !== undefined) setPage(controlledPage); }, [controlledPage]);
 
-  useEffect(() => { renderPage(); }, [pdf, page, scale, positions, sigDataUrl]);
+  useEffect(() => { renderPage(); }, [pdf, page, scale, positions, sigDataUrl, signatureSize]);
 
   async function renderPage() {
     const canvas = canvasRef.current;
@@ -152,7 +156,10 @@ export default function PdfEditor({
       const pos = positions.find(ps => ps.page === page);
       if (pos && sigDataUrl) {
         const img = new Image(); img.src = sigDataUrl; await img.decode();
-        const w = 240 * pos.scale; const h = w * 0.35;
+        const baseW = signatureSize?.width || img.naturalWidth || 240;
+        const baseH = signatureSize?.height || img.naturalHeight || baseW * 0.35;
+        const w = baseW * (pos.scale || 1);
+        const h = baseH * (pos.scale || 1);
         const cw = canvas.width, ch = canvas.height;
         const x = (pos.nx || 0.5) * cw; const y = (pos.ny || 0.5) * ch;
         ctx.save();
