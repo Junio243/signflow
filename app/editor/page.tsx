@@ -246,10 +246,8 @@ export default function EditorPage() {
         const pdfjs = await import('pdfjs-dist/legacy/build/pdf')
 
         try {
-          const version = (pdfjs as any).version || 'latest'
-          // A partir da v4 o pacote deixou de expor pdf.worker.entry, por isso usamos a CDN oficial
-          // que hospeda o worker já pronto para ser carregado no navegador.
-          ;(pdfjs as any).GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${version}/build/pdf.worker.min.js`
+          // Usa o worker legacy local disponível em public/pdf.worker.min.mjs
+          ;(pdfjs as any).GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
         } catch (e) {
           console.warn('[Editor] Não foi possível configurar o workerSrc de PDF.js', e)
         }
