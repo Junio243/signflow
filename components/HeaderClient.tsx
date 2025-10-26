@@ -24,6 +24,13 @@ const NAV_LINKS = [
   { href: '/contato', label: 'Contato' },
 ]
 
+const LANDING_LINKS = [
+  { href: '/#como-funciona', label: 'Como Funciona' },
+  { href: '/#seguranca', label: 'Segurança' },
+  { href: '/#precos', label: 'Preços' },
+  { href: '/#suporte', label: 'Suporte/Ajuda' },
+]
+
 export default function HeaderClient() {
   const router = useRouter()
   const pathname = usePathname()
@@ -94,6 +101,14 @@ export default function HeaderClient() {
     router.push(`/login?next=${next}`)
   }, [router, supabase, user])
 
+  const navLinks = useMemo(() => {
+    if (pathname === '/') {
+      return [...LANDING_LINKS, ...NAV_LINKS]
+    }
+
+    return NAV_LINKS
+  }, [pathname])
+
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 lg:px-6">
@@ -113,8 +128,9 @@ export default function HeaderClient() {
         </div>
 
         <nav aria-label="Principal" className="hidden items-center gap-3 text-sm font-medium text-slate-700 md:flex">
-          {NAV_LINKS.map(link => {
-            const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`)
+          {navLinks.map(link => {
+            const isActive =
+              !link.href.includes('#') && (pathname === link.href || pathname.startsWith(`${link.href}/`))
             return (
               <Link
                 key={link.href}
@@ -131,6 +147,14 @@ export default function HeaderClient() {
         </nav>
 
         <div className="flex items-center gap-3">
+          {!user && pathname === '/' && (
+            <Link
+              href="/signup"
+              className="hidden items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 md:inline-flex"
+            >
+              Criar conta
+            </Link>
+          )}
           {!authConfigured && (
             <span className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-600">
               Autenticação indisponível
@@ -186,8 +210,9 @@ export default function HeaderClient() {
       {mobileOpen && (
         <nav className="border-t border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 md:hidden" aria-label="Menu móvel">
           <ul className="flex flex-col gap-2">
-            {NAV_LINKS.map(link => {
-              const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`)
+            {navLinks.map(link => {
+              const isActive =
+                !link.href.includes('#') && (pathname === link.href || pathname.startsWith(`${link.href}/`))
               return (
                 <li key={link.href}>
                   <Link
@@ -202,6 +227,16 @@ export default function HeaderClient() {
                 </li>
               )
             })}
+            {!user && pathname === '/' && (
+              <li>
+                <Link
+                  href="/signup"
+                  className="flex w-full items-center justify-between rounded-lg bg-brand-600 px-3 py-2 text-white transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+                >
+                  Criar conta
+                </Link>
+              </li>
+            )}
             <li>
               <button
                 type="button"

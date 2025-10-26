@@ -5,25 +5,6 @@ import Link from 'next/link'
 export default function HomePage() {
   return (
     <main className="pro-root">
-      {/* ===== NAV / HEADER ===== */}
-      <header className="pro-nav">
-        <div className="wrap nav-row">
-          <Link href="/" className="brand" aria-label="SignFlow - página inicial">
-            <span className="glyph">◆</span> <b>SignFlow</b>
-          </Link>
-          <nav className="links" aria-label="Navegação principal">
-            <Link href="/#como-funciona">Como Funciona</Link>
-            <Link href="/#seguranca">Segurança</Link>
-            <Link href="/#precos">Preços</Link>
-            <Link href="/#suporte">Suporte/Ajuda</Link>
-            <Link href="/login">Entrar</Link>
-          </nav>
-          <Link href="/signup" className="btn btn-primary" aria-label="Criar conta">
-            <BoltIcon/> Criar conta
-          </Link>
-        </div>
-      </header>
-
       {/* ===== HERO ===== */}
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-bg" />
