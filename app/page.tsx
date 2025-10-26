@@ -131,10 +131,22 @@ export default function HomePage() {
         <div className="wrap">
           <h2 id="diff-title">Diferenciais corporativos</h2>
           <div className="grid-4">
-            <Feature title="Confiabilidade" text="Sinalização clara (Assinado/Cancelado/Expirado) e histórico."/>
-            <Feature title="Padronização" text="Perfis com logo/cor/rodapé por unidade (Saúde, Educação, Jurídico)."/>
-            <Feature title="Desempenho" text="Processamento local com pdf-lib e distribuição via storage público."/>
-            <Feature title="Escalabilidade" text="Pronto para times: políticas, auditoria e integrações planejadas."/>
+            <Feature
+              title="Validade Jurídica"
+              text="Documentos com selo ICP-Brasil e metadados prontos para reconhecimento cartorial imediato."
+            />
+            <Feature
+              title="Segurança/Criptografia"
+              text="Criptografia ponta a ponta, hashes SHA-256 e armazenamento segregado para proteger cada assinatura."
+            />
+            <Feature
+              title="Trilha de Auditoria"
+              text="Registro imutável de eventos com carimbo de tempo, IP e status a cada movimentação."
+            />
+            <Feature
+              title="Acesso de Qualquer Lugar"
+              text="Disponível em desktop, mobile e API para equipes híbridas assinarem sem fricção."
+            />
           </div>
         </div>
       </section>
