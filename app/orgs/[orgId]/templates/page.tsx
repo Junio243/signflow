@@ -16,6 +16,7 @@ type TemplateRow = {
 export default function OrgTemplates({ params }: { params: { orgId: string } }) {
   const orgId = params.orgId;
   const router = useRouter();
+  const supabaseClient = supabase;
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [busy, setBusy] = useState(false);
@@ -29,7 +30,12 @@ export default function OrgTemplates({ params }: { params: { orgId: string } }) 
     (async()=>{
       setLoading(true);
       try {
-        const { data } = await supabase.from('templates').select('*').eq('org_id', orgId).order('created_at', { ascending: false });
+        if (!supabaseClient) {
+          setInfo('Serviço de templates indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+          setLoading(false);
+          return;
+        }
+        const { data } = await supabaseClient.from('templates').select('*').eq('org_id', orgId).order('created_at', { ascending: false });
         setTemplates((data || []) as TemplateRow[]);
       } catch (e) {
         console.error(e);
@@ -49,22 +55,27 @@ export default function OrgTemplates({ params }: { params: { orgId: string } }) 
     try {
       const safeName = name.replace(/\s+/g,'-').toLowerCase();
       const path = `${orgId}/${Date.now()}-${safeName}.pdf`;
-      const { error: upErr } = await supabase.storage.from('signflow-templates').upload(path, file, { upsert: true });
+      if (!supabaseClient) {
+        setInfo('Serviço de armazenamento indisponível.');
+        setBusy(false);
+        return;
+      }
+      const { error: upErr } = await supabaseClient.storage.from('signflow-templates').upload(path, file, { upsert: true });
       if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from('signflow-templates').getPublicUrl(path);
+      const { data: pub } = supabaseClient.storage.from('signflow-templates').getPublicUrl(path);
       const fileUrl = pub?.publicUrl ?? null;
 
       // parse placeholders JSON
       let placeholders = [];
       try { placeholders = JSON.parse(placeholdersTxt); } catch (e) { placeholders = []; }
 
-      const { data: ins, error: insErr } = await supabase.from('templates').insert({
+      const { data: ins, error: insErr } = await supabaseClient.from('templates').insert({
         org_id: orgId,
         name,
         storage_path: path,
         file_url: fileUrl,
         placeholders,
-        created_by: (await supabase.auth.getSession()).data?.session?.user?.id
+        created_by: (await supabaseClient.auth.getSession()).data?.session?.user?.id
       }).select().single();
       if (insErr) throw insErr;
       setTemplates([ins, ...templates]);
@@ -85,13 +96,18 @@ export default function OrgTemplates({ params }: { params: { orgId: string } }) 
     setBusy(true); setInfo(null);
     try {
       // delete storage
-      const { data: rows } = await supabase.from('templates').select('storage_path').eq('id', t.id).single();
+      if (!supabaseClient) {
+        setInfo('Serviço de templates indisponível.');
+        setBusy(false);
+        return;
+      }
+      const { data: rows } = await supabaseClient.from('templates').select('storage_path').eq('id', t.id).single();
       const path = (rows as any)?.storage_path;
       if (path) {
-        const { error: delErr } = await supabase.storage.from('signflow-templates').remove([path]);
+        const { error: delErr } = await supabaseClient.storage.from('signflow-templates').remove([path]);
         if (delErr) console.warn('storage remove err', delErr);
       }
-      const { error } = await supabase.from('templates').delete().eq('id', t.id);
+      const { error } = await supabaseClient.from('templates').delete().eq('id', t.id);
       if (error) throw error;
       setTemplates(templates.filter(x=>x.id !== t.id));
       setInfo('Template removido.');
@@ -101,6 +117,15 @@ export default function OrgTemplates({ params }: { params: { orgId: string } }) 
     } finally {
       setBusy(false);
     }
+  }
+
+  if (!supabaseClient) {
+    return (
+      <div style={{ maxWidth: 900, margin: '20px auto', padding: 16 }}>
+        <h1>Templates da organização</h1>
+        <p>Serviço de templates indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.</p>
+      </div>
+    );
   }
 
   if (loading) return <p style={{ padding:16 }}>Carregando…</p>;

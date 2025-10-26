@@ -31,16 +31,20 @@ export default function HeaderClient() {
   const [user, setUser] = useState<SessionUser | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const authConfigured = Boolean(supabase)
 
   const fetchSession = useCallback(async () => {
+    if (!supabase) return
     const { data } = await supabase.auth.getSession()
     setUser(data?.session?.user ?? null)
-  }, [])
+  }, [supabase])
 
   useEffect(() => {
     let isMounted = true
 
     fetchSession()
+
+    if (!supabase) return () => {}
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return
@@ -62,7 +66,7 @@ export default function HeaderClient() {
       maybeSubscription?.subscription?.unsubscribe?.()
       maybeSubscription?.unsubscribe?.()
     }
-  }, [fetchSession])
+  }, [fetchSession, supabase])
 
   useEffect(() => {
     setMenuOpen(false)
@@ -75,6 +79,10 @@ export default function HeaderClient() {
   }, [user])
 
   const handleAuth = useCallback(async () => {
+    if (!supabase) {
+      alert('Serviço de autenticação indisponível. Configure as variáveis NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+      return
+    }
     if (user) {
       await supabase.auth.signOut()
       setMenuOpen(false)
@@ -84,7 +92,7 @@ export default function HeaderClient() {
 
     const next = encodeURIComponent('/dashboard')
     router.push(`/login?next=${next}`)
-  }, [router, user])
+  }, [router, supabase, user])
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur">
@@ -123,6 +131,11 @@ export default function HeaderClient() {
         </nav>
 
         <div className="flex items-center gap-3">
+          {!authConfigured && (
+            <span className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-600">
+              Autenticação indisponível
+            </span>
+          )}
           {user ? (
             <div className="relative" ref={dropdownRef}>
               <button

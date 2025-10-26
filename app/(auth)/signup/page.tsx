@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient'
 
 export default function SignUpPage() {
   const router = useRouter()
+  const supabaseClient = supabase
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,11 +16,25 @@ export default function SignUpPage() {
   const cadastrar = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null); setInfo(null); setLoading(true)
-    const { error } = await supabase.auth.signUp({ email, password })
+    if (!supabaseClient) {
+      setError('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+      setLoading(false)
+      return
+    }
+    const { error } = await supabaseClient.auth.signUp({ email, password })
     setLoading(false)
     if (error) { setError(error.message); return }
     setInfo('Cadastro criado! Confirme seu e-mail (se obrigatório) e faça login.')
     setTimeout(() => router.replace('/login'), 1200)
+  }
+
+  if (!supabaseClient) {
+    return (
+      <div style={{ maxWidth: 360, margin: '40px auto', padding: 16 }}>
+        <h1>Cadastrar</h1>
+        <p>Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.</p>
+      </div>
+    )
   }
 
   return (

@@ -18,6 +18,7 @@ type SignatureRow = {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const supabaseClient = supabase;
 
   const [loading, setLoading] = useState(true);
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
@@ -46,13 +47,18 @@ export default function SettingsPage() {
     (async () => {
       setLoading(true);
       try {
-        const { data: sess } = await supabase.auth.getSession();
+        if (!supabaseClient) {
+          setInfo('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+          setSessionUserId(null);
+          return;
+        }
+        const { data: sess } = await supabaseClient.auth.getSession();
         const uid = sess?.session?.user?.id ?? null;
         setSessionUserId(uid);
 
         if (uid) {
           // profile
-          const { data: profileData, error: profileErr } = await supabase
+          const { data: profileData, error: profileErr } = await supabaseClient
             .from('profiles')
             .select('*')
             .eq('id', uid)
@@ -78,7 +84,11 @@ export default function SettingsPage() {
   // fetch signatures
   async function fetchSignatures(uid: string) {
     try {
-      const { data, error } = await supabase
+      if (!supabaseClient) {
+        setInfo('Serviço de assinaturas indisponível.');
+        return;
+      }
+      const { data, error } = await supabaseClient
         .from('signatures')
         .select('*')
         .eq('user_id', uid)
@@ -100,6 +110,10 @@ export default function SettingsPage() {
     setBusy(true);
     setInfo(null);
     try {
+      if (!supabaseClient) {
+        setInfo('Serviço de perfil indisponível.');
+        return;
+      }
       const payload = {
         id: sessionUserId,
         display_name: displayName,
@@ -109,7 +123,7 @@ export default function SettingsPage() {
         language,
         preferred_signature_id: preferredSignatureId || null,
       };
-      const { error } = await supabase.from('profiles').upsert(payload, { returning: 'minimal' });
+      const { error } = await supabaseClient.from('profiles').upsert(payload);
       if (error) throw error;
       setInfo('Perfil salvo.');
     } catch (e: any) {
@@ -205,7 +219,11 @@ export default function SettingsPage() {
     type: 'draw' | 'upload' | 'certified' = 'upload'
   ) {
     // ensure current session
-    const { data: sess } = await supabase.auth.getSession();
+    if (!supabaseClient) {
+      setInfo('Serviço de assinaturas indisponível.');
+      return;
+    }
+    const { data: sess } = await supabaseClient.auth.getSession();
     const uid = sess?.session?.user?.id ?? null;
     if (!uid) {
       setInfo('Faça login primeiro.');
@@ -219,17 +237,17 @@ export default function SettingsPage() {
       const path = `${uid}/${Date.now()}-${safeName}`;
 
       // upload to storage
-      const { error: upErr } = await supabase.storage
+      const { error: upErr } = await supabaseClient.storage
         .from('signflow-signatures')
         .upload(path, file, { upsert: false });
       if (upErr) throw upErr;
 
       // get public url
-      const { data: pub } = supabase.storage.from('signflow-signatures').getPublicUrl(path);
+      const { data: pub } = supabaseClient.storage.from('signflow-signatures').getPublicUrl(path);
       const fileUrl = pub?.publicUrl ?? null;
 
       // insert row with user_id to satisfy RLS
-      const { data: ins, error: insErr } = await supabase
+      const { data: ins, error: insErr } = await supabaseClient
         .from('signatures')
         .insert({
           user_id: uid,
@@ -284,20 +302,27 @@ export default function SettingsPage() {
     setBusy(true);
     setInfo(null);
     try {
+      if (!supabaseClient) {
+        setInfo('Serviço de assinaturas indisponível.');
+        return;
+      }
       // try RPC first
-      const { error: unsetErr } = await supabase.rpc('unset_user_default_signature', { p_user_id: sessionUserId });
+      const { error: unsetErr } = await supabaseClient.rpc('unset_user_default_signature', { p_user_id: sessionUserId });
       if (unsetErr) {
         // fallback: unset via update
-        const { error: uErr } = await supabase.from('signatures').update({ is_default: false }).eq('user_id', sessionUserId);
+        const { error: uErr } = await supabaseClient
+          .from('signatures')
+          .update({ is_default: false })
+          .eq('user_id', sessionUserId);
         if (uErr) console.warn('fallback unset default error', uErr);
       }
-      const { error: setErr } = await supabase.from('signatures').update({ is_default: true }).eq('id', sigId);
+      const { error: setErr } = await supabaseClient.from('signatures').update({ is_default: true }).eq('id', sigId);
       if (setErr) throw setErr;
 
       // update profile preference
-      const { error: profErr } = await supabase
+      const { error: profErr } = await supabaseClient
         .from('profiles')
-        .upsert({ id: sessionUserId, preferred_signature_id: sigId }, { returning: 'minimal' });
+        .upsert({ id: sessionUserId, preferred_signature_id: sigId });
       if (profErr) console.warn('profile update error', profErr);
 
       setPreferredSignatureId(sigId);
@@ -321,16 +346,20 @@ export default function SettingsPage() {
     setBusy(true);
     setInfo(null);
     try {
+      if (!supabaseClient) {
+        setInfo('Serviço de assinaturas indisponível.');
+        return;
+      }
       if (sig.storage_path) {
-        const { error: remErr } = await supabase.storage.from('signflow-signatures').remove([sig.storage_path]);
+        const { error: remErr } = await supabaseClient.storage.from('signflow-signatures').remove([sig.storage_path]);
         if (remErr) console.warn('storage remove error', remErr);
       }
-      const { error: delErr } = await supabase.from('signatures').delete().eq('id', sig.id);
+      const { error: delErr } = await supabaseClient.from('signatures').delete().eq('id', sig.id);
       if (delErr) throw delErr;
 
       // if it was default, clear profile preferred_signature_id
       if (sig.is_default) {
-        await supabase.from('profiles').update({ preferred_signature_id: null }).eq('id', sessionUserId);
+        await supabaseClient.from('profiles').update({ preferred_signature_id: null }).eq('id', sessionUserId);
         setPreferredSignatureId(null);
       }
 
@@ -345,6 +374,15 @@ export default function SettingsPage() {
   }
 
   // ------------------ UI ------------------
+  if (!supabaseClient) {
+    return (
+      <div style={{ maxWidth: 900, margin: '20px auto', padding: 16 }}>
+        <h1>Configurações</h1>
+        <p>Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.</p>
+      </div>
+    );
+  }
+
   if (loading) return <p style={{ padding: 16 }}>Carregando…</p>;
   if (!sessionUserId) {
     return (

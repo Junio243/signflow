@@ -35,6 +35,7 @@
     "app",
     "components",
     "lib",
+    "types",
     "supabase",
     "styles",
     ".next/types/**/*.ts"

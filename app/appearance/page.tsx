@@ -8,6 +8,7 @@ type Profile = { id: string; name: string; type: 'medico'|'faculdade'|'generico'
 
 export default function AppearancePage() {
   const router = useRouter()
+  const supabaseClient = supabase
   const [loading, setLoading] = useState(true)
   // Form
   const [name, setName] = useState('')
@@ -26,9 +27,14 @@ export default function AppearancePage() {
 
   useEffect(() => {
     const boot = async () => {
-      const s = await supabase.auth.getSession()
+      if (!supabaseClient) {
+        setInfo('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+        setLoading(false)
+        return
+      }
+      const s = await supabaseClient.auth.getSession()
       if (!s.data?.session) { window.location.href = '/login?next=/appearance'; return }
-      const { data } = await supabase.from('validation_profiles').select('id, name, type, theme').order('created_at', { ascending: false })
+      const { data } = await supabaseClient.from('validation_profiles').select('id, name, type, theme').order('created_at', { ascending: false })
       setProfiles((data || []) as Profile[])
       setLoading(false)
     }
@@ -38,9 +44,13 @@ export default function AppearancePage() {
   const uploadLogoIfAny = async (): Promise<string | null> => {
     if (!logoFile) return null
     const key = `branding/${Date.now()}-${logoFile.name}`
-    const up = await supabase.storage.from('signflow').upload(key, logoFile, { contentType: logoFile.type, upsert: true })
+    if (!supabaseClient) {
+      setInfo('Serviço de armazenamento indisponível.');
+      return null
+    }
+    const up = await supabaseClient.storage.from('signflow').upload(key, logoFile, { contentType: logoFile.type, upsert: true })
     if (up.error) { setInfo('Não consegui subir o logo.'); return null }
-    const pub = await supabase.storage.from('signflow').getPublicUrl(key)
+    const pub = await supabaseClient.storage.from('signflow').getPublicUrl(key)
     return pub.data?.publicUrl ?? null
   }
 
@@ -59,15 +69,28 @@ export default function AppearancePage() {
         certificate_type: certificateType,
         certificate_valid_until: normalizedCertificateValidUntil,
       }
-      const { error } = await supabase.from('validation_profiles').insert({ name, type, theme })
+      if (!supabaseClient) {
+        setInfo('Serviço de perfis indisponível.');
+        return
+      }
+      const { error } = await supabaseClient.from('validation_profiles').insert({ name, type, theme })
       if (error) { setInfo('Erro ao salvar perfil: '+error.message); return }
       setInfo('Perfil criado!')
       setName(''); setLogoFile(null); setLogoUrl(null)
       setCertificateType('Certificado digital ICP-Brasil')
       setCertificateValidUntil('')
-      const { data } = await supabase.from('validation_profiles').select('id, name, type, theme').order('created_at', { ascending: false })
+      const { data } = await supabaseClient.from('validation_profiles').select('id, name, type, theme').order('created_at', { ascending: false })
       setProfiles((data || []) as Profile[])
     } catch { setInfo('Falha ao criar perfil.') }
+  }
+
+  if (!supabaseClient) {
+    return (
+      <div style={{ maxWidth: 900, margin: '24px auto', padding: 16 }}>
+        <h1>Aparência da Validação</h1>
+        <p>Serviço de perfis indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.</p>
+      </div>
+    )
   }
 
   if (loading) return <p style={{ padding:16 }}>Carregando…</p>

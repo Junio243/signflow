@@ -75,6 +75,7 @@ const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
 
 export default function DashboardPage() {
   const router = useRouter()
+  const supabaseClient = supabase
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [docs, setDocs] = useState<Doc[]>([])
@@ -86,16 +87,26 @@ export default function DashboardPage() {
   const [feedback, setFeedback] = useState<string | null>(null)
 
   const fetchSession = useCallback(async () => {
-    const { data } = await supabase.auth.getSession()
+    if (!supabaseClient) {
+      setErrorMsg('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+      setIsLogged(false)
+      setUserEmail(null)
+      return null
+    }
+    const { data } = await supabaseClient.auth.getSession()
     const session = data?.session ?? null
     setIsLogged(!!session)
     setUserEmail(session?.user?.email ?? null)
     return session
-  }, [])
+  }, [supabaseClient])
 
   const fetchDocs = useCallback(async () => {
     setErrorMsg(null)
-    let { data, error } = await supabase
+    if (!supabaseClient) {
+      setErrorMsg('Serviço de documentos indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+      return
+    }
+    let { data, error } = await supabaseClient
       .from('documents')
       .select('id, status, created_at, signed_pdf_url, qr_code_url, original_pdf_name, canceled_at')
       .order('created_at', { ascending: false })
@@ -105,9 +116,9 @@ export default function DashboardPage() {
       const message = String(error.message || '')
       const missingColumn = message.includes('does not exist') || message.includes('não existe')
       if (missingColumn) {
-        const retry = await supabase
+        const retry = await supabaseClient
           .from('documents')
-          .select('id, status, created_at, signed_pdf_url, qr_code_url, original_pdf_name')
+          .select('id, status, created_at, signed_pdf_url, qr_code_url, original_pdf_name, canceled_at')
           .order('created_at', { ascending: false })
           .limit(200)
         data = retry.data
@@ -127,6 +138,11 @@ export default function DashboardPage() {
     let active = true
     setLoading(true)
 
+    if (!supabaseClient) {
+      setLoading(false)
+      return
+    }
+
     fetchSession().then(() =>
       fetchDocs()
         .catch(err => setErrorMsg(err instanceof Error ? err.message : String(err)))
@@ -135,16 +151,16 @@ export default function DashboardPage() {
         }),
     )
 
-    const channel = supabase
+    const channel = supabaseClient
       .channel('realtime-docs')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => fetchDocs())
       .subscribe()
 
     return () => {
       active = false
-      supabase.removeChannel(channel)
+      supabaseClient.removeChannel(channel)
     }
-  }, [fetchDocs, fetchSession])
+  }, [fetchDocs, fetchSession, supabaseClient])
 
   useEffect(() => {
     if (!feedback) return
@@ -159,7 +175,11 @@ export default function DashboardPage() {
   }
 
   const handleNew = async () => {
-    const { data } = await supabase.auth.getSession()
+    if (!supabaseClient) {
+      setErrorMsg('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+      return
+    }
+    const { data } = await supabaseClient.auth.getSession()
     if (!data?.session) {
       router.push(`/login?next=${encodeURIComponent('/editor')}`)
       return
@@ -180,7 +200,11 @@ export default function DashboardPage() {
 
     try {
       setActionBusyId(doc.id)
-      const { error } = await supabase
+      if (!supabaseClient) {
+        setFeedback('Serviço de documentos indisponível. Configure as variáveis de ambiente.')
+        return
+      }
+      const { error } = await supabaseClient
         .from('documents')
         .update({ status: 'canceled', canceled_at: new Date().toISOString() })
         .eq('id', doc.id)
@@ -236,6 +260,15 @@ export default function DashboardPage() {
   }, [docs])
 
   const statusOptions = useMemo(() => STATUS_FILTERS, [])
+
+  if (!supabaseClient) {
+    return (
+      <div className="mx-auto flex max-w-4xl flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-800">
+        <h1 className="text-xl font-semibold">Dashboard indisponível</h1>
+        <p>Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY para acessar os documentos.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
