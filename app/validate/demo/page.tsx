@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { ShieldCheck } from 'lucide-react'
 import QRCode from 'qrcode'
 
 export default function ValidateDemoPage() {
@@ -14,6 +15,14 @@ export default function ValidateDemoPage() {
   }, [])
 
   const color = '#2563eb'
+  const accentColor = '#059669'
+  const headerPalette = {
+    bg: '#ecfdf5',
+    border: '#a7f3d0',
+    text: '#047857',
+    icon: '#059669',
+    badge: 'rgba(5, 150, 105, 0.1)',
+  }
   const issuer = 'Exemplo: Dr(a). Fulano — CRM/DF 12345'
   const reg = 'Instituição: Hospital/Clínica — CNPJ 00.000.000/0001-00'
   const footer = 'Demonstração visual da validação no SignFlow (sem consulta ao banco).'
@@ -22,6 +31,65 @@ export default function ValidateDemoPage() {
 
   return (
     <div style={{ maxWidth: 900, margin: '24px auto', padding: 16 }}>
+      <div
+        style={{
+          border: `1px solid ${headerPalette.border}`,
+          background: headerPalette.bg,
+          color: headerPalette.text,
+          borderRadius: 16,
+          padding: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          marginBottom: 24,
+        }}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+          <div
+            style={{
+              background: headerPalette.badge,
+              borderRadius: '50%',
+              width: 48,
+              height: 48,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <ShieldCheck size={28} color={headerPalette.icon} strokeWidth={2.5} />
+          </div>
+          <div style={{ flex: '1 1 auto', minWidth: 220 }}>
+            <div style={{ fontWeight: 700, fontSize: 20 }}>Documento válido e assinado digitalmente</div>
+            <div style={{ fontSize: 13, opacity: 0.9 }}>Experiência demonstrativa do fluxo de validação.</div>
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              minWidth: 200,
+              alignItems: 'flex-start',
+            }}
+          >
+            <div style={{ fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase', fontWeight: 600 }}>
+              Selos oficiais
+            </div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <img
+                src="/seals/icp-brasil.svg"
+                alt="Selo ICP-Brasil"
+                style={{ height: 42, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#fff' }}
+              />
+              <img
+                src="/seals/dataprev.svg"
+                alt="Selo Dataprev / gov.br"
+                style={{ height: 42, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#fff' }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
         <div>
           <h1 style={{ margin:0, fontSize:22 }}>Validação — Demo</h1>
@@ -29,7 +97,7 @@ export default function ValidateDemoPage() {
         </div>
       </div>
 
-      <div style={{ border:`2px solid ${color}`, borderRadius:12, padding:16 }}>
+      <div style={{ border:`2px solid ${accentColor}`, borderRadius:12, padding:16 }}>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
           <div>
             <div style={{ fontSize:12, color:'#6b7280' }}>Status</div>
