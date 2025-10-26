@@ -20,9 +20,7 @@ type Props = {
 if (typeof window !== 'undefined') {
   try {
     const ver = (pdfjsLib as any).version || 'latest';
-    // aponta o worker para a mesma versão do pdfjs via CDN (unpkg)
     (pdfjsLib as any).GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${ver}/build/pdf.worker.min.js`;
-    // console.info('pdfjs version:', ver, 'workerSrc set to', (pdfjsLib as any).GlobalWorkerOptions.workerSrc);
   } catch (e) {
     console.warn('Não foi possível configurar GlobalWorkerOptions.workerSrc automaticamente:', e);
   }
@@ -50,6 +48,11 @@ export default function PdfEditor({
   const rafRef = useRef(false);
   const latestPosRef = useRef<{ nx: number; ny: number } | null>(null);
 
+  // Log quando 'file' muda
+  useEffect(() => {
+    console.log('PdfEditor: prop file mudou ->', file ? { name: file.name, size: file.size } : null);
+  }, [file]);
+
   useEffect(() => {
     let cancelled = false;
     let task: any;
@@ -57,6 +60,7 @@ export default function PdfEditor({
 
     (async () => {
       if (!file) {
+        console.log('PdfEditor: sem arquivo, limpando estado.');
         setPdf(null);
         setError(null);
         return;
@@ -65,42 +69,42 @@ export default function PdfEditor({
       try {
         setLoading(true);
         setError(null);
+        console.log('PdfEditor: iniciando load do arquivo:', { name: file.name, size: file.size });
 
-        // 1) tentar com Uint8Array (recomendado)
+        // 1) tenta com Uint8Array (recomendado)
         try {
           const ab = await file.arrayBuffer();
+          console.log('PdfEditor: arrayBuffer lido, byteLength=', ab.byteLength);
           const uint8 = new Uint8Array(ab);
 
-          // NÃO definimos disableWorker aqui — deixamos o worker carregado pelo GlobalWorkerOptions
-          task = (pdfjsLib as any).getDocument({
-            data: uint8
-          });
+          task = (pdfjsLib as any).getDocument({ data: uint8 });
           const doc = await task.promise;
           if (cancelled) { await doc?.destroy?.(); return; }
+          console.log('PdfEditor: pdf carregado via Uint8Array, páginas=', doc.numPages);
           setPdf(doc);
           if (controlledPage === undefined) setPage(1);
           onDocumentLoaded?.({ pages: doc.numPages || 1 });
           onPageChange?.(1);
           return;
         } catch (firstErr) {
-          console.warn('pdfjs getDocument usando Uint8Array falhou — tentando fallback por blob URL', firstErr);
+          console.warn('PdfEditor: getDocument usando Uint8Array falhou — tentando blob URL. Erro:', firstErr);
         }
 
-        // 2) fallback: usar blob URL (às vezes corrige problemas de compatibilidade/bundling)
+        // 2) fallback: blob URL
         try {
           blobUrl = URL.createObjectURL(file);
-          task = (pdfjsLib as any).getDocument({
-            url: blobUrl
-          });
+          console.log('PdfEditor: tentando getDocument via blob URL:', blobUrl);
+          task = (pdfjsLib as any).getDocument({ url: blobUrl });
           const doc = await task.promise;
           if (cancelled) { await doc?.destroy?.(); return; }
+          console.log('PdfEditor: pdf carregado via blob URL, páginas=', doc.numPages);
           setPdf(doc);
           if (controlledPage === undefined) setPage(1);
           onDocumentLoaded?.({ pages: doc.numPages || 1 });
           onPageChange?.(1);
           return;
         } catch (secondErr) {
-          console.warn('pdfjs getDocument via blob URL também falhou', secondErr);
+          console.warn('PdfEditor: getDocument via blob URL também falhou:', secondErr);
           throw secondErr;
         }
       } catch (err: any) {
@@ -124,19 +128,26 @@ export default function PdfEditor({
   }, [file, controlledPage, onDocumentLoaded, onPageChange]);
 
   useEffect(() => { setSigDataUrl(signatureUrl); }, [signatureUrl]);
-
   useEffect(() => { if (controlledPage !== undefined) setPage(controlledPage); }, [controlledPage]);
 
   useEffect(() => { renderPage(); }, [pdf, page, scale, positions, sigDataUrl]);
 
   async function renderPage() {
-    const canvas = canvasRef.current; if (!canvas || !pdf) return;
+    const canvas = canvasRef.current;
+    if (!canvas) { console.log('PdfEditor.renderPage: canvas não encontrado'); return; }
+    if (!pdf) { console.log('PdfEditor.renderPage: pdf não definido'); return; }
+
     try {
+      console.log('PdfEditor.renderPage: renderizando página', page);
       const p = await pdf.getPage(page);
       const viewport = p.getViewport({ scale });
       canvas.width = viewport.width; canvas.height = viewport.height;
+      // também atualiza estilo CSS para evitar que canvas fique com 0x0 visualmente
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
       const ctx = canvas.getContext('2d')!;
       await p.render({ canvasContext: ctx, viewport }).promise;
+      console.log('PdfEditor.renderPage: render concluído para página', page);
 
       const pos = positions.find(ps => ps.page === page);
       if (pos && sigDataUrl) {
@@ -236,6 +247,7 @@ export default function PdfEditor({
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          style={{ display: 'block', maxWidth: '100%' }}
         />
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center rounded-lg border bg-white/80 text-sm text-slate-600">
