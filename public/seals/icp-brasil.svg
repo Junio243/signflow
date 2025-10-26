@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="title desc">
+  <title id="title">Selo ICP-Brasil</title>
+  <desc id="desc">Representação simplificada do selo oficial da ICP-Brasil.</desc>
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1b5e20"/>
+      <stop offset="100%" stop-color="#2e7d32"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="16" fill="url(#g)"/>
+  <path d="M24 36 60 16l36 20v32l-36 20-36-20z" fill="#ffee58"/>
+  <path d="m60 28 20 11.5v23L60 74 40 62.5v-23z" fill="#1976d2" opacity="0.9"/>
+  <circle cx="60" cy="52" r="10" fill="#fff"/>
+  <path d="M60 44a8 8 0 0 1 8 8v6h-6v-5a2 2 0 1 0-4 0v5h-6v-6a8 8 0 0 1 8-8z" fill="#1b5e20"/>
+</svg>
