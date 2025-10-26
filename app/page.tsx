@@ -227,7 +227,17 @@ export default function HomePage() {
             <Link href="/docs/immutability">Como garantimos a imutabilidade?</Link>
             <Link href="/status">SLA & Uptime</Link>
             <Link href="/contato">Contato</Link>
+            <Link href="/terms">Termos de Uso</Link>
+            <Link href="/privacy">Política de Privacidade</Link>
           </nav>
+        </div>
+
+        <div className="wrap foot-legal" aria-label="Informações corporativas">
+          <div className="legal-block">
+            <div><strong>SignFlow Serviços Digitais S.A.</strong></div>
+            <div>CNPJ 12.345.678/0001-99 · Av. das Nações Unidas, 1000 — São Paulo/SP · CEP 04578-000</div>
+            <div>Suporte corporativo: suporte@signflow.com.br · (11) 5555-0000</div>
+          </div>
         </div>
 
         {/* Selo final */}
@@ -239,6 +249,11 @@ export default function HomePage() {
               <div className="seal-sub">Consulta oficial · QR Code verificado · Certificado ICP-Brasil emitido pela AC Dataprev ✔</div>
             </div>
             <span className="seal-check" aria-hidden>✔</span>
+          </div>
+          <div className="seal-chips" role="list" aria-label="Selos de conformidade">
+            <Chip><IcpiIcon/> ICP-Brasil homologado</Chip>
+            <Chip><DataprevIcon/> Integração Dataprev</Chip>
+            <Chip><LockIcon/> Certificado SSL EV</Chip>
           </div>
         </div>
       </footer>
@@ -584,7 +599,9 @@ const css = `
 /* FOOTER */
 .foot{border-top:1px solid rgba(148,163,184,.35);background:#fff}
 .foot-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 0;flex-wrap:wrap}
-.foot-nav{display:flex;gap:14px}
+.foot-nav{display:flex;gap:14px;flex-wrap:wrap}
+.foot-legal{padding:0 0 18px;color:var(--muted)}
+.legal-block{display:flex;flex-direction:column;gap:4px;font-size:12px;line-height:1.5;text-align:center}
 .muted{color:var(--muted)} .small{font-size:12px}
 
 /* SEAL */
@@ -594,6 +611,7 @@ const css = `
 .seal-title{font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--primary)}
 .seal-sub{font-size:12px;color:#0f172a}
 .seal-check{font-size:24px;color:#16a34a;font-weight:900;margin-left:6px}
+.seal-chips{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 
 /* RESPONSIVO */
 @media (max-width: 1080px){
