@@ -12,14 +12,14 @@ export default function HomePage() {
             <span className="glyph">◆</span> <b>SignFlow</b>
           </Link>
           <nav className="links" aria-label="Navegação principal">
-            <Link href="/">Home</Link>
-            <Link href="/#produtos">Produtos</Link>
-            <Link href="/#planos">Planos</Link>
-            <Link href="/#suporte">Suporte</Link>
+            <Link href="/#como-funciona">Como Funciona</Link>
+            <Link href="/#seguranca">Segurança</Link>
+            <Link href="/#precos">Preços</Link>
+            <Link href="/#suporte">Suporte/Ajuda</Link>
             <Link href="/login">Entrar</Link>
           </nav>
-          <Link href="/editor" className="btn btn-primary" aria-label="Assinar documento agora">
-            <BoltIcon/> Assinar agora
+          <Link href="/signup" className="btn btn-primary" aria-label="Criar conta">
+            <BoltIcon/> Criar conta
           </Link>
         </div>
       </header>
@@ -52,7 +52,7 @@ export default function HomePage() {
       </section>
 
       {/* ===== TRUST: Logos Reais + Selos ===== */}
-      <section className="trusted" aria-labelledby="trusted-title">
+      <section className="trusted" id="seguranca" aria-labelledby="trusted-title">
         <div className="wrap">
           <h2 id="trusted-title" className="trusted-title">Confiado por instituições de missão crítica</h2>
           <p className="trusted-sub">Infraestrutura auditável, LGPD, ISO 27001 e ICP-Brasil — com validação pública por QR.</p>
@@ -103,7 +103,7 @@ export default function HomePage() {
       </section>
 
       {/* ===== COMO FUNCIONA (4 passos visuais) ===== */}
-      <section className="how" id="produtos" aria-labelledby="how-title">
+      <section className="how" id="como-funciona" aria-labelledby="how-title">
         <div className="wrap">
           <h2 id="how-title">Como funciona</h2>
           <p className="sub">Fluxo visual e direto — do upload até a validação pública.</p>
@@ -179,7 +179,7 @@ export default function HomePage() {
       </section>
 
       {/* ===== PLANOS ===== */}
-      <section className="pricing" id="planos" aria-labelledby="planos-title">
+      <section className="pricing" id="precos" aria-labelledby="planos-title">
         <div className="wrap">
           <h2 id="planos-title">Planos</h2>
           <p className="sub">Comece grátis. Evolua quando precisar.</p>
