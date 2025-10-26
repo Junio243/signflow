@@ -9,7 +9,6 @@ type Profile = { id: string; name: string; type: 'medico'|'faculdade'|'generico'
 export default function AppearancePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [isLogged, setIsLogged] = useState(false)
 
   // Form
   const [name, setName] = useState('')
@@ -20,6 +19,8 @@ export default function AppearancePage() {
   const [reg, setReg] = useState('Registro (CRM/CRP/OAB/CNPJ)')
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [certificateType, setCertificateType] = useState('Certificado digital ICP-Brasil')
+  const [certificateValidUntil, setCertificateValidUntil] = useState('')
 
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [info, setInfo] = useState<string | null>(null)
@@ -28,7 +29,6 @@ export default function AppearancePage() {
     const boot = async () => {
       const s = await supabase.auth.getSession()
       if (!s.data?.session) { window.location.href = '/login?next=/appearance'; return }
-      setIsLogged(true)
       const { data } = await supabase.from('validation_profiles').select('id, name, type, theme').order('created_at', { ascending: false })
       setProfiles((data || []) as Profile[])
       setLoading(false)
@@ -49,11 +49,21 @@ export default function AppearancePage() {
     try {
       setInfo(null)
       const logo = await uploadLogoIfAny()
-      const theme = { color, footer, issuer, reg, logo_url: logo ?? logoUrl ?? null }
+      const theme = {
+        color,
+        footer,
+        issuer,
+        reg,
+        logo_url: logo ?? logoUrl ?? null,
+        certificate_type: certificateType,
+        certificate_valid_until: certificateValidUntil || null,
+      }
       const { error } = await supabase.from('validation_profiles').insert({ name, type, theme })
       if (error) { setInfo('Erro ao salvar perfil: '+error.message); return }
       setInfo('Perfil criado!')
       setName(''); setLogoFile(null); setLogoUrl(null)
+      setCertificateType('Certificado digital ICP-Brasil')
+      setCertificateValidUntil('')
       const { data } = await supabase.from('validation_profiles').select('id, name, type, theme').order('created_at', { ascending: false })
       setProfiles((data || []) as Profile[])
     } catch { setInfo('Falha ao criar perfil.') }
@@ -82,6 +92,16 @@ export default function AppearancePage() {
             <input type="color" value={color} onChange={e=>setColor(e.target.value)} title="Cor do tema" />
             <input placeholder="Instituição/Profissional" value={issuer} onChange={e=>setIssuer(e.target.value)} style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8 }} />
             <input placeholder="Registro (CRM/CRP/OAB/CNPJ)" value={reg} onChange={e=>setReg(e.target.value)} style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8 }} />
+            <input placeholder="Tipo de certificado (ex.: ICP-Brasil A3)" value={certificateType} onChange={e=>setCertificateType(e.target.value)} style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8 }} />
+            <div>
+              <label style={{ display:'block', fontSize:12, color:'#6b7280', marginBottom:4 }}>Validade do certificado</label>
+              <input
+                type="date"
+                value={certificateValidUntil}
+                onChange={e=>setCertificateValidUntil(e.target.value)}
+                style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8, width:'100%' }}
+              />
+            </div>
             <textarea placeholder="Rodapé" value={footer} onChange={e=>setFooter(e.target.value)} style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8 }} />
             <div>
               <div>Logo (opcional):</div>
