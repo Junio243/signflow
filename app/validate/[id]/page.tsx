@@ -41,8 +41,10 @@ export default function ValidatePage() {
     (async () => {
       if (id === 'demo') { window.location.replace('/validate/demo'); return }
       if (!isUuid(id)) { setErrorMsg('ID inválido.'); return }
+      if (!supabase) { setErrorMsg('Serviço de validação indisponível no momento.'); return }
+      const client = supabase
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('documents')
         .select('id, status, created_at, signed_pdf_url, qr_code_url, original_pdf_name, validation_theme_snapshot, metadata, canceled_at')
         .eq('id', id).maybeSingle()

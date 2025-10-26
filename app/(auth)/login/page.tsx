@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient'
 
 export default function LoginPage() {
   const router = useRouter()
+  const supabaseClient = supabase
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,7 +16,12 @@ export default function LoginPage() {
   const loginComSenha = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null); setInfo(null); setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (!supabaseClient) {
+      setError('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+      setLoading(false)
+      return
+    }
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password })
     setLoading(false)
     if (error) { setError(error.message); return }
     router.replace('/dashboard')
@@ -23,13 +29,27 @@ export default function LoginPage() {
 
   const loginComLink = async () => {
     setError(null); setInfo(null); setLoading(true)
-    const { error } = await supabase.auth.signInWithOtp({
+    if (!supabaseClient) {
+      setError('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+      setLoading(false)
+      return
+    }
+    const { error } = await supabaseClient.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` }
     })
     setLoading(false)
     if (error) { setError(error.message); return }
     setInfo('Enviamos um link de acesso para o seu e-mail. Abra em até 10–60 minutos.')
+  }
+
+  if (!supabaseClient) {
+    return (
+      <div style={{ maxWidth: 360, margin: '40px auto', padding: 16 }}>
+        <h1>Entrar</h1>
+        <p>Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.</p>
+      </div>
+    )
   }
 
   return (

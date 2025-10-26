@@ -107,6 +107,7 @@ function profileBadge(type: ProfileType) {
 }
 
 export default function EditorPage() {
+  const supabaseClient = supabase
   const fileInputRef = useRef<HTMLInputElement>(null)
   const signCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
@@ -159,7 +160,11 @@ export default function EditorPage() {
   }
 
   const loadProfiles = useCallback(async ({ selectId }: { selectId?: string | null } = {}) => {
-    const { data, error } = await supabase
+    if (!supabaseClient) {
+      setStatus({ tone: 'error', text: 'Serviço de perfis indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.' })
+      return
+    }
+    const { data, error } = await supabaseClient
       .from('validation_profiles')
       .select('id, name, type, theme')
       .order('created_at', { ascending: false })
@@ -198,7 +203,11 @@ export default function EditorPage() {
 
   useEffect(() => {
     const boot = async () => {
-      const session = await supabase.auth.getSession()
+      if (!supabaseClient) {
+        setStatus({ tone: 'error', text: 'Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.' })
+        return
+      }
+      const session = await supabaseClient.auth.getSession()
       const userId = session.data?.session?.user?.id ?? null
       setSessionUserId(userId)
       await loadProfiles()
@@ -381,17 +390,23 @@ export default function EditorPage() {
     setProfileFormStatus({ tone: 'neutral', text: 'Salvando perfil...' })
 
     try {
+      const client = supabaseClient
+      if (!client) {
+        setProfileFormStatus({ tone: 'error', text: 'Serviço de perfis indisponível.' })
+        return
+      }
+
       let logoUrl: string | null = null
       if (profileLogoFile) {
         const storageKey = `branding/${Date.now()}-${profileLogoFile.name}`
-        const upload = await supabase.storage.from('signflow').upload(storageKey, profileLogoFile, {
+        const upload = await client.storage.from('signflow').upload(storageKey, profileLogoFile, {
           contentType: profileLogoFile.type || 'image/png',
           upsert: true,
         })
         if (upload.error) {
           throw new Error(upload.error.message)
         }
-        const publicUrl = await supabase.storage.from('signflow').getPublicUrl(storageKey)
+        const publicUrl = await client.storage.from('signflow').getPublicUrl(storageKey)
         logoUrl = publicUrl.data?.publicUrl ?? null
       }
 
@@ -403,7 +418,7 @@ export default function EditorPage() {
         logo_url: logoUrl,
       }
 
-      const insert = await supabase
+      const insert = await client
         .from('validation_profiles')
         .insert({ name: profileName.trim(), type: profileType, theme })
         .select('id')
@@ -633,6 +648,14 @@ export default function EditorPage() {
   }
 
   const disableAction = busy || !pdfFile || !sigPreviewUrl || positions.length === 0
+
+  if (!supabaseClient) {
+    return (
+      <div className="mx-auto mt-10 max-w-3xl px-4 text-amber-600">
+        Serviço de edição indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 pb-16">

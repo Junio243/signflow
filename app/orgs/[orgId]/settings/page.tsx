@@ -20,6 +20,7 @@ type OrgRow = {
 export default function OrgSettings({ params }: { params: { orgId: string } }) {
   const orgId = params.orgId;
   const router = useRouter();
+  const supabaseClient = supabase;
   const [loading, setLoading] = useState(true);
   const [org, setOrg] = useState<OrgRow | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -42,7 +43,12 @@ export default function OrgSettings({ params }: { params: { orgId: string } }) {
     (async () => {
       setLoading(true);
       try {
-        const { data: orgData, error: orgErr } = await supabase
+        if (!supabaseClient) {
+          setInfo('Serviço de organizações indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+          setLoading(false);
+          return;
+        }
+        const { data: orgData, error: orgErr } = await supabaseClient
           .from('organizations')
           .select('*')
           .eq('id', orgId)
@@ -62,11 +68,11 @@ export default function OrgSettings({ params }: { params: { orgId: string } }) {
         setAddress(orgData.address || 'Brasília/DF — Plano Piloto');
 
         // check membership role
-        const { data: members } = await supabase
+        const { data: members } = await supabaseClient
           .from('organization_members')
           .select('role')
           .eq('org_id', orgId)
-          .eq('user_id', (await supabase.auth.getSession()).data?.session?.user?.id)
+          .eq('user_id', (await supabaseClient.auth.getSession()).data?.session?.user?.id)
           .single();
         setIsAdmin(Boolean(members && (members as any).role === 'admin'));
       } catch (e) {
@@ -82,13 +88,17 @@ export default function OrgSettings({ params }: { params: { orgId: string } }) {
     if (!file) return;
     setBusy(true); setInfo(null);
     try {
+      if (!supabaseClient) {
+        setInfo('Serviço de armazenamento indisponível.');
+        return;
+      }
       const path = `${orgId}/logo-${Date.now()}-${file.name.replace(/\s+/g,'-')}`;
-      const { error: upErr } = await supabase.storage.from('signflow-logos').upload(path, file, { upsert: true });
+      const { error: upErr } = await supabaseClient.storage.from('signflow-logos').upload(path, file, { upsert: true });
       if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from('signflow-logos').getPublicUrl(path);
+      const { data: pub } = supabaseClient.storage.from('signflow-logos').getPublicUrl(path);
       const fileUrl = pub?.publicUrl ?? null;
       // update organization
-      const { error: upd } = await supabase.from('organizations').update({ logo_url: fileUrl }).eq('id', orgId);
+      const { error: upd } = await supabaseClient.from('organizations').update({ logo_url: fileUrl }).eq('id', orgId);
       if (upd) throw upd;
       setOrg({...org!, logo_url: fileUrl});
       setInfo('Logo atualizado.');
@@ -108,7 +118,12 @@ export default function OrgSettings({ params }: { params: { orgId: string } }) {
         name, slug, primary_color: primaryColor, secondary_color: secondaryColor,
         footer_template: footerTemplate, dpo_contact: dpoContact, address
       };
-      const { error } = await supabase.from('organizations').update(payload).eq('id', orgId);
+      if (!supabaseClient) {
+        setInfo('Serviço de organizações indisponível.');
+        setBusy(false);
+        return;
+      }
+      const { error } = await supabaseClient.from('organizations').update(payload).eq('id', orgId);
       if (error) throw error;
       setInfo('Organização salva.');
       router.refresh();
@@ -122,15 +137,19 @@ export default function OrgSettings({ params }: { params: { orgId: string } }) {
 
   async function handleCreateMember() {
     // simple UI to invite current user as admin (for initial bootstrap)
-    const uid = (await supabase.auth.getSession()).data?.session?.user?.id;
+    if (!supabaseClient) {
+      setInfo('Serviço de autenticação indisponível.');
+      return;
+    }
+    const uid = (await supabaseClient.auth.getSession()).data?.session?.user?.id;
     if (!uid) return setInfo('Faça login.');
     setBusy(true); setInfo(null);
     try {
       // try RPC first
-      const { error } = await supabase.rpc('add_org_member', { p_org: orgId, p_user: uid, p_role: 'admin' });
+      const { error } = await supabaseClient.rpc('add_org_member', { p_org: orgId, p_user: uid, p_role: 'admin' });
       if (error) {
         // fallback upsert
-        const { error: iErr } = await supabase.from('organization_members').upsert({ org_id: orgId, user_id: uid, role: 'admin' });
+        const { error: iErr } = await supabaseClient.from('organization_members').upsert({ org_id: orgId, user_id: uid, role: 'admin' });
         if (iErr) {
           setInfo('Erro ao criar membro: ' + iErr.message);
         } else {
@@ -147,6 +166,15 @@ export default function OrgSettings({ params }: { params: { orgId: string } }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (!supabaseClient) {
+    return (
+      <div style={{ maxWidth: 900, margin: '20px auto', padding: 16 }}>
+        <h1>Configurações da organização</h1>
+        <p>Serviço de organizações indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.</p>
+      </div>
+    );
   }
 
   if (loading) return <p style={{ padding: 16 }}>Carregando…</p>;

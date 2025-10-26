@@ -34,6 +34,10 @@ export default function AuthCallbackClient() {
           setMsg('Erro ao autenticar: ' + hashErr);
           return;
         }
+        if (!supabase) {
+          setMsg('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+          return;
+        }
         if (access_token && refresh_token) {
           const { error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
           if (setErr) {
@@ -47,7 +51,7 @@ export default function AuthCallbackClient() {
 
         const code = sp.get('code');
         if (code) {
-          const { error: exErr } = await supabase.auth.exchangeCodeForSession({ code });
+          const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
           if (exErr) {
             setMsg('Falha ao concluir o login (code): ' + exErr.message);
             return;

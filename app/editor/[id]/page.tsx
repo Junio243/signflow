@@ -58,6 +58,7 @@ function statusMeta(status: string | null | undefined): StatusMeta {
 export default function EditorDocumentPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
+  const supabaseClient = supabase
   const [doc, setDoc] = useState<Doc | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -68,7 +69,12 @@ export default function EditorDocumentPage() {
     let active = true
     ;(async () => {
       setLoading(true)
-      const { data, error } = await supabase
+      if (!supabaseClient) {
+        setError('Serviço de documentos indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+        setLoading(false)
+        return
+      }
+      const { data, error } = await supabaseClient
         .from('documents')
         .select('id, status, created_at, signed_pdf_url, qr_code_url, original_pdf_name, metadata, validation_theme_snapshot, canceled_at')
         .eq('id', id)
@@ -83,7 +89,7 @@ export default function EditorDocumentPage() {
       setLoading(false)
     })()
     return () => { active = false }
-  }, [params.id])
+  }, [params.id, supabaseClient])
 
   const theme = useMemo(() => {
     const meta = doc?.metadata
@@ -95,6 +101,13 @@ export default function EditorDocumentPage() {
     return null
   }, [doc])
 
+  if (!supabaseClient) {
+    return (
+      <div className="mx-auto mt-10 max-w-3xl px-4 text-amber-600">
+        Serviço de documentos indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.
+      </div>
+    )
+  }
   if (loading) return <div className="mx-auto mt-10 max-w-3xl px-4 text-slate-600">Carregando…</div>
   if (error) return <div className="mx-auto mt-10 max-w-3xl px-4 text-rose-600">Erro: {error}</div>
   if (!doc) return <div className="mx-auto mt-10 max-w-3xl px-4 text-slate-600">Documento não encontrado.</div>
