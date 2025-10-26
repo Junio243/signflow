@@ -245,16 +245,13 @@ export default function EditorPage() {
         // Importa PDF.js dinamicamente no cliente
         const pdfjs = await import('pdfjs-dist/legacy/build/pdf')
 
-        // Tenta carregar worker dinamicamente (fallback silencioso)
         try {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const worker = await import('pdfjs-dist/build/pdf.worker.entry')
-          // Em alguns bundlers o default contém o path; em outros, o módulo é função. Ajustamos defensivamente:
-          // @ts-ignore
-          pdfjs.GlobalWorkerOptions.workerSrc = worker?.default ?? worker
+          const version = (pdfjs as any).version || 'latest'
+          // A partir da v4 o pacote deixou de expor pdf.worker.entry, por isso usamos a CDN oficial
+          // que hospeda o worker já pronto para ser carregado no navegador.
+          ;(pdfjs as any).GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${version}/build/pdf.worker.min.js`
         } catch (e) {
-          // fallback: se não conseguir importar, não falha — PDF.js funcionará (sem worker) ou use um CDN worker.
-          console.warn('[Editor] Não foi possível carregar pdf.worker.entry dinamicamente', e)
+          console.warn('[Editor] Não foi possível configurar o workerSrc de PDF.js', e)
         }
 
         const loadingTask = pdfjs.getDocument({ data: ab })
