@@ -105,24 +105,28 @@ export default function ValidatePage() {
     return {}
   }, [doc])
 
+  const safeTrim = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
+
   const color = typeof theme.color === 'string' && theme.color.trim() ? theme.color : '#2563eb'
   const primarySigner = useMemo(() => (events.length ? events[events.length - 1] : null), [events])
 
   const issuerFromTheme = typeof theme.issuer === 'string' && theme.issuer.trim() ? theme.issuer : 'Instituição/Profissional'
   const regFromTheme = typeof theme.reg === 'string' && theme.reg.trim() ? theme.reg : 'Registro'
-  const issuer = primarySigner?.signer_name?.trim() || issuerFromTheme
-  const reg = primarySigner?.signer_reg?.trim() || regFromTheme
+  const issuer = safeTrim(primarySigner?.signer_name) || issuerFromTheme
+  const reg = safeTrim(primarySigner?.signer_reg) || regFromTheme
   const footer = typeof theme.footer === 'string' ? theme.footer : ''
-  const logo = (primarySigner?.logo_url && primarySigner.logo_url.trim())
-    ? primarySigner.logo_url.trim()
-    : typeof theme.logo_url === 'string'
-      ? theme.logo_url
+  const primaryLogo = safeTrim(primarySigner?.logo_url)
+  const themeLogo = safeTrim(theme.logo_url)
+  const logo = primaryLogo
+    ? primaryLogo
+    : themeLogo
+      ? themeLogo
       : null
   const certificateTypeFromTheme = typeof theme.certificate_type === 'string' && theme.certificate_type.trim()
     ? theme.certificate_type
     : 'Certificado digital (modelo padrão)'
-  const certificateType = primarySigner?.certificate_type?.trim() || certificateTypeFromTheme
-  const certificateIssuer = primarySigner?.certificate_issuer?.trim() || (
+  const certificateType = safeTrim(primarySigner?.certificate_type) || certificateTypeFromTheme
+  const certificateIssuer = safeTrim(primarySigner?.certificate_issuer) || (
     typeof theme.certificate_issuer === 'string' && theme.certificate_issuer.trim()
       ? theme.certificate_issuer
       : null
