@@ -22,8 +22,9 @@ type Props = {
 
 if (typeof window !== 'undefined') {
   try {
-    const ver = (pdfjsLib as any).version || 'latest';
-    (pdfjsLib as any).GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${ver}/build/pdf.worker.min.js`;
+    // usamos a versão legacy do worker que está disponível em public/pdf.worker.min.mjs
+    const workerSrc = '/pdf.worker.min.mjs';
+    (pdfjsLib as any).GlobalWorkerOptions.workerSrc = workerSrc;
   } catch (e) {
     console.warn('Não foi possível configurar GlobalWorkerOptions.workerSrc automaticamente:', e);
   }
