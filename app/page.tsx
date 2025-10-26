@@ -56,13 +56,37 @@ export default function HomePage() {
         <div className="wrap">
           <h2 id="trusted-title" className="trusted-title">Confiado por instituições de missão crítica</h2>
           <p className="trusted-sub">Infraestrutura auditável, LGPD, ISO 27001 e ICP-Brasil — com validação pública por QR.</p>
-          <div className="logos-row" role="list">
-            <BrandLogo variant="bb"  label="Banco do Brasil" />
-            <BrandLogo variant="ein" label="Hospital Israelita Albert Einstein" />
-            <BrandLogo variant="nub" label="Nubank" />
-            <BrandLogo variant="mgl" label="Magazine Luiza" />
-            <BrandLogo variant="dtp" label="Dataprev (integração homologada)" />
-            <BrandLogo variant="gdf" label="GDF • ICP-Brasil (conformidade)" />
+          <div className="logos-row" role="list" aria-label="Selos oficiais de segurança e conformidade">
+            <OfficialSeal
+              variant="icp"
+              label="ICP-Brasil"
+              description="Certificação digital reconhecida pelo Estado brasileiro"
+              icon={<IcpBrasilSealIcon/>}
+            />
+            <OfficialSeal
+              variant="dataprev"
+              label="Dataprev"
+              description="Integração homologada para verificação de identidade"
+              icon={<DataprevSealIcon/>}
+            />
+            <OfficialSeal
+              variant="govbr"
+              label="Gov.br"
+              description="Acesso unificado com autenticação segura"
+              icon={<GovBrSealIcon/>}
+            />
+            <OfficialSeal
+              variant="secure"
+              label="Site Seguro"
+              description="Criptografia ativa e monitoramento contínuo"
+              icon={<SecureSiteSealIcon/>}
+            />
+            <OfficialSeal
+              variant="lgpd"
+              label="LGPD"
+              description="Tratamento de dados alinhado à legislação brasileira"
+              icon={<LgpdSealIcon/>}
+            />
           </div>
 
           <div className="compliance">
@@ -341,6 +365,87 @@ function DocMock() {
   )
 }
 
+type OfficialSealProps = {
+  variant:'icp'|'dataprev'|'govbr'|'secure'|'lgpd'
+  label:string
+  description:string
+  icon:React.ReactNode
+}
+
+function OfficialSeal({ variant, label, description, icon }:OfficialSealProps) {
+  const baseId = `seal-${variant}`
+  return (
+    <figure
+      className={`seal-card seal-${variant}`}
+      role="listitem"
+      aria-labelledby={`${baseId}-title`}
+      aria-describedby={`${baseId}-desc`}
+    >
+      <div className="seal-art" aria-hidden>
+        {icon}
+      </div>
+      <figcaption className="seal-meta">
+        <span id={`${baseId}-title`} className="seal-name">{label}</span>
+        <span id={`${baseId}-desc`} className="seal-desc">{description}</span>
+      </figcaption>
+    </figure>
+  )
+}
+
+function IcpBrasilSealIcon(){
+  return (
+    <svg viewBox="0 0 48 48" className="seal-svg" aria-hidden>
+      <circle cx="24" cy="24" r="22" fill="#ffffff" stroke="#0b5cab" strokeWidth="2.6"/>
+      <path d="M16 20l8-8 8 8-8 8-8-8z" fill="#f7c948"/>
+      <path d="M17 28l7 7 7-7" fill="#0f9d58"/>
+      <path d="M24 12v24" stroke="#0f9d58" strokeWidth="2.4" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
+function DataprevSealIcon(){
+  return (
+    <svg viewBox="0 0 48 48" className="seal-svg" aria-hidden>
+      <rect x="6" y="10" width="36" height="28" rx="6" fill="#0b6c4d"/>
+      <rect x="10" y="16" width="28" height="4" rx="2" fill="#ffffff" opacity="0.9"/>
+      <rect x="10" y="22" width="20" height="4" rx="2" fill="#c7f9e3"/>
+      <rect x="10" y="28" width="16" height="4" rx="2" fill="#ffffff" opacity="0.7"/>
+      <path d="M34 28l4 4" stroke="#c7f9e3" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
+function GovBrSealIcon(){
+  return (
+    <svg viewBox="0 0 48 48" className="seal-svg" aria-hidden>
+      <rect x="6" y="12" width="36" height="24" rx="12" fill="#0b5cab"/>
+      <path d="M12 30c4-6 8-9 12-9s8 3 12 9" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <circle cx="24" cy="21" r="4" fill="#f7c948"/>
+    </svg>
+  )
+}
+
+function SecureSiteSealIcon(){
+  return (
+    <svg viewBox="0 0 48 48" className="seal-svg" aria-hidden>
+      <rect x="10" y="18" width="28" height="18" rx="6" fill="#0f172a"/>
+      <path d="M18 18v-3a6 6 0 1112 0v3" stroke="#4ade80" strokeWidth="2.4" strokeLinecap="round"/>
+      <path d="M24 26v4" stroke="#4ade80" strokeWidth="2.6" strokeLinecap="round"/>
+      <circle cx="24" cy="34" r="1.6" fill="#4ade80"/>
+    </svg>
+  )
+}
+
+function LgpdSealIcon(){
+  return (
+    <svg viewBox="0 0 48 48" className="seal-svg" aria-hidden>
+      <path d="M24 6l16 7v9c0 9-7 16-16 20-9-4-16-11-16-20v-9l16-7z" fill="#2563eb"/>
+      <path d="M18 24l4 4 8-10" stroke="#bfdbfe" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <circle cx="24" cy="16" r="3" fill="#bfdbfe"/>
+    </svg>
+  )
+}
+
 /* ===== ÍCONES (tamanho/espessura padronizados) ===== */
 function IconBase(p:{children:React.ReactNode}){return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{p.children}</svg>}
 function CheckIcon(){return <IconBase><path d="M20 6L9 17l-5-5"/></IconBase>}
@@ -398,7 +503,18 @@ const css = `
 .trusted{background:#fff;border-top:1px solid rgba(148,163,184,.25);border-bottom:1px solid rgba(148,163,184,.25);padding:26px 0 30px}
 .trusted-title{margin:0;text-align:center;font-size:18px;letter-spacing:.08em;text-transform:uppercase;color:#475569}
 .trusted-sub{text-align:center;color:#334155;margin:6px 0 14px}
-.logos-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;align-items:center}
+.logos-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;align-items:stretch;margin:22px 0 10px}
+.seal-card{--seal-accent:#0f172a;--seal-bg:#f8fafc;display:flex;align-items:center;gap:14px;padding:16px;border-radius:18px;border:1px solid rgba(15,23,42,.12);background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(226,232,240,.55));box-shadow:0 14px 32px rgba(15,23,42,.08);min-height:104px}
+.seal-art{width:56px;height:56px;border-radius:14px;border:2px solid var(--seal-accent);background:var(--seal-bg);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(15,23,42,.12)}
+.seal-svg{width:42px;height:42px}
+.seal-meta{display:flex;flex-direction:column;gap:4px}
+.seal-name{font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--seal-accent)}
+.seal-desc{font-size:12px;line-height:1.45;color:#1f2937}
+.seal-icp{--seal-accent:#0b5cab;--seal-bg:#e8f1ff}
+.seal-dataprev{--seal-accent:#0b6c4d;--seal-bg:#e0f7eb}
+.seal-govbr{--seal-accent:#0b5cab;--seal-bg:#e3edff}
+.seal-secure{--seal-accent:#0f172a;--seal-bg:#e6fbea}
+.seal-lgpd{--seal-accent:#2563eb;--seal-bg:#e0ecff}
 .logo-chip{display:flex;gap:10px;align-items:center;justify-content:flex-start}
 .logo-chip.compact .logo-name{display:none}
 .logo-svg{width:110px;height:40px;border-radius:10px;box-shadow:0 10px 24px rgba(15,23,42,.08)}
@@ -473,11 +589,11 @@ const css = `
   .grid-4{grid-template-columns:1fr 1fr}
   .grid-3{grid-template-columns:1fr}
   .grid-2{grid-template-columns:1fr}
-  .logos-row{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .logos-row{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width: 680px){
   .cta-box{flex-direction:column;align-items:flex-start}
-  .logos-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .logos-row{grid-template-columns:1fr}
 }
 `
 
