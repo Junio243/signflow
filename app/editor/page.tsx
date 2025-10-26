@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { PDFDocument } from 'pdf-lib'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabaseClient'
+import PdfEditor from '@/components/PdfEditor'
 
 type Profile = { id: string; name: string; type: 'medico'|'faculdade'|'generico'; theme: any }
 type Pos = { page: number; nx: number; ny: number; scale: number; rotation: number };
@@ -25,7 +26,6 @@ export default function EditorPage() {
 
   // PDF
   const [pdfFile, setPdfFile] = useState<File | null>(null)
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [pdfBytes, setPdfBytes] = useState<ArrayBuffer | null>(null)
 
   // Assinatura
@@ -35,6 +35,7 @@ export default function EditorPage() {
   const [drewSomething, setDrewSomething] = useState(false)
   const [sigImgFile, setSigImgFile] = useState<File | null>(null)
   const [sigImgPreview, setSigImgPreview] = useState<string | null>(null)
+  const [signaturePreviewUrl, setSignaturePreviewUrl] = useState<string | null>(null)
 
   // Tamanhos
   const [sigWidth, setSigWidth] = useState<number>(180) // px
@@ -43,10 +44,28 @@ export default function EditorPage() {
   // Posição normalizada 0..1 (legacy)
   const [normX, setNormX] = useState<number | null>(null)
   const [normY, setNormY] = useState<number | null>(null)
-  const previewRef = useRef<HTMLDivElement | null>(null)
 
   // NOVO: positions array (para presets/multi-page)
   const [positions, setPositions] = useState<Pos[]>([])
+  const [activePage, setActivePage] = useState(1)
+  const [pdfPageCount, setPdfPageCount] = useState(1)
+
+  useEffect(() => {
+    const firstPagePos = positions.find(p => p.page === 1)
+    if (firstPagePos) {
+      setNormX(firstPagePos.nx)
+      setNormY(firstPagePos.ny)
+    } else {
+      setNormX(null)
+      setNormY(null)
+    }
+  }, [positions])
+
+  useEffect(() => {
+    return () => {
+      if (sigImgPreview) URL.revokeObjectURL(sigImgPreview)
+    }
+  }, [sigImgPreview])
 
   // Perfis (com theme)
   const [profiles, setProfiles] = useState<Profile[]>([])
@@ -130,6 +149,18 @@ export default function EditorPage() {
 
   const ctx = () => signCanvasRef.current!.getContext('2d')!
 
+  useEffect(() => {
+    if (sigMode === 'draw') {
+      if (drewSomething && signCanvasRef.current) {
+        setSignaturePreviewUrl(signCanvasRef.current.toDataURL('image/png'))
+      } else if (!drewSomething) {
+        setSignaturePreviewUrl(null)
+      }
+    } else if (sigMode === 'upload') {
+      setSignaturePreviewUrl(sigImgPreview)
+    }
+  }, [sigMode, drewSomething, sigImgPreview])
+
   // ====== NOVAS funções de desenho (persistem traços) ======
   const onPD = (e: React.PointerEvent<HTMLCanvasElement>) => {
     setDrawing(true);
@@ -159,6 +190,9 @@ export default function EditorPage() {
     if (currentStrokeRef.current && currentStrokeRef.current.length) {
       strokesRef.current.push(currentStrokeRef.current);
       currentStrokeRef.current = null;
+      if (signCanvasRef.current) {
+        setSignaturePreviewUrl(signCanvasRef.current.toDataURL('image/png'))
+      }
     }
   }
 
@@ -169,48 +203,67 @@ export default function EditorPage() {
       c.clearRect(0, 0, cvs.width, cvs.height)
       strokesRef.current = [];
       setDrewSomething(false)
+      setSignaturePreviewUrl(null)
     } else {
       setSigImgFile(null)
+      if (sigImgPreview) URL.revokeObjectURL(sigImgPreview)
       setSigImgPreview(null)
+      setSignaturePreviewUrl(null)
     }
   }
+
+  const removePositionForPage = (pageNumber: number) => {
+    setPositions(prev => prev.filter(p => p.page !== pageNumber))
+    if (pageNumber === 1) {
+      setNormX(null)
+      setNormY(null)
+    }
+    setInfo('Posição removida.')
+  }
+
+  const replicatePositionToAllPages = () => {
+    if (!pdfFile || !pdfBytes) {
+      setInfo('Envie um PDF antes de replicar as posições.')
+      return
+    }
+    const base = positions.find(p => p.page === activePage)
+    if (!base) {
+      setInfo('Defina a posição na página atual antes de replicar.')
+      return
+    }
+    if (pdfPageCount <= 1) {
+      setInfo('O PDF possui apenas uma página.')
+      return
+    }
+    const replicated = Array.from({ length: pdfPageCount }, (_, idx) => ({ ...base, page: idx + 1 }))
+    setPositions(replicated)
+    setInfo('Posição aplicada em todas as páginas.')
+  }
+
+  const clearAllPositions = () => {
+    setPositions([])
+    setNormX(null)
+    setNormY(null)
+    setInfo('Todas as posições foram removidas.')
+  }
+
+  const sortedPositions = [...positions].sort((a, b) => a.page - b.page)
+  const hasPositionForActive = positions.some(p => p.page === activePage)
 
   // ====== PDF preview & click ======
   const onPdfChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] || null
     setPdfFile(f)
     setNormX(null); setNormY(null)
-    if (!f) { setPdfUrl(null); setPdfBytes(null); return }
-    setPdfUrl(URL.createObjectURL(f))
+    setPositions([])
+    setActivePage(1)
+    setPdfPageCount(1)
+    if (!f) { setPdfBytes(null); return }
     setPdfBytes(await f.arrayBuffer())
-    setInfo('Clique na prévia para posicionar assinatura/QR (aplica em todas as páginas).')
+    setInfo('Use a prévia interativa para posicionar assinatura e QR nas páginas desejadas.')
+    // permite escolher o mesmo arquivo novamente, se necessário
+    e.target.value = ''
   }
-
-  const onPreviewClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const box = previewRef.current!
-    const r = box.getBoundingClientRect()
-    const nx = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))
-    const ny = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height))
-    setNormX(nx)
-    setNormY(ny)
-
-    // ====== Atualiza positions array (para presets) ======
-    setPositions(prev => {
-      // replace existing position for page 1 or add
-      const others = prev.filter(p => p.page !== 1);
-      return [...others, { page: 1, nx, ny, scale: 1, rotation: 0 }];
-    });
-
-    setInfo('Posição atualizada.');
-  }
-
-  const Marker = () => (normX===null||normY===null)?null:(
-    <div style={{
-      position:'absolute', left:`${normX*100}%`, top:`${normY*100}%`,
-      transform:'translate(-50%,-50%)', width:12, height:12, borderRadius:999,
-      background:'#2563eb', border:'2px solid #fff', boxShadow:'0 0 0 1px #2563eb', pointerEvents:'none'
-    }}/>
-  )
 
   // ====== Perfis (com theme) ======
   useEffect(() => {
@@ -426,28 +479,31 @@ export default function EditorPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: 16 }}>
         {/* Prévia */}
-        <Card title="Prévia do PDF (clique para posicionar)">
-          <div
-            ref={previewRef}
-            style={{ position:'relative', width:'100%', height:560, border:'1px solid #e5e7eb', borderRadius:10, overflow:'hidden', background:'#fafafa' }}
-          >
-            {pdfUrl ? (
-              <>
-                {/* garantir que o object não capture eventos */}
-                <object data={pdfUrl} type="application/pdf" width="100%" height="100%" style={{ pointerEvents: 'none' }}></object>
-                <div onClick={onPreviewClick} title="Clique para escolher a posição" style={{ position:'absolute', inset:0, cursor:'crosshair' }} />
-                <Marker />
-              </>
-            ) : (
-              <div style={{ padding: 12, color: '#6b7280' }}>Envie um PDF para visualizar aqui.</div>
-            )}
-          </div>
+        <Card title="Prévia interativa">
+          {pdfFile ? (
+            <div style={{ border:'1px solid #e5e7eb', borderRadius:12, padding:12, background:'#f8fafc' }}>
+              <PdfEditor
+                file={pdfFile}
+                signatureUrl={signaturePreviewUrl}
+                positions={positions}
+                onPositions={setPositions}
+                page={activePage}
+                onPageChange={setActivePage}
+                onDocumentLoaded={({ pages }) => setPdfPageCount(pages)}
+              />
+            </div>
+          ) : (
+            <div style={{ padding: 12, color: '#6b7280' }}>Envie um PDF para habilitar a prévia interativa.</div>
+          )}
         </Card>
 
         {/* Controles */}
         <div style={{ display:'grid', gap:16 }}>
           <Card title="1) PDF">
             <input type="file" accept="application/pdf" onChange={onPdfChange} />
+            <p style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
+              {pdfFile ? `Selecionado: ${pdfFile.name}` : 'Nenhum PDF selecionado no momento.'}
+            </p>
           </Card>
 
           <Card title="2) Assinatura" right={
@@ -478,7 +534,10 @@ export default function EditorPage() {
                   onChange={(e)=> {
                     const f = e.target.files?.[0] || null
                     setSigImgFile(f)
-                    setSigImgPreview(f ? URL.createObjectURL(f) : null)
+                    if (sigImgPreview) URL.revokeObjectURL(sigImgPreview)
+                    const preview = f ? URL.createObjectURL(f) : null
+                    setSigImgPreview(preview)
+                    setSignaturePreviewUrl(preview)
                   }}
                 />
                 {sigImgPreview && (
@@ -501,6 +560,52 @@ export default function EditorPage() {
               <label>QR Code: {qrSize}px
                 <input type="range" min={64} max={320} value={qrSize} onChange={e=>setQrSize(parseInt(e.target.value))} />
               </label>
+            </div>
+          </Card>
+
+          <Card title="Posições no PDF" right={<span style={{ fontSize:13, color:'#64748b' }}>Página atual: {activePage} / {pdfPageCount}</span>}>
+            <div style={{ fontSize:13, color:'#6b7280', marginBottom:8 }}>
+              Use a prévia interativa para clicar onde a assinatura deve aparecer. Você pode arrastar e ajustar escala/rotação.
+            </div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:12 }}>
+              <button
+                onClick={()=>removePositionForPage(activePage)}
+                disabled={!hasPositionForActive}
+                style={{ padding:'6px 10px', borderRadius:8, border:'1px solid #e5e7eb', background:'#fff', cursor: hasPositionForActive ? 'pointer' : 'not-allowed' }}
+              >
+                Remover posição desta página
+              </button>
+              <button
+                onClick={replicatePositionToAllPages}
+                disabled={positions.length === 0 || pdfPageCount <= 1}
+                style={{ padding:'6px 10px', borderRadius:8, border:'1px solid #2563eb', background: positions.length === 0 || pdfPageCount <= 1 ? '#bfdbfe' : '#2563eb', color:'#fff', cursor: (positions.length === 0 || pdfPageCount <= 1) ? 'not-allowed' : 'pointer' }}
+              >
+                Aplicar em todas as páginas
+              </button>
+              <button
+                onClick={clearAllPositions}
+                disabled={positions.length === 0}
+                style={{ padding:'6px 10px', borderRadius:8, border:'1px solid #e5e7eb', background:'#fff', cursor: positions.length === 0 ? 'not-allowed' : 'pointer' }}
+              >
+                Limpar tudo
+              </button>
+            </div>
+            <div style={{ display:'grid', gap:8 }}>
+              {sortedPositions.length === 0 && <div style={{ color:'#6b7280' }}>Nenhuma posição definida ainda.</div>}
+              {sortedPositions.map(pos => (
+                <div key={pos.page} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', border:'1px solid #e5e7eb', borderRadius:8 }}>
+                  <div>
+                    <div style={{ fontWeight:600 }}>Página {pos.page}</div>
+                    <div style={{ fontSize:12, color:'#64748b' }}>
+                      X {(pos.nx * 100).toFixed(1)}% · Y {(pos.ny * 100).toFixed(1)}% · Escala {(pos.scale).toFixed(2)} · Rotação {pos.rotation}°
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button onClick={()=>setActivePage(pos.page)} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid #dbeafe', background:'#eff6ff', color:'#1d4ed8', cursor:'pointer' }}>Ir</button>
+                    <button onClick={()=>removePositionForPage(pos.page)} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid #fee2e2', background:'#fee2e2', color:'#b91c1c', cursor:'pointer' }}>Remover</button>
+                  </div>
+                </div>
+              ))}
             </div>
           </Card>
 
