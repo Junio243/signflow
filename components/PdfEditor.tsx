@@ -2,7 +2,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 // usar a build legacy evita diversos problemas com bundlers/Next.js
-import pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 import 'pdfjs-dist/web/pdf_viewer.css';
 
 type Pos = { page: number; nx: number; ny: number; scale: number; rotation: number };
