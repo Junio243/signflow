@@ -3,7 +3,14 @@ export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
-import { PDFDocument, rgb } from 'pdf-lib';
+import {
+  PDFDocument,
+  rgb,
+  pushGraphicsState,
+  popGraphicsState,
+  rotateRadians,
+  translate
+} from 'pdf-lib';
 import QRCode from 'qrcode';
 
 export async function POST(req: NextRequest) {
@@ -52,8 +59,24 @@ export async function POST(req: NextRequest) {
     const pages = pdfDoc.getPages();
 
     // desenha assinaturas
-    const positions: Array<{ page: number; x: number; y: number; scale?: number; rotation?: number }> =
-      (doc?.metadata?.positions || []) as any[];
+    const metadata = (doc?.metadata || {}) as any;
+    let positions: Array<any> = [];
+    let signatureMeta: { width?: number; height?: number } | null = null;
+
+    if (Array.isArray(metadata)) {
+      positions = metadata as any[];
+    } else if (metadata && typeof metadata === 'object') {
+      if (Array.isArray(metadata.positions)) {
+        positions = metadata.positions as any[];
+      }
+      if (metadata.signature_meta && typeof metadata.signature_meta === 'object') {
+        signatureMeta = metadata.signature_meta as any;
+      }
+    }
+
+    if (!positions.length && Array.isArray(doc?.metadata)) {
+      positions = doc?.metadata as any[];
+    }
 
     let sigImage: any = null;
     if (sigBytes) {
@@ -65,20 +88,54 @@ export async function POST(req: NextRequest) {
     for (const pos of positions) {
       const pageIndex = Math.min(Math.max((pos.page ?? 1) - 1, 0), pages.length - 1);
       const page = pages[pageIndex];
+      const pageWidth = page.getWidth();
+      const pageHeight = page.getHeight();
+
+      const nx = typeof pos.nx === 'number' ? pos.nx : null;
+      const ny = typeof pos.ny === 'number' ? pos.ny : null;
+      let centerX = typeof pos.x === 'number' ? pos.x : null;
+      let centerY = typeof pos.y === 'number' ? pos.y : null;
+
+      if (centerX === null) {
+        centerX = nx !== null ? nx * pageWidth : pageWidth / 2;
+      }
+      if (centerY === null) {
+        centerY = ny !== null ? pageHeight - ny * pageHeight : pageHeight / 2;
+      }
+
+      const scale = typeof pos.scale === 'number' ? pos.scale : 1;
+      const rotation = typeof pos.rotation === 'number' ? pos.rotation : 0;
+
+      const baseWidth = signatureMeta?.width || (sigImage?.width ?? 240);
+      const baseHeight = signatureMeta?.height || (sigImage?.height ?? 120);
+      const width = baseWidth * scale;
+      const height = baseHeight * scale;
 
       if (sigImage) {
-        const w = (sigImage.width || 240) * (pos.scale || 0.5);
-        const h = (sigImage.height || 120) * (pos.scale || 0.5);
-        page.drawImage(sigImage, {
-          x: pos.x,
-          y: pos.y,
-          width: w,
-          height: h,
-          rotate: pos.rotation ? { type: 'degrees', angle: pos.rotation } as any : undefined,
-        });
+        if (rotation) {
+          const angle = rotateRadians((rotation * Math.PI) / 180);
+          page.pushOperators(pushGraphicsState());
+          page.pushOperators(translate(centerX, centerY), angle);
+          page.drawImage(sigImage, { x: -width / 2, y: -height / 2, width, height });
+          page.pushOperators(popGraphicsState());
+        } else {
+          page.drawImage(sigImage, {
+            x: centerX - width / 2,
+            y: centerY - height / 2,
+            width,
+            height,
+          });
+        }
       } else {
-        // fallback: retângulo cinza, se não houver imagem
-        page.drawRectangle({ x: pos.x, y: pos.y, width: 160, height: 64, color: rgb(0.9, 0.9, 0.9) });
+        const rectWidth = width || 160;
+        const rectHeight = height || 64;
+        page.drawRectangle({
+          x: centerX - rectWidth / 2,
+          y: centerY - rectHeight / 2,
+          width: rectWidth,
+          height: rectHeight,
+          color: rgb(0.9, 0.9, 0.9)
+        });
       }
     }
 
