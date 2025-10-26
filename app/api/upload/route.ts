@@ -20,6 +20,9 @@ export async function POST(req: NextRequest) {
     const original_pdf_name =
       form.get('original_pdf_name')?.toString() || 'documento.pdf';
     const positionsRaw = form.get('positions')?.toString() || '[]';
+    const signatureMetaRaw = form.get('signature_meta')?.toString() || 'null';
+    const validationThemeRaw = form.get('validation_theme_snapshot')?.toString() || 'null';
+    const validationProfileId = form.get('validation_profile_id')?.toString() || null;
     const userId = form.get('user_id')?.toString() || null;
 
     if (!pdf) {
@@ -56,27 +59,75 @@ export async function POST(req: NextRequest) {
     }
 
     // cria registro
-    const positions = JSON.parse(positionsRaw || '[]');
+    let positions: any[] = [];
+    try {
+      const parsed = JSON.parse(positionsRaw || '[]');
+      positions = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      positions = [];
+    }
+
+    let signatureMeta: any = null;
+    try {
+      signatureMeta = JSON.parse(signatureMetaRaw || 'null');
+    } catch {
+      signatureMeta = null;
+    }
+
+    let validationTheme: any = null;
+    try {
+      validationTheme = JSON.parse(validationThemeRaw || 'null');
+    } catch {
+      validationTheme = null;
+    }
     const now = new Date();
     const expires = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    const ins = await supabaseAdmin
+    const metadata: Record<string, any> = { positions };
+    if (signatureMeta) metadata.signature_meta = signatureMeta;
+    if (validationTheme) metadata.validation_theme_snapshot = validationTheme;
+    if (validationProfileId) metadata.validation_profile_id = validationProfileId;
+
+    const basePayload: Record<string, any> = {
+      id,
+      user_id: userId,
+      original_pdf_name,
+      metadata,
+      status: 'draft',
+      created_at: now.toISOString(),
+      expires_at: expires.toISOString(),
+      signed_pdf_url: null,
+      qr_code_url: null,
+      ip_hash,
+    };
+
+    if (validationTheme) {
+      basePayload.validation_theme_snapshot = validationTheme;
+    }
+    if (validationProfileId) {
+      basePayload.validation_profile_id = validationProfileId;
+    }
+
+    let ins = await supabaseAdmin
       .from('documents')
       // @ts-ignore (evita never do types gerados no build)
-      .insert({
-        id,
-        user_id: userId,
-        original_pdf_name,
-        metadata: { positions },
-        status: 'draft',
-        created_at: now.toISOString(),
-        expires_at: expires.toISOString(),
-        signed_pdf_url: null,
-        qr_code_url: null,
-        ip_hash,
-      })
+      .insert(basePayload)
       .select('id')
       .maybeSingle();
+
+    if (ins.error &&
+      (ins.error.message?.includes('validation_theme_snapshot') || ins.error.message?.includes('validation_profile_id'))
+    ) {
+      const fallbackPayload = { ...basePayload };
+      delete (fallbackPayload as any).validation_theme_snapshot;
+      delete (fallbackPayload as any).validation_profile_id;
+      ins = await supabaseAdmin
+        .from('documents')
+        // @ts-ignore
+        .insert(fallbackPayload)
+        .select('id')
+        .maybeSingle();
+    }
 
     if (ins.error) {
       return NextResponse.json({ error: ins.error.message }, { status: 500 });

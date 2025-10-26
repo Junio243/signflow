@@ -12,6 +12,7 @@ type Doc = {
   qr_code_url: string | null
   original_pdf_name: string | null
   validation_theme_snapshot: any | null
+  metadata: any | null
   canceled_at?: string | null
 }
 
@@ -41,7 +42,7 @@ export default function ValidatePage() {
 
       const { data, error } = await supabase
         .from('documents')
-        .select('id, status, created_at, signed_pdf_url, qr_code_url, original_pdf_name, validation_theme_snapshot, canceled_at')
+        .select('id, status, created_at, signed_pdf_url, qr_code_url, original_pdf_name, validation_theme_snapshot, metadata, canceled_at')
         .eq('id', id).maybeSingle()
 
       if (error) { setErrorMsg(error.message); return }
@@ -52,12 +53,17 @@ export default function ValidatePage() {
   if (errorMsg) return <p style={{ padding:16 }}>Erro: {errorMsg}</p>
   if (!doc) return <p style={{ padding:16 }}>Carregando…</p>
 
-  const snap = doc.validation_theme_snapshot || {}
-  const color = snap.color || '#2563eb'
-  const issuer = snap.issuer || 'Instituição/Profissional'
-  const reg = snap.reg || 'Registro'
-  const footer = snap.footer || ''
-  const logo = snap.logo_url || null
+  let snap = doc.validation_theme_snapshot || null
+  if (!snap && doc.metadata && typeof doc.metadata === 'object') {
+    const meta = doc.metadata as any
+    snap = meta.validation_theme_snapshot || meta.theme || null
+  }
+  const theme = snap || {}
+  const color = theme.color || '#2563eb'
+  const issuer = theme.issuer || 'Instituição/Profissional'
+  const reg = theme.reg || 'Registro'
+  const footer = theme.footer || ''
+  const logo = theme.logo_url || null
   const st = (doc.status || '').toLowerCase()
   const isCanceled = st === 'canceled'
 
