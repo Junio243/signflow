@@ -124,9 +124,17 @@ export default function PdfEditor({
 
     return () => {
       cancelled = true;
-      try { task?.destroy?.(); } catch (_) {}
+      try {
+        task?.destroy?.();
+      } catch (cleanupErr) {
+        console.warn('PdfEditor: erro ao destruir task de carregamento', cleanupErr);
+      }
       if (blobUrl) {
-        try { URL.revokeObjectURL(blobUrl); } catch (_) {}
+        try {
+          URL.revokeObjectURL(blobUrl);
+        } catch (revokeErr) {
+          console.warn('PdfEditor: erro ao revogar blob URL', revokeErr);
+        }
       }
     };
   }, [file, controlledPage, onDocumentLoaded, onPageChange]);

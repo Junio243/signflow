@@ -258,7 +258,11 @@ export default function EditorPage() {
         const pdf = await loadingTask.promise
 
         if (cancelled) {
-          try { pdf.destroy?.() } catch {}
+          try {
+            pdf.destroy?.()
+          } catch (cleanupErr) {
+            console.warn('[Editor] Falha ao destruir PDF cancelado', cleanupErr)
+          }
           return
         }
 
@@ -269,14 +273,22 @@ export default function EditorPage() {
           const viewport = page.getViewport({ scale: 1 })
           sizes.push({ width: viewport.width, height: viewport.height })
           // cleanup page if API supports
-          try { page.cleanup?.() } catch {}
+          try {
+            page.cleanup?.()
+          } catch (cleanupErr) {
+            console.warn('[Editor] Falha ao limpar página do PDF', cleanupErr)
+          }
         }
 
         setPageSizes(sizes)
         setPdfPageCount(sizes.length || 1)
         setActivePage(1)
 
-        try { pdf.destroy?.() } catch {}
+        try {
+          pdf.destroy?.()
+        } catch (cleanupErr) {
+          console.warn('[Editor] Falha ao destruir PDF após leitura', cleanupErr)
+        }
       } catch (err) {
         console.error('[Editor] Falha ao ler PDF', err)
         setStatus({ tone: 'error', text: 'Não consegui ler o PDF para prévia. Tente outro arquivo.' })
@@ -321,7 +333,6 @@ export default function EditorPage() {
   // Copie daqui para baixo exatamente como estava no seu arquivo original
   // (do `const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {` até o final do componente)
 
-  // --- Início: handlers & render (usar o bloco já existente no seu arquivo) ---
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null
     setPdfFile(file)
@@ -468,6 +479,35 @@ export default function EditorPage() {
     setResult(null)
   }, [])
 
+  const removePosition = (page: number) => {
+    setPositions(current => current.filter(pos => pos.page !== page))
+    setResult(null)
+  }
+
+  const handleGoToPosition = (page: number) => {
+    setActivePage(Math.max(1, page))
+  }
+
+  const clearPositions = () => {
+    setPositions([])
+    setResult(null)
+  }
+
+  const handleProfileLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null
+    setProfileLogoFile(file)
+  }
+
+  const handlePageChange = (page: number) => {
+    setActivePage(page)
+  }
+
+  const handleDocumentLoaded = ({ pages }: { pages: number }) => {
+    if (Number.isFinite(pages) && pages > 0) {
+      setPdfPageCount(pages)
+    }
+  }
+
   const computePositionsForApi = () => {
     if (!positions.length) return []
 
@@ -605,8 +645,504 @@ export default function EditorPage() {
             Envie o PDF, desenhe ou importe a assinatura, posicione nas páginas e gere o arquivo assinado com QR Code.
           </p>
         </header>
-        {/* ... aqui continua todo o JSX padrão (status, seções, PdfEditor, etc.) ... */}
-        {/* Use a versão original do seu JSX daqui para baixo sem alterações */}
+        {status && (
+          <div
+            role="status"
+            className={`rounded-xl border px-4 py-3 text-sm ${
+              status.tone === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : status.tone === 'error'
+                  ? 'border-red-200 bg-red-50 text-red-700'
+                  : 'border-slate-200 bg-white text-slate-700'
+            }`}
+          >
+            {status.text}
+          </div>
+        )}
+
+        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+          <div className="space-y-6">
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Documento PDF</h2>
+                  <p className="text-sm text-slate-500">
+                    Escolha o arquivo que será assinado. Você poderá visualizar cada página abaixo.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {pdfFile && (
+                    <SecondaryButton type="button" onClick={() => fileInputRef.current?.click()} disabled={busy}>
+                      Trocar PDF
+                    </SecondaryButton>
+                  )}
+                  <PrimaryButton type="button" onClick={() => fileInputRef.current?.click()} disabled={busy}>
+                    {pdfFile ? 'Selecionar outro PDF' : 'Selecionar PDF'}
+                  </PrimaryButton>
+                </div>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+
+              {pdfFile ? (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="font-medium text-slate-900">{pdfFile.name}</span>
+                    <span className="text-xs uppercase tracking-wide text-slate-500">{formatBytes(pdfFile.size)}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                    <span>Páginas detectadas: {pdfPageCount}</span>
+                    <span>Assinaturas posicionadas: {positions.length}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+                  Arraste ou escolha um PDF para começar.
+                </div>
+              )}
+
+              <div className="mt-6">
+                {pdfFile ? (
+                  <PdfEditor
+                    file={pdfFile}
+                    signatureUrl={sigPreviewUrl}
+                    signatureSize={signatureSize}
+                    positions={positions}
+                    onPositions={handlePositionsChange}
+                    page={activePage}
+                    onPageChange={handlePageChange}
+                    onDocumentLoaded={handleDocumentLoaded}
+                  />
+                ) : (
+                  <p className="text-sm text-slate-500">
+                    Selecione um documento para visualizar as páginas e posicionar a assinatura.
+                  </p>
+                )}
+              </div>
+
+              {positions.length > 0 && (
+                <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                  <h3 className="text-sm font-semibold text-slate-900">Assinaturas posicionadas</h3>
+                  <ul className="mt-3 space-y-2">
+                    {positions
+                      .slice()
+                      .sort((a, b) => a.page - b.page)
+                      .map(pos => (
+                        <li
+                          key={pos.page}
+                          className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div>
+                            <span className="font-medium text-slate-900">Página {pos.page}</span>
+                            <span className="ml-2 text-[11px] uppercase tracking-wide text-slate-500">
+                              {(pos.nx * 100).toFixed(0)}% × {(pos.ny * 100).toFixed(0)}% · Escala {(pos.scale ?? 1).toFixed(1)}× · Rotação{' '}
+                              {(pos.rotation ?? 0).toFixed(0)}°
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <SecondaryButton
+                              type="button"
+                              className="h-8 px-3 text-xs"
+                              onClick={() => handleGoToPosition(pos.page)}
+                              disabled={busy}
+                            >
+                              Ir para página
+                            </SecondaryButton>
+                            <SecondaryButton
+                              type="button"
+                              className="h-8 px-3 text-xs text-red-600 hover:text-red-700"
+                              onClick={() => removePosition(pos.page)}
+                              disabled={busy}
+                            >
+                              Remover
+                            </SecondaryButton>
+                          </div>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Assinatura</h2>
+                  <p className="text-sm text-slate-500">
+                    Desenhe direto no navegador ou envie uma imagem transparente da sua assinatura.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <SecondaryButton
+                    type="button"
+                    className={`px-4 py-2 text-sm ${sigMode === 'draw' ? 'border-blue-200 text-blue-600' : ''}`}
+                    onClick={() => setSigMode('draw')}
+                    disabled={busy}
+                  >
+                    Desenhar
+                  </SecondaryButton>
+                  <SecondaryButton
+                    type="button"
+                    className={`px-4 py-2 text-sm ${sigMode === 'upload' ? 'border-blue-200 text-blue-600' : ''}`}
+                    onClick={() => setSigMode('upload')}
+                    disabled={busy}
+                  >
+                    Enviar imagem
+                  </SecondaryButton>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-6 md:grid-cols-2">
+                <div className="space-y-4">
+                  {sigMode === 'draw' ? (
+                    <div>
+                      <canvas
+                        ref={signCanvasRef}
+                        width={DEFAULT_SIGNATURE_CANVAS.width}
+                        height={DEFAULT_SIGNATURE_CANVAS.height}
+                        className="w-full rounded-xl border border-slate-200 bg-white shadow-inner"
+                        onPointerDown={onPointerDown}
+                        onPointerMove={onPointerMove}
+                        onPointerUp={onPointerUp}
+                      />
+                      <p className="mt-2 text-xs text-slate-500">
+                        Use o mouse ou o dedo (no celular) para desenhar. Toque fora para finalizar o traço.
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700">Envie uma imagem (PNG recomendado)</label>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="mt-2 block w-full text-sm text-slate-600"
+                        onChange={handleSignatureUpload}
+                        disabled={busy}
+                      />
+                      <p className="mt-2 text-xs text-slate-500">
+                        Utilize um arquivo com fundo transparente para melhores resultados.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <SecondaryButton type="button" onClick={resetSignature} disabled={busy || (!sigPreviewUrl && !sigHasDrawing)}>
+                      Limpar assinatura
+                    </SecondaryButton>
+                    {sigPreviewUrl && (
+                      <span className="text-xs text-slate-500">
+                        Tamanho base: {(signatureSize?.width ?? DEFAULT_SIGNATURE_CANVAS.width).toFixed(0)} ×{' '}
+                        {(signatureSize?.height ?? DEFAULT_SIGNATURE_CANVAS.height).toFixed(0)} px
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    <h3 className="text-sm font-semibold text-slate-900">Pré-visualização</h3>
+                    {sigPreviewUrl ? (
+                      <div className="mt-3 flex flex-col items-center gap-3">
+                        <img
+                          src={sigPreviewUrl}
+                          alt="Pré-visualização da assinatura"
+                          className="max-h-40 w-auto rounded-lg border border-slate-200 bg-white px-4 py-2"
+                        />
+                        <p className="text-xs text-slate-500">
+                          A assinatura será posicionada nas páginas selecionadas com o tamanho ajustável.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-xs text-slate-500">
+                        Desenhe ou envie uma imagem para visualizar aqui antes de aplicar no documento.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div className="space-y-6">
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Perfil de validação</h2>
+                  <p className="text-sm text-slate-500">
+                    Personalize o carimbo de validação com dados do profissional ou da instituição.
+                  </p>
+                </div>
+                <SecondaryButton type="button" onClick={() => setProfileFormOpen(true)} disabled={profileFormBusy}>
+                  Novo perfil
+                </SecondaryButton>
+              </div>
+
+              {profiles.length > 0 ? (
+                <ul className="mt-4 space-y-3">
+                  {profiles.map(profile => {
+                    const badge = profileBadge(profile.type)
+                    return (
+                      <li key={profile.id}>
+                        <label className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-sm transition ${
+                          profileId === profile.id
+                            ? 'border-blue-300 bg-blue-50'
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}>
+                          <input
+                            type="radio"
+                            name="profile"
+                            value={profile.id}
+                            checked={profileId === profile.id}
+                            onChange={() => setProfileId(profile.id)}
+                            className="mt-1"
+                          />
+                          <div className="flex-1 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`rounded-full px-2 py-1 text-xs font-medium ${badge}`}>{PROFILE_TYPE_LABEL[profile.type]}</span>
+                              <span className="font-semibold text-slate-900">{profile.name}</span>
+                            </div>
+                            <p className="text-xs text-slate-500">
+                              Emissor: {profile.theme?.issuer || '—'} · Registro: {profile.theme?.reg || '—'}
+                            </p>
+                          </div>
+                        </label>
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : (
+                <p className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                  Nenhum perfil cadastrado ainda. Crie o primeiro para personalizar o rodapé de validação.
+                </p>
+              )}
+
+              {profileFormOpen && (
+                <form onSubmit={handleCreateProfile} className="mt-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-900">Novo perfil</h3>
+                    <SecondaryButton
+                      type="button"
+                      onClick={() => {
+                        setProfileFormOpen(false)
+                        resetProfileForm()
+                      }}
+                      disabled={profileFormBusy}
+                    >
+                      Cancelar
+                    </SecondaryButton>
+                  </div>
+                  <div className="grid gap-4">
+                    <div className="grid gap-2">
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Nome do perfil</label>
+                      <input
+                        value={profileName}
+                        onChange={event => setProfileName(event.target.value)}
+                        placeholder="Ex.: Médico CRM/DF"
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        disabled={profileFormBusy}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Tipo</span>
+                      <div className="flex flex-wrap gap-3 text-sm text-slate-600">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="profile-type"
+                            checked={profileType === 'medico'}
+                            onChange={() => setProfileType('medico')}
+                            disabled={profileFormBusy}
+                          />
+                          Médico
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="profile-type"
+                            checked={profileType === 'faculdade'}
+                            onChange={() => setProfileType('faculdade')}
+                            disabled={profileFormBusy}
+                          />
+                          Faculdade
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="profile-type"
+                            checked={profileType === 'generico'}
+                            onChange={() => setProfileType('generico')}
+                            disabled={profileFormBusy}
+                          />
+                          Genérico
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Cor tema</label>
+                      <input
+                        type="color"
+                        value={profileColor}
+                        onChange={event => setProfileColor(event.target.value)}
+                        className="h-10 w-24 cursor-pointer rounded-lg border border-slate-300"
+                        disabled={profileFormBusy}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Instituição / Profissional</label>
+                      <input
+                        value={profileIssuer}
+                        onChange={event => setProfileIssuer(event.target.value)}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        disabled={profileFormBusy}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Registro</label>
+                      <input
+                        value={profileReg}
+                        onChange={event => setProfileReg(event.target.value)}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        disabled={profileFormBusy}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Rodapé</label>
+                      <textarea
+                        value={profileFooter}
+                        onChange={event => setProfileFooter(event.target.value)}
+                        rows={3}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        disabled={profileFormBusy}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Logo (opcional)</label>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={handleProfileLogoChange}
+                        disabled={profileFormBusy}
+                        className="text-sm text-slate-600"
+                      />
+                      {profileLogoPreview && (
+                        <img
+                          src={profileLogoPreview}
+                          alt="Pré-visualização do logo"
+                          className="h-16 w-auto rounded-md border border-slate-200 bg-white object-contain p-2"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {profileFormStatus && (
+                    <div
+                      className={`rounded-lg border px-3 py-2 text-xs ${
+                        profileFormStatus.tone === 'success'
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : profileFormStatus.tone === 'error'
+                            ? 'border-red-200 bg-red-50 text-red-600'
+                            : 'border-slate-200 bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      {profileFormStatus.text}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <SecondaryButton type="button" onClick={resetProfileForm} disabled={profileFormBusy}>
+                      Limpar campos
+                    </SecondaryButton>
+                    <PrimaryButton type="submit" disabled={profileFormBusy}>
+                      {profileFormBusy ? 'Salvando…' : 'Salvar perfil'}
+                    </PrimaryButton>
+                  </div>
+                </form>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-slate-900">Resultado</h2>
+              <p className="text-sm text-slate-500">
+                Após gerar, você poderá compartilhar o PDF assinado e o link de validação.
+              </p>
+
+              {result ? (
+                <div className="mt-4 space-y-4 text-sm text-slate-700">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-700">
+                    Documento assinado com sucesso!
+                  </div>
+                  {result.signed_pdf_url && (
+                    <Link
+                      href={result.signed_pdf_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-blue-600 transition hover:border-blue-200 hover:bg-blue-50"
+                    >
+                      Baixar PDF assinado
+                      <span className="text-xs uppercase tracking-wide text-blue-400">Abrir</span>
+                    </Link>
+                  )}
+                  {result.qr_code_url && (
+                    <Link
+                      href={result.qr_code_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-blue-600 transition hover:border-blue-200 hover:bg-blue-50"
+                    >
+                      Ver QR Code
+                      <span className="text-xs uppercase tracking-wide text-blue-400">Abrir</span>
+                    </Link>
+                  )}
+                  {result.validate_url && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                      Link de validação:
+                      <Link
+                        href={result.validate_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 block truncate font-medium text-blue-600"
+                      >
+                        {result.validate_url}
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                  Ainda não há um documento assinado. Posicione a assinatura e clique em “Gerar PDF assinado”.
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-slate-500">
+            {result
+              ? 'Documento assinado! Compartilhe os links disponíveis ao lado.'
+              : 'Quando tudo estiver pronto, gere o PDF assinado para liberar os links de validação.'}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <SecondaryButton type="button" onClick={clearPositions} disabled={busy || positions.length === 0}>
+              Limpar posições
+            </SecondaryButton>
+            <PrimaryButton type="button" onClick={assinarESalvar} disabled={disableAction}>
+              {busy ? 'Processando…' : 'Gerar PDF assinado'}
+            </PrimaryButton>
+          </div>
+        </div>
       </div>
     </div>
   )

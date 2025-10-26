@@ -83,8 +83,7 @@ export default function AuthCallbackClient() {
     };
 
     run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router, sp]);
 
   return (
     <div style={{ maxWidth: 520, margin: '24px auto', padding: 16 }}>
