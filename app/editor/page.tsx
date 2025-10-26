@@ -39,6 +39,16 @@ type Pos = {
 
 type SignatureSize = { width: number; height: number } | null
 
+type Signer = {
+  name: string
+  reg: string
+  certificate_type: string
+  certificate_valid_until: string
+  certificate_issuer: string
+  email: string
+  logo_url: string
+}
+
 type UploadResult = {
   id: string
   signed_pdf_url?: string | null
@@ -63,6 +73,16 @@ const DEFAULT_THEME_COLOR = '#2563eb'
 const DEFAULT_THEME_ISSUER = 'Instituição/Profissional'
 const DEFAULT_THEME_REG = 'Registro (CRM/CRP/OAB/CNPJ)'
 const DEFAULT_THEME_FOOTER = 'Documento assinado digitalmente via SignFlow.'
+
+const createEmptySigner = (): Signer => ({
+  name: '',
+  reg: '',
+  certificate_type: '',
+  certificate_valid_until: '',
+  certificate_issuer: '',
+  email: '',
+  logo_url: '',
+})
 
 const PrimaryButton = ({ className = '', disabled, ...props }: ButtonProps) => (
   <button
@@ -124,6 +144,8 @@ export default function EditorPage() {
   const [sigImgFile, setSigImgFile] = useState<File | null>(null)
   const [sigPreviewUrl, setSigPreviewUrl] = useState<string | null>(null)
   const [signatureSize, setSignatureSize] = useState<SignatureSize>(null)
+
+  const [signers, setSigners] = useState<Signer[]>([createEmptySigner()])
 
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [profileId, setProfileId] = useState<string | null>(null)
@@ -247,7 +269,7 @@ export default function EditorPage() {
 
     let cancelled = false
 
-    ;(async () => {
+    void (async () => {
       try {
         const ab = await pdfFile.arrayBuffer()
 
@@ -256,7 +278,7 @@ export default function EditorPage() {
 
         try {
           // Usa o worker legacy local disponível em public/pdf.worker.min.mjs
-          ;(pdfjs as any).GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
+          (pdfjs as any).GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
         } catch (e) {
           console.warn('[Editor] Não foi possível configurar o workerSrc de PDF.js', e)
         }
@@ -521,6 +543,27 @@ export default function EditorPage() {
     }
   }
 
+  const handleSignerChange = (index: number, field: keyof Signer, value: string) => {
+    setSigners(prev => {
+      const next = prev.slice()
+      next[index] = { ...next[index], [field]: value }
+      return next
+    })
+  }
+
+  const addSigner = () => {
+    setSigners(prev => [...prev, createEmptySigner()])
+  }
+
+  const removeSigner = (index: number) => {
+    setSigners(prev => {
+      if (prev.length <= 1) {
+        return [createEmptySigner()]
+      }
+      return prev.filter((_, idx) => idx !== index)
+    })
+  }
+
   const computePositionsForApi = () => {
     if (!positions.length) return []
 
@@ -543,6 +586,40 @@ export default function EditorPage() {
         page_height: ch,
       }
     })
+  }
+
+  const computeSignersForMetadata = () => {
+    return signers
+      .map(signer => {
+        const name = signer.name.trim()
+        if (!name) return null
+
+        const reg = signer.reg.trim()
+        const certificateType = signer.certificate_type.trim()
+        const certificateValidUntil = signer.certificate_valid_until.trim()
+        const certificateIssuer = signer.certificate_issuer.trim()
+        const email = signer.email.trim()
+        const logoUrl = signer.logo_url.trim()
+
+        return {
+          name,
+          reg: reg || null,
+          certificate_type: certificateType || null,
+          certificate_valid_until: certificateValidUntil || null,
+          certificate_issuer: certificateIssuer || null,
+          email: email || null,
+          logo_url: logoUrl || null,
+        }
+      })
+      .filter(Boolean) as Array<{
+        name: string
+        reg: string | null
+        certificate_type: string | null
+        certificate_valid_until: string | null
+        certificate_issuer: string | null
+        email: string | null
+        logo_url: string | null
+      }>
   }
 
   const ensureSignatureBlob = async (): Promise<File | Blob | null> => {
@@ -589,6 +666,12 @@ export default function EditorPage() {
       return
     }
 
+    const signersForMetadata = computeSignersForMetadata()
+    if (!signersForMetadata.length) {
+      setError('Cadastre ao menos um signatário com nome para continuar.')
+      return
+    }
+
     setBusy(true)
     setInfo('Enviando arquivo…')
 
@@ -604,6 +687,7 @@ export default function EditorPage() {
           height: signatureSize?.height ?? DEFAULT_SIGNATURE_CANVAS.height,
         }),
       )
+      form.append('signers', JSON.stringify(signersForMetadata))
 
       if (sessionUserId) {
         form.append('user_id', sessionUserId)
@@ -1091,6 +1175,123 @@ export default function EditorPage() {
                   </div>
                 </form>
               )}
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Signatários</h2>
+                  <p className="text-sm text-slate-500">
+                    Informe os dados de cada pessoa responsável pela assinatura. Eles serão exibidos na validação e no histórico
+                    do documento.
+                  </p>
+                </div>
+                <PrimaryButton type="button" onClick={addSigner} disabled={busy}>
+                  Adicionar signatário
+                </PrimaryButton>
+              </div>
+
+              <div className="mt-6 space-y-4">
+                {signers.map((signer, index) => (
+                  <div key={index} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-slate-900">Signatário {index + 1}</div>
+                      <SecondaryButton type="button" onClick={() => removeSigner(index)} disabled={busy}>
+                        Remover
+                      </SecondaryButton>
+                    </div>
+
+                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                      <div className="grid gap-2">
+                        <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Nome completo</label>
+                        <input
+                          value={signer.name}
+                          onChange={event => handleSignerChange(index, 'name', event.target.value)}
+                          placeholder="Ex.: Dra. Maria Oliveira"
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          disabled={busy}
+                          required
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Registro profissional</label>
+                        <input
+                          value={signer.reg}
+                          onChange={event => handleSignerChange(index, 'reg', event.target.value)}
+                          placeholder="CRM/DF 12345"
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          disabled={busy}
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <label className="text-xs font-medium uppercase tracking-wide text-slate-500">E-mail (opcional)</label>
+                        <input
+                          type="email"
+                          value={signer.email}
+                          onChange={event => handleSignerChange(index, 'email', event.target.value)}
+                          placeholder="contato@exemplo.com"
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          disabled={busy}
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Tipo de certificado</label>
+                        <input
+                          value={signer.certificate_type}
+                          onChange={event => handleSignerChange(index, 'certificate_type', event.target.value)}
+                          placeholder="ICP-Brasil A3, GOV.BR, ..."
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          disabled={busy}
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Emissor do certificado</label>
+                        <input
+                          value={signer.certificate_issuer}
+                          onChange={event => handleSignerChange(index, 'certificate_issuer', event.target.value)}
+                          placeholder="AC Valid, SERPRO, etc."
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          disabled={busy}
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Validade do certificado</label>
+                        <input
+                          type="date"
+                          value={signer.certificate_valid_until}
+                          onChange={event => handleSignerChange(index, 'certificate_valid_until', event.target.value)}
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          disabled={busy}
+                        />
+                      </div>
+
+                      <div className="grid gap-2 md:col-span-2">
+                        <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Logo individual (URL opcional)</label>
+                        <input
+                          type="url"
+                          value={signer.logo_url}
+                          onChange={event => handleSignerChange(index, 'logo_url', event.target.value)}
+                          placeholder="https://exemplo.com/logo.png"
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          disabled={busy}
+                        />
+                        <p className="text-xs text-slate-500">
+                          Caso cada signatário possua um selo próprio, informe a URL pública do arquivo PNG ou SVG.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className="mt-4 text-xs text-slate-500">
+                Os signatários cadastrados serão salvos nos metadados do documento e aparecerão automaticamente na página de validação.
+              </p>
             </section>
 
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

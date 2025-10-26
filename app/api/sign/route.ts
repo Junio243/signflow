@@ -13,6 +13,134 @@ import {
 } from 'pdf-lib';
 import QRCode from 'qrcode';
 
+type SignerMetadata = {
+  name: string;
+  reg: string | null;
+  certificate_type: string | null;
+  certificate_valid_until: string | null;
+  certificate_issuer: string | null;
+  logo_url: string | null;
+  email: string | null;
+  metadata: Record<string, unknown> | null;
+};
+
+function toIsoOrNull(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim()) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString();
+    }
+  }
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString();
+  }
+
+  return null;
+}
+
+function extractSignersFromMetadata(doc: any): SignerMetadata[] {
+  const metadata = doc && typeof doc.metadata === 'object' && doc.metadata
+    ? (doc.metadata as Record<string, any>)
+    : {};
+
+  const rawSigners = Array.isArray((metadata as any).signers)
+    ? ((metadata as any).signers as any[])
+    : [];
+
+  const sanitized = rawSigners
+    .map(raw => {
+      if (!raw || typeof raw !== 'object') return null;
+      const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+      if (!name) return null;
+
+      const reg = typeof raw.reg === 'string' && raw.reg.trim() ? raw.reg.trim() : null;
+      const certificate_type =
+        typeof raw.certificate_type === 'string' && raw.certificate_type.trim()
+          ? raw.certificate_type.trim()
+          : null;
+      const certificate_valid_until =
+        typeof raw.certificate_valid_until === 'string' && raw.certificate_valid_until.trim()
+          ? raw.certificate_valid_until.trim()
+          : null;
+      const certificate_issuer =
+        typeof raw.certificate_issuer === 'string' && raw.certificate_issuer.trim()
+          ? raw.certificate_issuer.trim()
+          : null;
+      const logo_url = typeof raw.logo_url === 'string' && raw.logo_url.trim() ? raw.logo_url.trim() : null;
+      const email = typeof raw.email === 'string' && raw.email.trim() ? raw.email.trim() : null;
+
+      return {
+        name,
+        reg,
+        certificate_type,
+        certificate_valid_until,
+        certificate_issuer,
+        logo_url,
+        email,
+        metadata: raw as Record<string, unknown>,
+      } satisfies SignerMetadata;
+    })
+    .filter(Boolean) as SignerMetadata[];
+
+  if (sanitized.length) {
+    return sanitized;
+  }
+
+  const theme =
+    (metadata && typeof (metadata as any).validation_theme_snapshot === 'object'
+      ? (metadata as any).validation_theme_snapshot
+      : null) ||
+    (metadata && typeof (metadata as any).theme === 'object' ? (metadata as any).theme : null);
+
+  if (theme && typeof theme === 'object') {
+    const issuer = typeof (theme as any).issuer === 'string' ? (theme as any).issuer.trim() : '';
+    const reg = typeof (theme as any).reg === 'string' && (theme as any).reg.trim() ? (theme as any).reg.trim() : null;
+    const certificate_type =
+      typeof (theme as any).certificate_type === 'string' && (theme as any).certificate_type.trim()
+        ? (theme as any).certificate_type.trim()
+        : null;
+    const certificate_valid_until =
+      typeof (theme as any).certificate_valid_until === 'string' && (theme as any).certificate_valid_until.trim()
+        ? (theme as any).certificate_valid_until.trim()
+        : null;
+    const certificate_issuer =
+      typeof (theme as any).certificate_issuer === 'string' && (theme as any).certificate_issuer.trim()
+        ? (theme as any).certificate_issuer.trim()
+        : null;
+    const logo_url =
+      typeof (theme as any).logo_url === 'string' && (theme as any).logo_url.trim()
+        ? (theme as any).logo_url.trim()
+        : null;
+
+    return [
+      {
+        name: issuer || 'Signatário',
+        reg,
+        certificate_type,
+        certificate_valid_until,
+        certificate_issuer,
+        logo_url,
+        email: null,
+        metadata: theme as Record<string, unknown>,
+      },
+    ];
+  }
+
+  return [
+    {
+      name: 'Signatário',
+      reg: null,
+      certificate_type: null,
+      certificate_valid_until: null,
+      certificate_issuer: null,
+      logo_url: null,
+      email: null,
+      metadata: null,
+    },
+  ];
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabaseAdmin = getSupabaseAdmin(); // ← client dentro do handler
@@ -189,6 +317,32 @@ export async function POST(req: NextRequest) {
 
     if (upd.error) {
       return NextResponse.json({ error: upd.error.message }, { status: 500 });
+    }
+
+    const signers = extractSignersFromMetadata(doc);
+    const nowIso = new Date().toISOString();
+    if (signers.length) {
+      const payload = signers.map(signer => ({
+        document_id: id,
+        signer_name: signer.name,
+        signer_reg: signer.reg,
+        certificate_type: signer.certificate_type,
+        certificate_issuer: signer.certificate_issuer,
+        signer_email: signer.email,
+        signed_at: nowIso,
+        certificate_valid_until: toIsoOrNull(signer.certificate_valid_until),
+        logo_url: signer.logo_url,
+        metadata: signer.metadata,
+      }));
+
+      const insEvents = await supabaseAdmin
+        .from('document_signing_events')
+        // @ts-ignore (tipagem gerada em tempo de build)
+        .insert(payload);
+
+      if (insEvents.error) {
+        return NextResponse.json({ error: insEvents.error.message }, { status: 500 });
+      }
     }
 
     return NextResponse.json({

@@ -24,3 +24,21 @@ create table if not exists public.signatures (
   image_url text not null,
   created_at timestamp with time zone default now()
 );
+
+create table if not exists public.document_signing_events (
+  id uuid primary key default gen_random_uuid(),
+  document_id uuid references public.documents(id) on delete cascade,
+  signer_name text not null,
+  signer_reg text,
+  certificate_type text,
+  certificate_issuer text,
+  signer_email text,
+  signed_at timestamp with time zone default now(),
+  certificate_valid_until timestamp with time zone,
+  logo_url text,
+  metadata jsonb,
+  created_at timestamp with time zone default now()
+);
+
+create index if not exists document_signing_events_document_id_idx
+  on public.document_signing_events (document_id, signed_at);

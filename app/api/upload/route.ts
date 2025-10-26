@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     const validationThemeRaw = form.get('validation_theme_snapshot')?.toString() || 'null';
     const validationProfileId = form.get('validation_profile_id')?.toString() || null;
     const userId = form.get('user_id')?.toString() || null;
+    const signersRaw = form.get('signers')?.toString() || '[]';
 
     if (!pdf) {
       return NextResponse.json({ error: 'PDF é obrigatório' }, { status: 400 });
@@ -80,6 +81,48 @@ export async function POST(req: NextRequest) {
     } catch {
       validationTheme = null;
     }
+
+    let signers: any[] = [];
+    try {
+      const parsed = JSON.parse(signersRaw || '[]');
+      signers = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      signers = [];
+    }
+
+    const sanitizedSigners = signers
+      .map(raw => {
+        if (!raw || typeof raw !== 'object') return null;
+        const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+        if (!name) return null;
+
+        const reg = typeof raw.reg === 'string' && raw.reg.trim() ? raw.reg.trim() : null;
+        const certificate_type =
+          typeof raw.certificate_type === 'string' && raw.certificate_type.trim()
+            ? raw.certificate_type.trim()
+            : null;
+        const certificate_valid_until =
+          typeof raw.certificate_valid_until === 'string' && raw.certificate_valid_until.trim()
+            ? raw.certificate_valid_until.trim()
+            : null;
+        const certificate_issuer =
+          typeof raw.certificate_issuer === 'string' && raw.certificate_issuer.trim()
+            ? raw.certificate_issuer.trim()
+            : null;
+        const email = typeof raw.email === 'string' && raw.email.trim() ? raw.email.trim() : null;
+        const logo_url = typeof raw.logo_url === 'string' && raw.logo_url.trim() ? raw.logo_url.trim() : null;
+
+        return {
+          name,
+          reg,
+          certificate_type,
+          certificate_valid_until,
+          certificate_issuer,
+          email,
+          logo_url,
+        };
+      })
+      .filter(Boolean);
     const now = new Date();
     const expires = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
@@ -87,6 +130,7 @@ export async function POST(req: NextRequest) {
     if (signatureMeta) metadata.signature_meta = signatureMeta;
     if (validationTheme) metadata.validation_theme_snapshot = validationTheme;
     if (validationProfileId) metadata.validation_profile_id = validationProfileId;
+    if (sanitizedSigners.length) metadata.signers = sanitizedSigners;
 
     const basePayload: Record<string, any> = {
       id,

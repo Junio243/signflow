@@ -18,6 +18,20 @@ type Doc = {
   canceled_at?: string | null
 }
 
+type SigningEvent = {
+  id: string
+  document_id: string
+  signer_name: string
+  signer_reg: string | null
+  certificate_type: string | null
+  certificate_issuer: string | null
+  signer_email: string | null
+  signed_at: string
+  certificate_valid_until: string | null
+  logo_url: string | null
+  metadata: any | null
+}
+
 const isUuid = (s: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)
 
@@ -36,6 +50,9 @@ export default function ValidatePage() {
   const id = params.id
   const [doc, setDoc] = useState<Doc | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [events, setEvents] = useState<SigningEvent[]>([])
+  const [eventsLoading, setEventsLoading] = useState(false)
+  const [eventsError, setEventsError] = useState<string | null>(null)
 
   useEffect(() => {
     (async () => {
@@ -51,6 +68,23 @@ export default function ValidatePage() {
 
       if (error) { setErrorMsg(error.message); return }
       setDoc(data as Doc)
+
+      setEventsError(null)
+      setEvents([])
+      setEventsLoading(true)
+      const { data: eventsData, error: eventsFetchError } = await client
+        .from('document_signing_events')
+        .select('id, document_id, signer_name, signer_reg, certificate_type, certificate_issuer, signer_email, signed_at, certificate_valid_until, logo_url, metadata')
+        .eq('document_id', id)
+        .order('signed_at', { ascending: true })
+
+      if (eventsFetchError) {
+        console.error('[Validate] Falha ao carregar histórico de assinaturas', eventsFetchError)
+        setEventsError(eventsFetchError.message)
+      } else {
+        setEvents((eventsData || []) as SigningEvent[])
+      }
+      setEventsLoading(false)
     })()
   }, [id])
 
@@ -72,19 +106,32 @@ export default function ValidatePage() {
   }, [doc])
 
   const color = typeof theme.color === 'string' && theme.color.trim() ? theme.color : '#2563eb'
-  const issuer = typeof theme.issuer === 'string' && theme.issuer.trim() ? theme.issuer : 'Instituição/Profissional'
-  const reg = typeof theme.reg === 'string' && theme.reg.trim() ? theme.reg : 'Registro'
+  const primarySigner = useMemo(() => (events.length ? events[events.length - 1] : null), [events])
+
+  const issuerFromTheme = typeof theme.issuer === 'string' && theme.issuer.trim() ? theme.issuer : 'Instituição/Profissional'
+  const regFromTheme = typeof theme.reg === 'string' && theme.reg.trim() ? theme.reg : 'Registro'
+  const issuer = primarySigner?.signer_name?.trim() || issuerFromTheme
+  const reg = primarySigner?.signer_reg?.trim() || regFromTheme
   const footer = typeof theme.footer === 'string' ? theme.footer : ''
-  const logo = typeof theme.logo_url === 'string' ? theme.logo_url : null
-  const certificateType = typeof theme.certificate_type === 'string' && theme.certificate_type.trim()
+  const logo = (primarySigner?.logo_url && primarySigner.logo_url.trim())
+    ? primarySigner.logo_url.trim()
+    : typeof theme.logo_url === 'string'
+      ? theme.logo_url
+      : null
+  const certificateTypeFromTheme = typeof theme.certificate_type === 'string' && theme.certificate_type.trim()
     ? theme.certificate_type
     : 'Certificado digital (modelo padrão)'
-  const certificateValidUntilRaw = theme.certificate_valid_until as string | null | undefined
-  const certificateValidUntilValue = typeof certificateValidUntilRaw === 'string'
-    ? certificateValidUntilRaw
-    : certificateValidUntilRaw != null
-      ? String(certificateValidUntilRaw)
+  const certificateType = primarySigner?.certificate_type?.trim() || certificateTypeFromTheme
+  const certificateIssuer = primarySigner?.certificate_issuer?.trim() || (
+    typeof theme.certificate_issuer === 'string' && theme.certificate_issuer.trim()
+      ? theme.certificate_issuer
       : null
+  )
+  const certificateValidUntilValue = primarySigner?.certificate_valid_until || (() => {
+    const certificateValidUntilRaw = theme.certificate_valid_until as string | null | undefined
+    if (typeof certificateValidUntilRaw === 'string') return certificateValidUntilRaw
+    return certificateValidUntilRaw != null ? String(certificateValidUntilRaw) : null
+  })()
 
   const certificateValidUntil = useMemo(() => {
     if (!certificateValidUntilValue) return null
@@ -303,6 +350,12 @@ export default function ValidatePage() {
             <div style={{ fontSize:12, color:'#6b7280' }}>Válido até</div>
             <div style={{ fontSize:14 }}>{certificateValidUntil ?? 'Validade não informada'}</div>
           </div>
+          {certificateIssuer && (
+            <div>
+              <div style={{ fontSize:12, color:'#6b7280' }}>Emissor do certificado</div>
+              <div style={{ fontSize:14 }}>{certificateIssuer}</div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -346,6 +399,107 @@ export default function ValidatePage() {
             )}
           </div>
         </div>
+      </section>
+
+      <section style={{ border:`2px solid ${color}`, borderRadius:12, padding:16, marginTop:16 }}>
+        <h2 style={{ fontSize:18, margin:'0 0 12px 0' }}>Histórico de assinaturas</h2>
+        {eventsLoading ? (
+          <div style={{ fontSize:13, color:'#6b7280' }}>Carregando histórico…</div>
+        ) : events.length === 0 ? (
+          <div style={{ fontSize:13, color:'#6b7280' }}>
+            Nenhum evento de assinatura foi registrado para este documento.
+          </div>
+        ) : (
+          <ul style={{ listStyle:'none', padding:0, margin:0, display:'flex', flexDirection:'column', gap:12 }}>
+            {events.map(event => {
+              const signedAtDisplay = (() => {
+                const date = new Date(event.signed_at)
+                return Number.isNaN(date.getTime()) ? event.signed_at : date.toLocaleString()
+              })()
+              const validUntilDisplay = (() => {
+                if (!event.certificate_valid_until) return 'Validade não informada'
+                const date = new Date(event.certificate_valid_until)
+                return Number.isNaN(date.getTime()) ? event.certificate_valid_until : date.toLocaleDateString()
+              })()
+
+              return (
+                <li
+                  key={event.id}
+                  style={{
+                    display:'flex',
+                    gap:16,
+                    alignItems:'flex-start',
+                    border:'1px solid #e5e7eb',
+                    borderRadius:12,
+                    background:'#fff',
+                    padding:16,
+                  }}
+                >
+                  {event.logo_url ? (
+                    <img
+                      src={event.logo_url}
+                      alt={`Logo de ${event.signer_name}`}
+                      style={{ width:64, height:64, objectFit:'contain', borderRadius:8, border:'1px solid #e5e7eb', background:'#fff' }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width:64,
+                        height:64,
+                        borderRadius:8,
+                        border:'1px dashed #cbd5f5',
+                        display:'flex',
+                        alignItems:'center',
+                        justifyContent:'center',
+                        fontSize:11,
+                        color:'#6b7280',
+                        background:'#f8fafc',
+                        textAlign:'center',
+                        padding:4,
+                      }}
+                    >
+                      Sem logo
+                    </div>
+                  )}
+
+                  <div style={{ flex:'1 1 auto', minWidth:0, display:'grid', gap:8 }}>
+                    <div>
+                      <div style={{ fontWeight:600, fontSize:16 }}>{event.signer_name}</div>
+                      <div style={{ fontSize:13, color:'#6b7280' }}>{event.signer_reg || 'Registro não informado'}</div>
+                      {event.signer_email && (
+                        <div style={{ fontSize:12, color:'#6b7280' }}>{event.signer_email}</div>
+                      )}
+                    </div>
+                    <div style={{ fontSize:13 }}>
+                      <strong>Assinado em:</strong> {signedAtDisplay}
+                    </div>
+                    <div style={{ display:'grid', gap:8, gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                      <div>
+                        <div style={{ fontSize:12, color:'#6b7280' }}>Certificado</div>
+                        <div style={{ fontSize:13 }}>{event.certificate_type || 'Tipo não informado'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize:12, color:'#6b7280' }}>Validade</div>
+                        <div style={{ fontSize:13 }}>{validUntilDisplay}</div>
+                      </div>
+                      {event.certificate_issuer && (
+                        <div>
+                          <div style={{ fontSize:12, color:'#6b7280' }}>Emissor</div>
+                          <div style={{ fontSize:13 }}>{event.certificate_issuer}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {eventsError && (
+          <div style={{ marginTop:12, fontSize:12, color:'#b91c1c' }}>
+            Não foi possível carregar o histórico completo agora: {eventsError}.
+          </div>
+        )}
       </section>
 
       <div style={{ marginTop:12, fontSize:12, color:'#374151' }}>

@@ -90,6 +90,51 @@ export interface Database {
           created_at?: string;
         };
       };
+
+      document_signing_events: {
+        Row: {
+          id: string;
+          document_id: string;
+          signer_name: string;
+          signer_reg: string | null;
+          certificate_type: string | null;
+          certificate_issuer: string | null;
+          signer_email: string | null;
+          signed_at: string;
+          certificate_valid_until: string | null;
+          logo_url: string | null;
+          metadata: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          signer_name: string;
+          signer_reg?: string | null;
+          certificate_type?: string | null;
+          certificate_issuer?: string | null;
+          signer_email?: string | null;
+          signed_at?: string;
+          certificate_valid_until?: string | null;
+          logo_url?: string | null;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          document_id?: string;
+          signer_name?: string;
+          signer_reg?: string | null;
+          certificate_type?: string | null;
+          certificate_issuer?: string | null;
+          signer_email?: string | null;
+          signed_at?: string;
+          certificate_valid_until?: string | null;
+          logo_url?: string | null;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+      };
     };
     Views: {};
     Functions: {};
