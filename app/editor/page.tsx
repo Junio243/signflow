@@ -25,6 +25,7 @@ export default function EditorPage() {
   const router = useRouter()
 
   // PDF
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [pdfBytes, setPdfBytes] = useState<ArrayBuffer | null>(null)
 
@@ -498,7 +499,30 @@ export default function EditorPage() {
         {/* Controles */}
         <div style={{ display:'grid', gap:16 }}>
           <Card title="1) PDF">
-            <input type="file" accept="application/pdf" onChange={onPdfChange} />
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={onPdfChange}
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #e5e7eb',
+                  background: '#fff',
+                  cursor: 'pointer'
+                }}
+              >
+                Escolher arquivo
+              </button>
+              <span style={{ color: '#6b7280', fontSize: 14 }}>
+                {pdfFile ? pdfFile.name : 'Nenhum arquivo escolhido'}
+              </span>
+            </div>
           </Card>
 
           <Card title="2) Assinatura" right={
