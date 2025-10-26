@@ -341,7 +341,11 @@ export async function POST(req: NextRequest) {
         .insert(payload);
 
       if (insEvents.error) {
-        return NextResponse.json({ error: insEvents.error.message }, { status: 500 });
+        console.error(
+          'Failed to persist signing events for document %s: %s',
+          id,
+          insEvents.error.message
+        );
       }
     }
 
