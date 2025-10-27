@@ -1,7 +1,7 @@
 // app/settings/page.tsx
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 
@@ -26,6 +26,8 @@ export default function SettingsPage() {
   // profile
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [cep, setCep] = useState('');
   const [city, setCity] = useState('Brasília/DF');
   const [timezone, setTimezone] = useState('America/Sao_Paulo');
   const [language, setLanguage] = useState('pt-BR');
@@ -35,6 +37,134 @@ export default function SettingsPage() {
   const [signatures, setSignatures] = useState<SignatureRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<{ phone?: string; email?: string; cep?: string }>({});
+
+  const cityOptions = useMemo(() => {
+    const baseOptions = [
+      'Brasília/DF',
+      'São Paulo/SP',
+      'Rio de Janeiro/RJ',
+      'Belo Horizonte/MG',
+      'Curitiba/PR',
+      'Porto Alegre/RS',
+      'Salvador/BA',
+      'Recife/PE',
+      'Fortaleza/CE',
+      'Manaus/AM',
+      'Florianópolis/SC',
+    ];
+    if (city && !baseOptions.includes(city)) {
+      return [city, ...baseOptions];
+    }
+    return baseOptions;
+  }, [city]);
+
+  const timezoneOptions = useMemo(() => {
+    const baseOptions = [
+      'America/Sao_Paulo',
+      'America/Bahia',
+      'America/Recife',
+      'America/Fortaleza',
+      'America/Belem',
+      'America/Manaus',
+      'America/Cuiaba',
+      'America/Porto_Velho',
+      'America/Rio_Branco',
+    ];
+    if (timezone && !baseOptions.includes(timezone)) {
+      return [timezone, ...baseOptions];
+    }
+    return baseOptions;
+  }, [timezone]);
+
+  const phoneRegex = /^\(\d{2}\)\s\d{4,5}-\d{4}$/;
+  const cepRegex = /^\d{5}-\d{3}$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  function formatBrazilianPhone(value: string) {
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+    if (!digits) return '';
+    if (digits.length <= 2) {
+      return digits.length === 2 ? `(${digits})` : `(${digits}`;
+    }
+    const ddd = digits.slice(0, 2);
+    const remaining = digits.slice(2);
+    if (remaining.length <= 4) {
+      return `(${ddd}) ${remaining}`;
+    }
+    if (remaining.length <= 8) {
+      return `(${ddd}) ${remaining.slice(0, remaining.length - 4)}-${remaining.slice(-4)}`;
+    }
+    return `(${ddd}) ${remaining.slice(0, 5)}-${remaining.slice(5)}`;
+  }
+
+  function formatCEP(value: string) {
+    const digits = value.replace(/\D/g, '').slice(0, 8);
+    if (digits.length <= 5) return digits;
+    return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+  }
+
+  function validatePhone(value: string) {
+    const digits = value.replace(/\D/g, '');
+    let message = '';
+    if (!digits) {
+      message = 'Informe o telefone com DDD.';
+    } else if (digits.length !== 10 && digits.length !== 11) {
+      message = 'O telefone deve ter 10 ou 11 dígitos.';
+    } else if (!phoneRegex.test(value)) {
+      message = 'Use o formato (11) 98888-7777.';
+    }
+    setFormErrors((prev) => ({ ...prev, phone: message }));
+    return message === '';
+  }
+
+  function validateCep(value: string) {
+    const formatted = formatCEP(value);
+    const digits = formatted.replace(/\D/g, '');
+    let message = '';
+    if (!digits) {
+      message = 'Informe o CEP.';
+    } else if (digits.length !== 8) {
+      message = 'O CEP deve ter 8 dígitos.';
+    } else if (!cepRegex.test(formatted)) {
+      message = 'Use o formato 00000-000.';
+    }
+    setFormErrors((prev) => ({ ...prev, cep: message }));
+    return message === '';
+  }
+
+  function validateEmail(value: string) {
+    const normalized = value.trim().toLowerCase();
+    let message = '';
+    if (!normalized) {
+      message = 'Informe o e-mail.';
+    } else if (!emailRegex.test(normalized)) {
+      message = 'E-mail inválido.';
+    }
+    setFormErrors((prev) => ({ ...prev, email: message }));
+    return message === '';
+  }
+
+  function handlePhoneInput(value: string) {
+    const formatted = formatBrazilianPhone(value);
+    setPhone(formatted);
+    validatePhone(formatted);
+  }
+
+  function handleCepInput(value: string) {
+    const formatted = formatCEP(value);
+    setCep(formatted);
+    validateCep(formatted);
+  }
+
+  function handleEmailInput(value: string) {
+    const normalized = value.replace(/\s+/g, '').toLowerCase();
+    setEmail(normalized);
+    validateEmail(normalized);
+  }
+
+  const hasErrors = Object.values(formErrors).some((msg) => Boolean(msg));
+  const isSaveDisabled = busy || hasErrors || !phone || !email || !cep;
 
   // drawing canvas
   const signCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -65,7 +195,9 @@ export default function SettingsPage() {
             .single();
           if (!profileErr && profileData) {
             setDisplayName(profileData.display_name || '');
-            setPhone(profileData.phone || '');
+            handlePhoneInput(profileData.phone || '');
+            handleEmailInput(profileData.email || '');
+            handleCepInput(profileData.cep || '');
             setCity(profileData.city || 'Brasília/DF');
             setTimezone(profileData.timezone || 'America/Sao_Paulo');
             setLanguage(profileData.language || 'pt-BR');
@@ -107,6 +239,25 @@ export default function SettingsPage() {
       setInfo('Faça login primeiro.');
       return;
     }
+    const normalizedPhone = formatBrazilianPhone(phone);
+    const normalizedCep = formatCEP(cep);
+    const normalizedEmail = email.replace(/\s+/g, '').toLowerCase();
+    const normalizedDisplayName = displayName.trim();
+
+    const phoneValid = validatePhone(normalizedPhone);
+    const emailValid = validateEmail(normalizedEmail);
+    const cepValid = validateCep(normalizedCep);
+
+    setPhone(normalizedPhone);
+    setCep(normalizedCep);
+    setEmail(normalizedEmail);
+    setDisplayName(normalizedDisplayName);
+
+    if (!phoneValid || !emailValid || !cepValid) {
+      setInfo('Corrija os campos destacados antes de salvar.');
+      return;
+    }
+
     setBusy(true);
     setInfo(null);
     try {
@@ -116,8 +267,10 @@ export default function SettingsPage() {
       }
       const payload = {
         id: sessionUserId,
-        display_name: displayName,
-        phone,
+        display_name: normalizedDisplayName,
+        phone: normalizedPhone,
+        email: normalizedEmail,
+        cep: normalizedCep,
         city,
         timezone,
         language,
@@ -405,23 +558,119 @@ export default function SettingsPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
             <label>Nome</label>
-            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8 }} />
+            <input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              onBlur={() => setDisplayName((prev) => prev.trim())}
+              style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8 }}
+            />
           </div>
           <div>
             <label>Telefone</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8 }} />
+            <input
+              type="tel"
+              inputMode="tel"
+              value={phone}
+              onChange={(e) => handlePhoneInput(e.target.value)}
+              onBlur={() => validatePhone(phone)}
+              maxLength={16}
+              placeholder="(11) 98888-7777"
+              aria-invalid={Boolean(formErrors.phone)}
+              style={{
+                width: '100%',
+                padding: 8,
+                border: `1px solid ${formErrors.phone ? '#dc2626' : '#e5e7eb'}`,
+                borderRadius: 8,
+              }}
+            />
+            {formErrors.phone && (
+              <p style={{ color: '#dc2626', fontSize: 12, marginTop: 4 }}>{formErrors.phone}</p>
+            )}
+          </div>
+          <div>
+            <label>E-mail</label>
+            <input
+              type="email"
+              inputMode="email"
+              value={email}
+              onChange={(e) => handleEmailInput(e.target.value)}
+              onBlur={() => validateEmail(email)}
+              placeholder="nome@exemplo.com"
+              aria-invalid={Boolean(formErrors.email)}
+              style={{
+                width: '100%',
+                padding: 8,
+                border: `1px solid ${formErrors.email ? '#dc2626' : '#e5e7eb'}`,
+                borderRadius: 8,
+              }}
+            />
+            {formErrors.email && (
+              <p style={{ color: '#dc2626', fontSize: 12, marginTop: 4 }}>{formErrors.email}</p>
+            )}
+          </div>
+          <div>
+            <label>CEP</label>
+            <input
+              value={cep}
+              inputMode="numeric"
+              maxLength={9}
+              onChange={(e) => handleCepInput(e.target.value)}
+              onBlur={() => validateCep(cep)}
+              placeholder="00000-000"
+              aria-invalid={Boolean(formErrors.cep)}
+              style={{
+                width: '100%',
+                padding: 8,
+                border: `1px solid ${formErrors.cep ? '#dc2626' : '#e5e7eb'}`,
+                borderRadius: 8,
+              }}
+            />
+            {formErrors.cep && (
+              <p style={{ color: '#dc2626', fontSize: 12, marginTop: 4 }}>{formErrors.cep}</p>
+            )}
           </div>
           <div>
             <label>Cidade</label>
-            <input value={city} onChange={(e) => setCity(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8 }} />
+            <select
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8 }}
+            >
+              {cityOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label>Fuso horário</label>
-            <input value={timezone} onChange={(e) => setTimezone(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8 }} />
+            <select
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8 }}
+            >
+              {timezoneOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         <div style={{ marginTop: 12 }}>
-          <button onClick={handleSaveProfile} disabled={busy} style={{ padding: '8px 12px', borderRadius: 8, background: '#2563eb', color: '#fff' }}>
+          <button
+            onClick={handleSaveProfile}
+            disabled={isSaveDisabled}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 8,
+              background: '#2563eb',
+              color: '#fff',
+              opacity: isSaveDisabled ? 0.6 : 1,
+              cursor: isSaveDisabled ? 'not-allowed' : 'pointer',
+            }}
+          >
             {busy ? 'Salvando…' : 'Salvar perfil'}
           </button>
         </div>
