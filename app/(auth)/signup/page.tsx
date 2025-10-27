@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type ReactNode, useState } from 'react'
-
 import { supabase } from '@/lib/supabaseClient'
 
 // Mapeia mensagens de erro do Supabase para português
@@ -35,7 +34,7 @@ export default function SignUpPage() {
   const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null)
   const [consentGiven, setConsentGiven] = useState(false)
 
-  // formata CPF para 000.000.000-00
+  // formata CPF para 000.000.000‑00
   const formatCpf = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 11)
     return digits
@@ -63,8 +62,6 @@ export default function SignUpPage() {
   // manipulador de envio
   const cadastrar = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-
-    // zera mensagens de erro/informação
     setError(null)
     setInfo(null)
     setEmailError(null)
@@ -91,7 +88,6 @@ export default function SignUpPage() {
       setPasswordError('A senha deve conter letras e números.')
       return
     }
-
     if (password !== confirmPassword) {
       setConfirmPasswordError('As senhas não coincidem.')
       return
@@ -99,20 +95,16 @@ export default function SignUpPage() {
 
     // valida consentimento
     if (!consentGiven) {
-      setError(
-        'Para criar sua conta é necessário aceitar a Política de Privacidade e os Termos de Uso, em conformidade com a LGPD e a legislação do DF.'
-      )
+      setError('Para criar sua conta é necessário aceitar a Política de Privacidade e os Termos de Uso, em conformidade com a LGPD e a legislação do DF.')
       return
     }
 
     if (!supabaseClient) {
-      setError(
-        'Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.'
-      )
+      setError('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
       return
     }
 
-    // valida nome completo
+    // valida nome
     const trimmedName = fullName.trim()
     if (trimmedName.length < 3) {
       setError('Informe seu nome completo.')
@@ -131,14 +123,11 @@ export default function SignUpPage() {
     }
 
     setLoading(true)
-
-    // prepara metadados
     const metadata = {
       full_name: trimmedName,
       ...(contactType === 'cpf' ? { cpf: digits } : { phone: digits }),
     }
 
-    // cria o usuário com metadata
     const { error: supaError } = await supabaseClient.auth.signUp({
       email,
       password,
@@ -156,7 +145,7 @@ export default function SignUpPage() {
     setTimeout(() => router.replace('/login'), 1200)
   }
 
-  /* === Tailwind wrapper & UI (refactor) === */
+  // Wrapper para layout com Tailwind
   const Wrapper = ({ children }: { children: ReactNode }) => (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
       <div className="w-full max-w-md">
@@ -189,6 +178,7 @@ export default function SignUpPage() {
         </header>
 
         <form className="space-y-4" onSubmit={cadastrar} noValidate>
+          {/* Nome completo */}
           <div className="space-y-1">
             <label htmlFor="fullName" className="block text-sm font-medium text-slate-700">
               Nome completo
@@ -205,6 +195,7 @@ export default function SignUpPage() {
             />
           </div>
 
+          {/* E-mail */}
           <div className="space-y-1">
             <label htmlFor="email" className="block text-sm font-medium text-slate-700">
               E-mail
@@ -232,6 +223,7 @@ export default function SignUpPage() {
             <p className="text-xs text-slate-500">Usaremos este endereço para confirmar seu cadastro.</p>
           </div>
 
+          {/* Senha */}
           <div className="space-y-1">
             <label htmlFor="password" className="block text-sm font-medium text-slate-700">
               Senha
@@ -260,6 +252,7 @@ export default function SignUpPage() {
             <p className="text-xs text-slate-500">Mínimo de 8 caracteres, preferencialmente com letras e números.</p>
           </div>
 
+          {/* Confirmação de senha */}
           <div className="space-y-1">
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700">
               Confirme a senha
@@ -285,6 +278,7 @@ export default function SignUpPage() {
             )}
           </div>
 
+          {/* Contato (CPF ou Telefone) */}
           <div className="space-y-1">
             <div className="text-sm font-medium text-slate-700">Contato</div>
             <div className="flex gap-4">
@@ -315,7 +309,6 @@ export default function SignUpPage() {
                 <span className="text-sm">Telefone com DDD</span>
               </label>
             </div>
-
             <input
               type="text"
               placeholder={contactType === 'cpf' ? '000.000.000-00' : '(11) 91234-5678'}
@@ -326,7 +319,7 @@ export default function SignUpPage() {
             />
           </div>
 
-          {/* caixa de consentimento LGPD/Termos */}
+          {/* Consentimento LGPD/Termos */}
           <label className="flex items-start gap-3 text-sm">
             <input
               type="checkbox"
@@ -350,4 +343,36 @@ export default function SignUpPage() {
 
           <button
             type="submit"
-            disabled={loa
+            disabled={loading}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? 'Cadastrando…' : 'Criar conta'}
+          </button>
+        </form>
+
+        {/* Mensagens de erro ou informação */}
+        <div className="space-y-3">
+          {error && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600" role="alert" aria-live="assertive">
+              Erro: {error}
+            </p>
+          )}
+          {info && (
+            <p className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-700" role="status" aria-live="polite">
+              {info}
+            </p>
+          )}
+          <p className="text-center text-sm text-slate-600">
+            Já tem conta?{' '}
+            <Link
+              href="/login"
+              className="font-semibold text-brand-600 transition hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+            >
+              Entrar
+            </Link>
+          </p>
+        </div>
+      </div>
+    </Wrapper>
+  )
+}
