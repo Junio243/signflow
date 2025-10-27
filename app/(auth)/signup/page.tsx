@@ -22,6 +22,7 @@ export default function SignUpPage() {
   const [info, setInfo] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null)
+  const [consentGiven, setConsentGiven] = useState(false)
 
   // formata CPF para 000.000.000‑00
   const formatCpf = (value: string) => {
@@ -56,6 +57,12 @@ export default function SignUpPage() {
     setPasswordError(null)
     setConfirmPasswordError(null)
 
+    // valida consentimento
+    if (!consentGiven) {
+      setError('Para criar sua conta é necessário aceitar a Política de Privacidade e os Termos de Uso, em conformidade com a LGPD e a legislação do DF.')
+      return
+    }
+
     if (!supabaseClient) {
       setError('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
       return
@@ -79,7 +86,7 @@ export default function SignUpPage() {
       return
     }
 
-    // valida senha
+    // valida senha (mantendo a lógica existente:contentReference[oaicite:0]{index=0}:contentReference[oaicite:1]{index=1})
     if (password.length < 8) {
       setPasswordError('Use ao menos 8 caracteres.')
       return
@@ -98,7 +105,7 @@ export default function SignUpPage() {
     // prepara metadados
     const metadata = {
       full_name: trimmedName,
-      ...(contactType === 'cpf' ? { cpf: digits } : { phone: digits }),
+      ...(contactType === 'cpf' ? { cpf: digits } : { phone: digits })
     }
 
     // cria o usuário com metadata
@@ -186,6 +193,21 @@ export default function SignUpPage() {
           value={contactValue}
           onChange={e => handleContactChange(e.target.value)}
         />
+        {/* caixa de consentimento LGPD/Termos */}
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={consentGiven}
+            onChange={e => setConsentGiven(e.target.checked)}
+            required
+          />
+          <span>
+            Estou ciente e concordo com a{' '}
+            <a href="/privacy">Política de Privacidade</a> e com os{' '}
+            <a href="/terms">Termos de Uso</a>, em conformidade com a Lei Geral de Proteção de Dados (LGPD)
+            e a legislação vigente no Distrito Federal (DF).
+          </span>
+        </label>
         <button type="submit" disabled={loading}>
           {loading ? 'Cadastrando...' : 'Criar conta'}
         </button>
