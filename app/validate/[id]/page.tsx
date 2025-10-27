@@ -88,13 +88,13 @@ export default function ValidatePage() {
     })()
   }, [id])
 
-  if (errorMsg) return <p style={{ padding:16 }}>Erro: {errorMsg}</p>
-  if (!doc) return <p style={{ padding:16 }}>Carregando…</p>
-
   const theme = useMemo(() => {
-    let snap = doc.validation_theme_snapshot || null
-    if (!snap && doc.metadata && typeof doc.metadata === 'object') {
-      const meta = doc.metadata as any
+    const currentDoc = doc
+    if (!currentDoc) return {}
+
+    let snap = currentDoc.validation_theme_snapshot || null
+    if (!snap && currentDoc.metadata && typeof currentDoc.metadata === 'object') {
+      const meta = currentDoc.metadata as any
       snap = meta.validation_theme_snapshot || meta.theme || null
     }
 
@@ -145,7 +145,19 @@ export default function ValidatePage() {
     }
     return certificateValidUntilValue
   }, [certificateValidUntilValue])
-  const st = (doc.status || '').toLowerCase()
+  const canceledSubtitle = useMemo(() => {
+    const canceledAtRaw = doc?.canceled_at
+    if (!canceledAtRaw) return 'Documento não é mais válido.'
+
+    const canceledAtDate = new Date(canceledAtRaw)
+    if (!Number.isNaN(canceledAtDate.getTime())) {
+      return `Cancelado em ${canceledAtDate.toLocaleString()}`
+    }
+
+    return 'Documento não é mais válido.'
+  }, [doc?.canceled_at])
+
+  const st = (doc?.status || '').toLowerCase()
   const isCanceled = st === 'canceled'
   const isExpired = st === 'expired'
   const accentColor = isCanceled
@@ -161,9 +173,7 @@ export default function ValidatePage() {
         icon: '#b91c1c',
         badge: 'rgba(185, 28, 28, 0.1)',
         message: 'Documento cancelado',
-        subtitle: doc.canceled_at
-          ? `Cancelado em ${new Date(doc.canceled_at).toLocaleString()}`
-          : 'Documento não é mais válido.'
+        subtitle: canceledSubtitle
       }
     : isExpired
       ? {
@@ -185,13 +195,19 @@ export default function ValidatePage() {
           subtitle: 'Emitido com certificados reconhecidos pela ICP-Brasil.'
         }
 
-  const documentName = doc.original_pdf_name || 'Documento assinado'
+  const documentName = doc?.original_pdf_name || 'Documento assinado'
   const signedAt = useMemo(() => {
-    const createdAt = doc.created_at ? new Date(doc.created_at) : null
-    return createdAt && !Number.isNaN(createdAt.getTime())
+    const createdAtRaw = doc?.created_at
+    if (!createdAtRaw) return 'Data não informada'
+
+    const createdAt = new Date(createdAtRaw)
+    return !Number.isNaN(createdAt.getTime())
       ? createdAt.toLocaleString()
       : 'Data não informada'
-  }, [doc.created_at])
+  }, [doc?.created_at])
+
+  if (errorMsg) return <p style={{ padding:16 }}>Erro: {errorMsg}</p>
+  if (!doc) return <p style={{ padding:16 }}>Carregando…</p>
 
   const handleDownload = () => {
     if (!doc.signed_pdf_url) return
