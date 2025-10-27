@@ -9,18 +9,39 @@ export default function SignUpPage() {
   const supabaseClient = supabase
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null)
 
   const cadastrar = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null); setInfo(null); setLoading(true)
+    setError(null); setInfo(null)
+    setPasswordError(null); setConfirmPasswordError(null)
+
     if (!supabaseClient) {
       setError('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
-      setLoading(false)
       return
     }
+
+    if (password.length < 8) {
+      setPasswordError('Use ao menos 8 caracteres.')
+      return
+    }
+
+    if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+      setPasswordError('A senha deve conter letras e números.')
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setConfirmPasswordError('As senhas não coincidem.')
+      return
+    }
+
+    setLoading(true)
     const { error } = await supabaseClient.auth.signUp({ email, password })
     setLoading(false)
     if (error) { setError(error.message); return }
@@ -45,6 +66,10 @@ export default function SignUpPage() {
                value={email} onChange={e => setEmail(e.target.value)} />
         <input type="password" placeholder="Crie uma senha" required
                value={password} onChange={e => setPassword(e.target.value)} />
+        {passwordError && <span style={{ color: 'red', fontSize: 12 }}>{passwordError}</span>}
+        <input type="password" placeholder="Confirme sua senha" required
+               value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+        {confirmPasswordError && <span style={{ color: 'red', fontSize: 12 }}>{confirmPasswordError}</span>}
         <button type="submit" disabled={loading}>
           {loading ? 'Cadastrando...' : 'Criar conta'}
         </button>
