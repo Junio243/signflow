@@ -35,6 +35,10 @@ type SigningEvent = {
 const isUuid = (s: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)
 
+const DEFAULT_THEME_ISSUER = 'Instituição/Profissional'
+const DEFAULT_THEME_REG = 'Registro'
+const DEFAULT_CERTIFICATE_TYPE = 'Certificado digital (modelo padrão)'
+
 function statusPt(status?: string | null) {
   switch ((status || '').toLowerCase()) {
     case 'signed': return 'Assinado'
@@ -105,33 +109,65 @@ export default function ValidatePage() {
     return {}
   }, [doc])
 
+  const metadataSigners = useMemo(() => {
+    if (!doc.metadata || typeof doc.metadata !== 'object') return []
+    const raw = Array.isArray((doc.metadata as any).signers) ? (doc.metadata as any).signers : []
+
+    return raw
+      .map(item => {
+        if (!item || typeof item !== 'object') return null
+        const name = typeof item.name === 'string' ? item.name.trim() : ''
+        if (!name) return null
+        return name
+      })
+      .filter(Boolean) as string[]
+  }, [doc])
+
   const color = typeof theme.color === 'string' && theme.color.trim() ? theme.color : '#2563eb'
   const primarySigner = useMemo(() => (events.length ? events[events.length - 1] : null), [events])
 
-  const issuerFromTheme = typeof theme.issuer === 'string' && theme.issuer.trim() ? theme.issuer : 'Instituição/Profissional'
-  const regFromTheme = typeof theme.reg === 'string' && theme.reg.trim() ? theme.reg : 'Registro'
-  const issuer = primarySigner?.signer_name?.trim() || issuerFromTheme
-  const reg = primarySigner?.signer_reg?.trim() || regFromTheme
+  const themeIssuerRaw = typeof theme.issuer === 'string' ? theme.issuer.trim() : ''
+  const themeRegRaw = typeof theme.reg === 'string' ? theme.reg.trim() : ''
+  const themeCertificateTypeRaw = typeof theme.certificate_type === 'string' ? theme.certificate_type.trim() : ''
+  const themeCertificateIssuerRaw = typeof theme.certificate_issuer === 'string' ? theme.certificate_issuer.trim() : ''
+  const themeCertificateValidUntilRaw =
+    typeof theme.certificate_valid_until === 'string' ? theme.certificate_valid_until.trim() : ''
+  const themeLogoRaw = typeof theme.logo_url === 'string' ? theme.logo_url.trim() : ''
+
+  const themeHasCustomIssuer = !!themeIssuerRaw && themeIssuerRaw !== DEFAULT_THEME_ISSUER
+  const themeHasCustomReg = !!themeRegRaw && themeRegRaw !== DEFAULT_THEME_REG
+  const themeHasCustomCertificateType =
+    !!themeCertificateTypeRaw && themeCertificateTypeRaw !== DEFAULT_CERTIFICATE_TYPE
+  const themeHasCertificateIssuer = !!themeCertificateIssuerRaw
+  const themeHasCertificateValidUntil = !!themeCertificateValidUntilRaw
+  const themeHasLogo = !!themeLogoRaw
+
+  const hasExplicitSigners = events.length > 0 || metadataSigners.length > 0
+  const themeProvidesDetails =
+    themeHasCustomIssuer ||
+    themeHasCustomReg ||
+    themeHasCustomCertificateType ||
+    themeHasCertificateIssuer ||
+    themeHasCertificateValidUntil ||
+    themeHasLogo
+  const shouldRenderSignerDetails = hasExplicitSigners || themeProvidesDetails
+  const headingLabel = hasExplicitSigners
+    ? events.length > 1 || (!events.length && metadataSigners.length > 1)
+      ? 'Signatários'
+      : 'Signatário'
+    : 'Signatários'
+
+  const issuer = primarySigner?.signer_name?.trim() || (themeHasCustomIssuer ? themeIssuerRaw : null)
+  const reg = primarySigner?.signer_reg?.trim() || (themeHasCustomReg ? themeRegRaw : null)
   const footer = typeof theme.footer === 'string' ? theme.footer : ''
   const logo = (primarySigner?.logo_url && primarySigner.logo_url.trim())
     ? primarySigner.logo_url.trim()
-    : typeof theme.logo_url === 'string'
-      ? theme.logo_url
+    : themeHasLogo
+      ? themeLogoRaw
       : null
-  const certificateTypeFromTheme = typeof theme.certificate_type === 'string' && theme.certificate_type.trim()
-    ? theme.certificate_type
-    : 'Certificado digital (modelo padrão)'
-  const certificateType = primarySigner?.certificate_type?.trim() || certificateTypeFromTheme
-  const certificateIssuer = primarySigner?.certificate_issuer?.trim() || (
-    typeof theme.certificate_issuer === 'string' && theme.certificate_issuer.trim()
-      ? theme.certificate_issuer
-      : null
-  )
-  const certificateValidUntilValue = primarySigner?.certificate_valid_until || (() => {
-    const certificateValidUntilRaw = theme.certificate_valid_until as string | null | undefined
-    if (typeof certificateValidUntilRaw === 'string') return certificateValidUntilRaw
-    return certificateValidUntilRaw != null ? String(certificateValidUntilRaw) : null
-  })()
+  const certificateType = primarySigner?.certificate_type?.trim() || (themeHasCustomCertificateType ? themeCertificateTypeRaw : null)
+  const certificateIssuer = primarySigner?.certificate_issuer?.trim() || (themeHasCertificateIssuer ? themeCertificateIssuerRaw : null)
+  const certificateValidUntilValue = primarySigner?.certificate_valid_until || (themeHasCertificateValidUntil ? themeCertificateValidUntilRaw : null)
 
   const certificateValidUntil = useMemo(() => {
     if (!certificateValidUntilValue) return null
@@ -325,38 +361,69 @@ export default function ValidatePage() {
       </div>
 
       <section style={{ border:`2px solid ${color}`, borderRadius:12, padding:16, marginBottom:16 }}>
-        <h2 style={{ fontSize:18, margin:'0 0 12px 0' }}>Signatário</h2>
-        <div style={{ display:'flex', gap:16, flexWrap:'wrap', alignItems:'center' }}>
-          {logo && (
-            <img
-              src={logo}
-              alt="Logo do emissor"
-              style={{ height:56, objectFit:'contain', maxWidth:'100%' }}
-            />
+        <div style={{ display:'flex', alignItems:'center', gap:12, margin:'0 0 12px 0' }}>
+          <h2 style={{ fontSize:18, margin:0 }}>{headingLabel}</h2>
+          {!hasExplicitSigners && (
+            <span
+              style={{
+                fontSize:11,
+                textTransform:'uppercase',
+                letterSpacing:0.5,
+                color:'#2563eb',
+                background:'rgba(37, 99, 235, 0.1)',
+                borderRadius:9999,
+                padding:'2px 8px',
+                fontWeight:600,
+              }}
+            >
+              Opcional
+            </span>
           )}
-          <div>
-            <div style={{ fontSize:12, color:'#6b7280' }}>Assinatura emitida por</div>
-            <div style={{ fontWeight:600 }}>{issuer}</div>
-            <div style={{ fontSize:14 }}>{reg}</div>
-          </div>
         </div>
 
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:12, marginTop:16 }}>
-          <div>
-            <div style={{ fontSize:12, color:'#6b7280' }}>Tipo de certificado</div>
-            <div style={{ fontSize:14 }}>{certificateType}</div>
+        {!shouldRenderSignerDetails ? (
+          <div style={{ fontSize:13, color:'#6b7280' }}>
+            Nenhum signatário individual foi cadastrado para este documento.
           </div>
-          <div>
-            <div style={{ fontSize:12, color:'#6b7280' }}>Válido até</div>
-            <div style={{ fontSize:14 }}>{certificateValidUntil ?? 'Validade não informada'}</div>
-          </div>
-          {certificateIssuer && (
-            <div>
-              <div style={{ fontSize:12, color:'#6b7280' }}>Emissor do certificado</div>
-              <div style={{ fontSize:14 }}>{certificateIssuer}</div>
+        ) : (
+          <>
+            {!hasExplicitSigners && (
+              <div style={{ fontSize:13, color:'#6b7280', marginBottom:12 }}>
+                Nenhum signatário individual foi cadastrado. Os dados exibidos abaixo são provenientes do perfil de validação.
+              </div>
+            )}
+
+            <div style={{ display:'flex', gap:16, flexWrap:'wrap', alignItems:'center' }}>
+              {logo && (
+                <img
+                  src={logo}
+                  alt="Logo do emissor"
+                  style={{ height:56, objectFit:'contain', maxWidth:'100%' }}
+                />
+              )}
+              <div>
+                <div style={{ fontSize:12, color:'#6b7280' }}>Assinatura emitida por</div>
+                <div style={{ fontWeight:600 }}>{issuer || 'Emitente não informado'}</div>
+                <div style={{ fontSize:14 }}>{reg || 'Registro não informado'}</div>
+              </div>
             </div>
-          )}
-        </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:12, marginTop:16 }}>
+              <div>
+                <div style={{ fontSize:12, color:'#6b7280' }}>Tipo de certificado</div>
+                <div style={{ fontSize:14 }}>{certificateType || 'Tipo de certificado não informado'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize:12, color:'#6b7280' }}>Válido até</div>
+                <div style={{ fontSize:14 }}>{certificateValidUntil ?? 'Validade não informada'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize:12, color:'#6b7280' }}>Emissor do certificado</div>
+                <div style={{ fontSize:14 }}>{certificateIssuer || 'Emissor não informado'}</div>
+              </div>
+            </div>
+          </>
+        )}
       </section>
 
       <section style={{ border:`2px solid ${color}`, borderRadius:12, padding:16 }}>

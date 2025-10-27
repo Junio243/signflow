@@ -69,15 +69,18 @@ export default function ValidateDemoPage() {
   }, [])
 
   const primarySigner = useMemo(() => (events.length ? events[events.length - 1] : null), [events])
+  const hasExplicitSigners = events.length > 0
+  const headingLabel = hasExplicitSigners ? (events.length > 1 ? 'Signatários' : 'Signatário') : 'Signatários'
 
-  const issuer = primarySigner?.signer_name
-    ? `${primarySigner.signer_name}`
-    : 'Exemplo: Dr(a). Fulano — CRM/DF 12345'
-  const reg = primarySigner?.signer_reg
-    ? `Registro: ${primarySigner.signer_reg}`
-    : 'Instituição: Hospital/Clínica — CNPJ 00.000.000/0001-00'
-  const certificateType = primarySigner?.certificate_type || 'Certificado digital ICP-Brasil A3'
-  const certificateIssuer = primarySigner?.certificate_issuer || 'AC VALID'
+  const fallbackIssuer = 'Exemplo: Dr(a). Fulano — CRM/DF 12345'
+  const fallbackReg = 'Instituição: Hospital/Clínica — CNPJ 00.000.000/0001-00'
+  const fallbackCertificateType = 'Certificado digital ICP-Brasil A3'
+  const fallbackCertificateIssuer = 'AC VALID'
+
+  const issuer = primarySigner?.signer_name || null
+  const reg = primarySigner?.signer_reg || null
+  const certificateType = primarySigner?.certificate_type || null
+  const certificateIssuer = primarySigner?.certificate_issuer || null
   const certificateValidUntilRaw = useMemo(() => {
     if (primarySigner?.certificate_valid_until) return primarySigner.certificate_valid_until
     const today = new Date()
@@ -94,6 +97,10 @@ export default function ValidateDemoPage() {
   const signedAt = useMemo(() => new Date().toLocaleString(), [])
   const documentName = 'declaração-assinada.pdf'
   const logo = primarySigner?.logo_url || null
+  const issuerDisplay = issuer || fallbackIssuer
+  const regDisplay = reg || fallbackReg
+  const certificateTypeDisplay = certificateType || fallbackCertificateType
+  const certificateIssuerDisplay = certificateIssuer || fallbackCertificateIssuer
 
   const handleDownload = () => {
     alert('No ambiente real, este botão abriria o PDF assinado.')
@@ -213,7 +220,32 @@ export default function ValidateDemoPage() {
       </div>
 
       <section style={{ border:`2px solid ${color}`, borderRadius:12, padding:16, marginBottom:16 }}>
-        <h2 style={{ fontSize:18, margin:'0 0 12px 0' }}>Signatário</h2>
+        <div style={{ display:'flex', alignItems:'center', gap:12, margin:'0 0 12px 0' }}>
+          <h2 style={{ fontSize:18, margin:0 }}>{headingLabel}</h2>
+          {!hasExplicitSigners && (
+            <span
+              style={{
+                fontSize:11,
+                textTransform:'uppercase',
+                letterSpacing:0.5,
+                color:'#2563eb',
+                background:'rgba(37, 99, 235, 0.1)',
+                borderRadius:9999,
+                padding:'2px 8px',
+                fontWeight:600,
+              }}
+            >
+              Opcional
+            </span>
+          )}
+        </div>
+
+        {!hasExplicitSigners && (
+          <div style={{ fontSize:13, color:'#6b7280', marginBottom:12 }}>
+            Nenhum signatário individual foi cadastrado nesta demonstração. Exibindo dados ilustrativos.
+          </div>
+        )}
+
         <div style={{ display:'flex', gap:16, alignItems:'center', flexWrap:'wrap' }}>
           {logo && (
             <img
@@ -224,26 +256,24 @@ export default function ValidateDemoPage() {
           )}
           <div>
             <div style={{ fontSize:12, color:'#6b7280' }}>Assinatura emitida por</div>
-            <div style={{ fontWeight:600 }}>{issuer}</div>
-            <div style={{ fontSize:14 }}>{reg}</div>
+            <div style={{ fontWeight:600 }}>{issuerDisplay}</div>
+            <div style={{ fontSize:14 }}>{regDisplay}</div>
           </div>
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:12, marginTop:16 }}>
           <div>
             <div style={{ fontSize:12, color:'#6b7280' }}>Tipo de certificado</div>
-            <div style={{ fontSize:14 }}>{certificateType}</div>
+            <div style={{ fontSize:14 }}>{certificateTypeDisplay}</div>
           </div>
           <div>
             <div style={{ fontSize:12, color:'#6b7280' }}>Válido até</div>
             <div style={{ fontSize:14 }}>{certificateValidUntil}</div>
           </div>
-          {certificateIssuer && (
-            <div>
-              <div style={{ fontSize:12, color:'#6b7280' }}>Emissor do certificado</div>
-              <div style={{ fontSize:14 }}>{certificateIssuer}</div>
-            </div>
-          )}
+          <div>
+            <div style={{ fontSize:12, color:'#6b7280' }}>Emissor do certificado</div>
+            <div style={{ fontSize:14 }}>{certificateIssuerDisplay}</div>
+          </div>
         </div>
       </section>
 
@@ -280,8 +310,13 @@ export default function ValidateDemoPage() {
 
       <section style={{ border:`2px solid ${color}`, borderRadius:12, padding:16, marginTop:16 }}>
         <h2 style={{ fontSize:18, margin:'0 0 12px 0' }}>Histórico de assinaturas</h2>
-        <ul style={{ listStyle:'none', padding:0, margin:0, display:'flex', flexDirection:'column', gap:12 }}>
-          {events.map(event => {
+        {events.length === 0 ? (
+          <div style={{ fontSize:13, color:'#6b7280' }}>
+            Nenhum evento de assinatura foi registrado nesta demonstração.
+          </div>
+        ) : (
+          <ul style={{ listStyle:'none', padding:0, margin:0, display:'flex', flexDirection:'column', gap:12 }}>
+            {events.map(event => {
             const signedAtDisplay = (() => {
               const date = new Date(event.signed_at)
               return Number.isNaN(date.getTime()) ? event.signed_at : date.toLocaleString()
@@ -362,8 +397,9 @@ export default function ValidateDemoPage() {
                 </div>
               </li>
             )
-          })}
-        </ul>
+            })}
+          </ul>
+        )}
       </section>
 
       <div style={{ marginTop:12, fontSize:12, color:'#374151' }}>

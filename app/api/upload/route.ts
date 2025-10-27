@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
     if (signatureMeta) metadata.signature_meta = signatureMeta;
     if (validationTheme) metadata.validation_theme_snapshot = validationTheme;
     if (validationProfileId) metadata.validation_profile_id = validationProfileId;
-    if (sanitizedSigners.length) metadata.signers = sanitizedSigners;
+    metadata.signers = sanitizedSigners;
 
     const basePayload: Record<string, any> = {
       id,

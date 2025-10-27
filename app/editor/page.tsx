@@ -667,10 +667,6 @@ export default function EditorPage() {
     }
 
     const signersForMetadata = computeSignersForMetadata()
-    if (!signersForMetadata.length) {
-      setError('Cadastre ao menos um signatário com nome para continuar.')
-      return
-    }
 
     setBusy(true)
     setInfo('Enviando arquivo…')
@@ -1182,8 +1178,8 @@ export default function EditorPage() {
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Signatários</h2>
                   <p className="text-sm text-slate-500">
-                    Informe os dados de cada pessoa responsável pela assinatura. Eles serão exibidos na validação e no histórico
-                    do documento.
+                    Informe os dados de cada pessoa responsável pela assinatura. Este passo é opcional e, se preferir, deixe
+                    em branco para seguir sem signatários nomeados.
                   </p>
                 </div>
                 <PrimaryButton type="button" onClick={addSigner} disabled={busy}>
@@ -1290,7 +1286,8 @@ export default function EditorPage() {
               </div>
 
               <p className="mt-4 text-xs text-slate-500">
-                Os signatários cadastrados serão salvos nos metadados do documento e aparecerão automaticamente na página de validação.
+                Os signatários cadastrados serão salvos nos metadados do documento e aparecerão automaticamente na página de
+                validação quando informados.
               </p>
             </section>
 
