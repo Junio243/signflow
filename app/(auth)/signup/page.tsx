@@ -4,6 +4,14 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
+// Mapeia mensagens de erro do Supabase para português
+const SUPABASE_ERROR_MESSAGES: Record<string, string> = {
+  'User already registered': 'Este e-mail já está cadastrado. Faça login para continuar.',
+  'Password should be at least 6 characters': 'A senha deve ter pelo menos 6 caracteres.',
+  'Invalid email': 'Informe um e-mail válido.',
+  'Email rate limit exceeded': 'Muitas tentativas de cadastro. Aguarde alguns minutos e tente novamente.',
+}
+
 export default function SignUpPage() {
   const router = useRouter()
   const supabaseClient = supabase
@@ -20,11 +28,12 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null)
   const [consentGiven, setConsentGiven] = useState(false)
 
-  // formata CPF para 000.000.000‑00
+  // formata CPF para 000.000.000-00
   const formatCpf = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 11)
     return digits
@@ -52,10 +61,38 @@ export default function SignUpPage() {
   // manipulador de envio
   const cadastrar = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // zera mensagens de erro/informação
     setError(null)
     setInfo(null)
+    setEmailError(null)
     setPasswordError(null)
     setConfirmPasswordError(null)
+
+    // valida email
+    if (!email.trim()) {
+      setEmailError('Informe um e-mail.')
+      return
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailError('Informe um e-mail válido.')
+      return
+    }
+
+    // valida senha mínima, força e confirmação
+    if (!password) {
+      setPasswordError('Crie uma senha.')
+      return
+    } else if (password.length < 8) { // mantemos 8 como regra local mais forte
+      setPasswordError('Use ao menos 8 caracteres.')
+      return
+    } else if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+      setPasswordError('A senha deve conter letras e números.')
+      return
+    }
+    if (password !== confirmPassword) {
+      setConfirmPasswordError('As senhas não coincidem.')
+      return
+    }
 
     // valida consentimento
     if (!consentGiven) {
@@ -68,7 +105,7 @@ export default function SignUpPage() {
       return
     }
 
-    // valida nome
+    // valida nome completo
     const trimmedName = fullName.trim()
     if (trimmedName.length < 3) {
       setError('Informe seu nome completo.')
@@ -86,40 +123,27 @@ export default function SignUpPage() {
       return
     }
 
-    // valida senha (mantendo a lógica existente:contentReference[oaicite:0]{index=0}:contentReference[oaicite:1]{index=1})
-    if (password.length < 8) {
-      setPasswordError('Use ao menos 8 caracteres.')
-      return
-    }
-    if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-      setPasswordError('A senha deve conter letras e números.')
-      return
-    }
-    if (password !== confirmPassword) {
-      setConfirmPasswordError('As senhas não coincidem.')
-      return
-    }
-
     setLoading(true)
-
     // prepara metadados
     const metadata = {
       full_name: trimmedName,
-      ...(contactType === 'cpf' ? { cpf: digits } : { phone: digits })
+      ...(contactType === 'cpf' ? { cpf: digits } : { phone: digits }),
     }
 
     // cria o usuário com metadata
-    const { error } = await supabaseClient.auth.signUp({
+    const { error: supaError } = await supabaseClient.auth.signUp({
       email,
       password,
       options: { data: metadata },
     })
     setLoading(false)
 
-    if (error) {
-      setError(error.message)
+    if (supaError) {
+      // mapeia a mensagem do supabase ou usa fallback
+      setError(SUPABASE_ERROR_MESSAGES[supaError.message] ?? supaError.message)
       return
     }
+
     setInfo('Cadastro criado! Confirme seu e-mail (se obrigatório) e faça login.')
     setTimeout(() => router.replace('/login'), 1200)
   }
@@ -135,29 +159,60 @@ export default function SignUpPage() {
           value={fullName}
           onChange={e => setFullName(e.target.value)}
         />
-        <input
-          type="email"
-          placeholder="seu@email.com"
-          required
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-        />
-        <input
-          type="password"
-          placeholder="Crie uma senha"
-          required
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-        />
-        {passwordError && <span style={{ color: 'red', fontSize: 12 }}>{passwordError}</span>}
-        <input
-          type="password"
-          placeholder="Confirme sua senha"
-          required
-          value={confirmPassword}
-          onChange={e => setConfirmPassword(e.target.value)}
-        />
-        {confirmPasswordError && <span style={{ color: 'red', fontSize: 12 }}>{confirmPasswordError}</span>}
+        <div style={{ display: 'grid', gap: 4 }}>
+          <input
+            type="email"
+            placeholder="seu@email.com"
+            value={email}
+            onChange={e => {
+              setEmail(e.target.value)
+              if (emailError) setEmailError(null)
+            }}
+            aria-invalid={Boolean(emailError)}
+            aria-describedby={emailError ? 'email-error' : undefined}
+          />
+          {emailError && (
+            <span id="email-error" style={{ color: 'red', fontSize: 12 }}>
+              {emailError}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'grid', gap: 4 }}>
+          <input
+            type="password"
+            placeholder="Crie uma senha"
+            value={password}
+            onChange={e => {
+              setPassword(e.target.value)
+              if (passwordError) setPasswordError(null)
+            }}
+            aria-invalid={Boolean(passwordError)}
+            aria-describedby={passwordError ? 'password-error' : undefined}
+          />
+          {passwordError && (
+            <span id="password-error" style={{ color: 'red', fontSize: 12 }}>
+              {passwordError}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'grid', gap: 4 }}>
+          <input
+            type="password"
+            placeholder="Confirme sua senha"
+            value={confirmPassword}
+            onChange={e => {
+              setConfirmPassword(e.target.value)
+              if (confirmPasswordError) setConfirmPasswordError(null)
+            }}
+            aria-invalid={Boolean(confirmPasswordError)}
+            aria-describedby={confirmPasswordError ? 'confirmPassword-error' : undefined}
+          />
+          {confirmPasswordError && (
+            <span id="confirmPassword-error" style={{ color: 'red', fontSize: 12 }}>
+              {confirmPasswordError}
+            </span>
+          )}
+        </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <input
