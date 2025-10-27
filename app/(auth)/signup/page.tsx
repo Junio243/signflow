@@ -12,10 +12,17 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [consentGiven, setConsentGiven] = useState(false)
 
   const cadastrar = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null); setInfo(null); setLoading(true)
+    setError(null)
+    setInfo(null)
+    if (!consentGiven) {
+      setError('Para criar sua conta é necessário aceitar a Política de Privacidade e os Termos de Uso, em conformidade com a LGPD e a legislação do DF.')
+      return
+    }
+    setLoading(true)
     if (!supabaseClient) {
       setError('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
       setLoading(false)
@@ -45,6 +52,19 @@ export default function SignUpPage() {
                value={email} onChange={e => setEmail(e.target.value)} />
         <input type="password" placeholder="Crie uma senha" required
                value={password} onChange={e => setPassword(e.target.value)} />
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={consentGiven}
+            onChange={e => setConsentGiven(e.target.checked)}
+            required
+          />
+          <span>
+            Estou ciente e concordo com a{' '}
+            <a href="/privacy">Política de Privacidade</a> e com os{' '}
+            <a href="/terms">Termos de Uso</a>, em conformidade com a Lei Geral de Proteção de Dados (LGPD) e a legislação vigente no Distrito Federal (DF).
+          </span>
+        </label>
         <button type="submit" disabled={loading}>
           {loading ? 'Cadastrando...' : 'Criar conta'}
         </button>
