@@ -88,54 +88,64 @@ export default function ValidatePage() {
     })()
   }, [id])
 
-  const theme = useMemo(() => {
+  const theme = useMemo<Record<string, unknown>>(() => {
     const currentDoc = doc
-    if (!currentDoc) return {}
+    if (!currentDoc) return {} as Record<string, unknown>
 
-    let snap = currentDoc.validation_theme_snapshot || null
-    if (!snap && currentDoc.metadata && typeof currentDoc.metadata === 'object') {
-      const meta = currentDoc.metadata as any
-      snap = meta.validation_theme_snapshot || meta.theme || null
+    let snap: unknown = currentDoc.validation_theme_snapshot ?? null
+
+    if (
+      (!snap || typeof snap !== 'object' || Array.isArray(snap)) &&
+      currentDoc.metadata &&
+      typeof currentDoc.metadata === 'object' &&
+      !Array.isArray(currentDoc.metadata)
+    ) {
+      const meta = currentDoc.metadata as Record<string, unknown>
+      const fallbackSnap = (meta.validation_theme_snapshot ?? meta.theme) as unknown
+      if (fallbackSnap && typeof fallbackSnap === 'object' && !Array.isArray(fallbackSnap)) {
+        snap = fallbackSnap
+      }
     }
 
-    if (snap && typeof snap === 'object') {
+    if (snap && typeof snap === 'object' && !Array.isArray(snap)) {
       return snap as Record<string, unknown>
     }
 
-    return {}
+    return {} as Record<string, unknown>
   }, [doc])
 
   const safeTrim = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
 
-  const color = typeof theme.color === 'string' && theme.color.trim() ? theme.color : '#2563eb'
+  const readThemeString = (snapshot: Record<string, unknown>, key: string, fallback = '') => {
+    const raw = snapshot[key]
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim()
+      if (trimmed) return trimmed
+    }
+    return fallback
+  }
+
+  const color = readThemeString(theme, 'color', '#2563eb')
   const primarySigner = useMemo(() => (events.length ? events[events.length - 1] : null), [events])
 
-  const issuerFromTheme = typeof theme.issuer === 'string' && theme.issuer.trim() ? theme.issuer : 'Instituição/Profissional'
-  const regFromTheme = typeof theme.reg === 'string' && theme.reg.trim() ? theme.reg : 'Registro'
+  const issuerFromTheme = readThemeString(theme, 'issuer', 'Instituição/Profissional')
+  const regFromTheme = readThemeString(theme, 'reg', 'Registro')
   const issuer = safeTrim(primarySigner?.signer_name) || issuerFromTheme
   const reg = safeTrim(primarySigner?.signer_reg) || regFromTheme
   const footer = typeof theme.footer === 'string' ? theme.footer : ''
   const primaryLogo = safeTrim(primarySigner?.logo_url)
-  const themeLogo = safeTrim(theme.logo_url)
+  const themeLogo = readThemeString(theme, 'logo_url')
   const logo = primaryLogo
     ? primaryLogo
     : themeLogo
       ? themeLogo
       : null
-  const certificateTypeFromTheme = typeof theme.certificate_type === 'string' && theme.certificate_type.trim()
-    ? theme.certificate_type
-    : 'Certificado digital (modelo padrão)'
+  const certificateTypeFromTheme = readThemeString(theme, 'certificate_type', 'Certificado digital (modelo padrão)')
   const certificateType = safeTrim(primarySigner?.certificate_type) || certificateTypeFromTheme
-  const certificateIssuer = safeTrim(primarySigner?.certificate_issuer) || (
-    typeof theme.certificate_issuer === 'string' && theme.certificate_issuer.trim()
-      ? theme.certificate_issuer
-      : null
-  )
-  const certificateValidUntilValue = primarySigner?.certificate_valid_until || (() => {
-    const certificateValidUntilRaw = theme.certificate_valid_until as string | null | undefined
-    if (typeof certificateValidUntilRaw === 'string') return certificateValidUntilRaw
-    return certificateValidUntilRaw != null ? String(certificateValidUntilRaw) : null
-  })()
+  const certificateIssuerFromTheme = readThemeString(theme, 'certificate_issuer')
+  const certificateIssuer = safeTrim(primarySigner?.certificate_issuer) || certificateIssuerFromTheme || null
+  const certificateValidUntilFromTheme = readThemeString(theme, 'certificate_valid_until')
+  const certificateValidUntilValue = safeTrim(primarySigner?.certificate_valid_until) || certificateValidUntilFromTheme
 
   const certificateValidUntil = useMemo(() => {
     if (!certificateValidUntilValue) return null
