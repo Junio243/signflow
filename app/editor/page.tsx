@@ -150,6 +150,7 @@ export default function EditorPage() {
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [profileId, setProfileId] = useState<string | null>(null)
   const [profileFormOpen, setProfileFormOpen] = useState(false)
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
   const [profileName, setProfileName] = useState('')
   const [profileType, setProfileType] = useState<ProfileType>('generico')
   const [profileColor, setProfileColor] = useState(DEFAULT_THEME_COLOR)
@@ -158,8 +159,10 @@ export default function EditorPage() {
   const [profileFooter, setProfileFooter] = useState(DEFAULT_THEME_FOOTER)
   const [profileLogoFile, setProfileLogoFile] = useState<File | null>(null)
   const [profileLogoPreview, setProfileLogoPreview] = useState<string | null>(null)
+  const [profileLogoExistingUrl, setProfileLogoExistingUrl] = useState<string | null>(null)
   const [profileFormStatus, setProfileFormStatus] = useState<StatusMessage | null>(null)
   const [profileFormBusy, setProfileFormBusy] = useState(false)
+  const [profileActionBusyId, setProfileActionBusyId] = useState<string | null>(null)
 
   const [status, setStatus] = useState<StatusMessage | null>(null)
   const [busy, setBusy] = useState(false)
@@ -177,8 +180,10 @@ export default function EditorPage() {
     setProfileReg(DEFAULT_THEME_REG)
     setProfileFooter(DEFAULT_THEME_FOOTER)
     setProfileLogoFile(null)
+    setProfileLogoExistingUrl(null)
     setProfileLogoPreview(null)
     setProfileFormStatus(null)
+    setEditingProfileId(null)
   }
 
   const loadProfiles = useCallback(async ({ selectId }: { selectId?: string | null } = {}) => {
@@ -245,7 +250,7 @@ export default function EditorPage() {
 
   useEffect(() => {
     if (!profileLogoFile) {
-      setProfileLogoPreview(null)
+      setProfileLogoPreview(profileLogoExistingUrl ?? null)
       return
     }
     const objectUrl = URL.createObjectURL(profileLogoFile)
@@ -257,7 +262,7 @@ export default function EditorPage() {
         /* noop */
       }
     }
-  }, [profileLogoFile])
+  }, [profileLogoFile, profileLogoExistingUrl])
 
   // ---------- NOVA LÓGICA: usar PDF.js (dynamically) para obter páginas/dimensões ----------
   useEffect(() => {
@@ -399,7 +404,7 @@ export default function EditorPage() {
     }
   }
 
-  const handleCreateProfile = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmitProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (profileFormBusy) return
 
@@ -409,7 +414,10 @@ export default function EditorPage() {
     }
 
     setProfileFormBusy(true)
-    setProfileFormStatus({ tone: 'neutral', text: 'Salvando perfil...' })
+    setProfileFormStatus({
+      tone: 'neutral',
+      text: editingProfileId ? 'Atualizando perfil...' : 'Salvando perfil...'
+    })
 
     try {
       const client = supabaseClient
@@ -418,7 +426,7 @@ export default function EditorPage() {
         return
       }
 
-      let logoUrl: string | null = null
+      let logoUrl: string | null = profileLogoExistingUrl
       if (profileLogoFile) {
         const storageKey = `branding/${Date.now()}-${profileLogoFile.name}`
         const upload = await client.storage.from('signflow').upload(storageKey, profileLogoFile, {
@@ -430,6 +438,7 @@ export default function EditorPage() {
         }
         const publicUrl = await client.storage.from('signflow').getPublicUrl(storageKey)
         logoUrl = publicUrl.data?.publicUrl ?? null
+        setProfileLogoExistingUrl(logoUrl)
       }
 
       const theme = {
@@ -440,33 +449,108 @@ export default function EditorPage() {
         logo_url: logoUrl,
       }
 
-      const insert = await client
-        .from('validation_profiles')
-        .insert({ name: profileName.trim(), type: profileType, theme })
-        .select('id')
-        .single()
+      if (editingProfileId) {
+        const updatedId = editingProfileId
+        const update = await client
+          .from('validation_profiles')
+          .update({ name: profileName.trim(), type: profileType, theme })
+          .eq('id', editingProfileId)
 
-      if (insert.error) {
-        throw new Error(insert.error.message)
-      }
+        if (update.error) {
+          throw new Error(update.error.message)
+        }
 
-      const newId = insert.data?.id ?? null
-      const hadNoProfiles = profiles.length === 0
+        await loadProfiles({ selectId: updatedId })
+        resetProfileForm()
+        setProfileFormStatus({ tone: 'success', text: 'Perfil atualizado com sucesso!' })
+        setSuccess('Perfil de validação atualizado com sucesso!')
+      } else {
+        const insert = await client
+          .from('validation_profiles')
+          .insert({ name: profileName.trim(), type: profileType, theme })
+          .select('id')
+          .single()
 
-      resetProfileForm()
-      setProfileFormStatus({ tone: 'success', text: 'Perfil criado com sucesso!' })
-      setSuccess('Perfil de validação criado com sucesso! Selecione-o na lista abaixo.')
+        if (insert.error) {
+          throw new Error(insert.error.message)
+        }
 
-      await loadProfiles({ selectId: newId })
+        const newId = insert.data?.id ?? null
+        const hadNoProfiles = profiles.length === 0
 
-      if (hadNoProfiles && newId) {
-        setProfileFormOpen(false)
+        resetProfileForm()
+        setProfileFormStatus({ tone: 'success', text: 'Perfil criado com sucesso!' })
+        setSuccess('Perfil de validação criado com sucesso! Selecione-o na lista abaixo.')
+
+        await loadProfiles({ selectId: newId })
+
+        if (hadNoProfiles && newId) {
+          setProfileFormOpen(false)
+        }
       }
     } catch (err: any) {
-      console.error('[Editor] Falha ao criar perfil de validação', err)
-      setProfileFormStatus({ tone: 'error', text: err?.message || 'Não foi possível criar o perfil.' })
+      console.error('[Editor] Falha ao salvar perfil de validação', err)
+      setProfileFormStatus({ tone: 'error', text: err?.message || 'Não foi possível salvar o perfil.' })
     } finally {
       setProfileFormBusy(false)
+    }
+  }
+
+  const handleEditProfile = (profile: Profile) => {
+    setProfileFormOpen(true)
+    setEditingProfileId(profile.id)
+    setProfileName(profile.name)
+    setProfileType(profile.type)
+    setProfileColor(profile.theme?.color ?? DEFAULT_THEME_COLOR)
+    setProfileIssuer(profile.theme?.issuer ?? DEFAULT_THEME_ISSUER)
+    setProfileReg(profile.theme?.reg ?? DEFAULT_THEME_REG)
+    setProfileFooter(profile.theme?.footer ?? DEFAULT_THEME_FOOTER)
+    setProfileLogoFile(null)
+    const existingLogo = profile.theme?.logo_url ?? null
+    setProfileLogoExistingUrl(existingLogo)
+    setProfileLogoPreview(existingLogo)
+    setProfileFormStatus(null)
+  }
+
+  const handleDeleteProfile = async (id: string) => {
+    if (profileActionBusyId) return
+    const confirmed = window.confirm('Tem certeza de que deseja excluir este perfil?')
+    if (!confirmed) return
+
+    if (!supabaseClient) {
+      setStatus({
+        tone: 'error',
+        text: 'Serviço de perfis indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.',
+      })
+      return
+    }
+
+    setProfileActionBusyId(id)
+    setStatus({ tone: 'neutral', text: 'Excluindo perfil...' })
+
+    try {
+      const { error } = await supabaseClient.from('validation_profiles').delete().eq('id', id)
+
+      if (error) {
+        throw new Error(error.message)
+      }
+
+      setSuccess('Perfil excluído com sucesso.')
+
+      if (editingProfileId === id) {
+        resetProfileForm()
+      }
+
+      if (profileId === id) {
+        setProfileId(null)
+      }
+
+      await loadProfiles()
+    } catch (err: any) {
+      console.error('[Editor] Falha ao excluir perfil de validação', err)
+      setError(err?.message || 'Não foi possível excluir o perfil.')
+    } finally {
+      setProfileActionBusyId(null)
     }
   }
 
@@ -531,6 +615,9 @@ export default function EditorPage() {
   const handleProfileLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null
     setProfileLogoFile(file)
+    if (file) {
+      setProfileLogoExistingUrl(null)
+    }
   }
 
   const handlePageChange = (page: number) => {
@@ -983,7 +1070,14 @@ export default function EditorPage() {
                     Personalize o carimbo de validação com dados do profissional ou da instituição.
                   </p>
                 </div>
-                <SecondaryButton type="button" onClick={() => setProfileFormOpen(true)} disabled={profileFormBusy}>
+                <SecondaryButton
+                  type="button"
+                  onClick={() => {
+                    resetProfileForm()
+                    setProfileFormOpen(true)
+                  }}
+                  disabled={profileFormBusy}
+                >
                   Novo perfil
                 </SecondaryButton>
               </div>
@@ -993,30 +1087,53 @@ export default function EditorPage() {
                   {profiles.map(profile => {
                     const badge = profileBadge(profile.type)
                     return (
-                      <li key={profile.id}>
-                        <label className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-sm transition ${
-                          profileId === profile.id
-                            ? 'border-blue-300 bg-blue-50'
-                            : 'border-slate-200 hover:border-slate-300'
-                        }`}>
-                          <input
-                            type="radio"
-                            name="profile"
-                            value={profile.id}
-                            checked={profileId === profile.id}
-                            onChange={() => setProfileId(profile.id)}
-                            className="mt-1"
-                          />
-                          <div className="flex-1 space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className={`rounded-full px-2 py-1 text-xs font-medium ${badge}`}>{PROFILE_TYPE_LABEL[profile.type]}</span>
-                              <span className="font-semibold text-slate-900">{profile.name}</span>
+                      <li key={profile.id} className="space-y-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <label
+                            className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-sm transition ${
+                              profileId === profile.id
+                                ? 'border-blue-300 bg-blue-50'
+                                : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="profile"
+                              value={profile.id}
+                              checked={profileId === profile.id}
+                              onChange={() => setProfileId(profile.id)}
+                              className="mt-1"
+                            />
+                            <div className="flex-1 space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`rounded-full px-2 py-1 text-xs font-medium ${badge}`}>
+                                  {PROFILE_TYPE_LABEL[profile.type]}
+                                </span>
+                                <span className="font-semibold text-slate-900">{profile.name}</span>
+                              </div>
+                              <p className="text-xs text-slate-500">
+                                Emissor: {profile.theme?.issuer || '—'} · Registro: {profile.theme?.reg || '—'}
+                              </p>
                             </div>
-                            <p className="text-xs text-slate-500">
-                              Emissor: {profile.theme?.issuer || '—'} · Registro: {profile.theme?.reg || '—'}
-                            </p>
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            <SecondaryButton
+                              type="button"
+                              onClick={() => handleEditProfile(profile)}
+                              disabled={profileFormBusy || profileActionBusyId === profile.id}
+                            >
+                              Editar
+                            </SecondaryButton>
+                            <SecondaryButton
+                              type="button"
+                              onClick={() => handleDeleteProfile(profile.id)}
+                              disabled={profileFormBusy || profileActionBusyId === profile.id}
+                              className="border-red-200 text-red-600 hover:bg-red-50 focus-visible:outline-red-500"
+                            >
+                              Excluir
+                            </SecondaryButton>
                           </div>
-                        </label>
+                        </div>
                       </li>
                     )
                   })}
@@ -1028,9 +1145,11 @@ export default function EditorPage() {
               )}
 
               {profileFormOpen && (
-                <form onSubmit={handleCreateProfile} className="mt-6 space-y-4">
+                <form onSubmit={handleSubmitProfile} className="mt-6 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-slate-900">Novo perfil</h3>
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      {editingProfileId ? 'Editar perfil' : 'Novo perfil'}
+                    </h3>
                     <SecondaryButton
                       type="button"
                       onClick={() => {
@@ -1170,7 +1289,13 @@ export default function EditorPage() {
                       Limpar campos
                     </SecondaryButton>
                     <PrimaryButton type="submit" disabled={profileFormBusy}>
-                      {profileFormBusy ? 'Salvando…' : 'Salvar perfil'}
+                      {profileFormBusy
+                        ? editingProfileId
+                          ? 'Atualizando…'
+                          : 'Salvando…'
+                        : editingProfileId
+                          ? 'Atualizar perfil'
+                          : 'Salvar perfil'}
                     </PrimaryButton>
                   </div>
                 </form>
