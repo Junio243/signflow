@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { type ReactNode, useState } from 'react'
+
 import { supabase } from '@/lib/supabaseClient'
 
 export default function SignUpPage() {
@@ -13,47 +15,145 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
 
-  const cadastrar = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null); setInfo(null); setLoading(true)
+  const cadastrar = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError(null)
+    setInfo(null)
+    setLoading(true)
+
     if (!supabaseClient) {
-      setError('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+      setError(
+        'Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.'
+      )
       setLoading(false)
       return
     }
+
     const { error } = await supabaseClient.auth.signUp({ email, password })
+
     setLoading(false)
-    if (error) { setError(error.message); return }
+
+    if (error) {
+      setError(error.message)
+      return
+    }
+
     setInfo('Cadastro criado! Confirme seu e-mail (se obrigatório) e faça login.')
     setTimeout(() => router.replace('/login'), 1200)
   }
 
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
+      <div className="w-full max-w-md">
+        <div className="rounded-2xl bg-white p-8 shadow-lg ring-1 ring-slate-950/5">
+          {children}
+        </div>
+      </div>
+    </main>
+  )
+
   if (!supabaseClient) {
     return (
-      <div style={{ maxWidth: 360, margin: '40px auto', padding: 16 }}>
-        <h1>Cadastrar</h1>
-        <p>Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.</p>
-      </div>
+      <Wrapper>
+        <div className="space-y-4 text-center">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Cadastrar</h1>
+            <p className="text-sm text-slate-600">
+              Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.
+            </p>
+          </div>
+        </div>
+      </Wrapper>
     )
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: '40px auto', padding: 16 }}>
-      <h1>Cadastrar</h1>
-      <form onSubmit={cadastrar} style={{ display: 'grid', gap: 8 }}>
-        <input type="email" placeholder="seu@email.com" required
-               value={email} onChange={e => setEmail(e.target.value)} />
-        <input type="password" placeholder="Crie uma senha" required
-               value={password} onChange={e => setPassword(e.target.value)} />
-        <button type="submit" disabled={loading}>
-          {loading ? 'Cadastrando...' : 'Criar conta'}
-        </button>
-      </form>
-      <p style={{ marginTop: 12 }}>
-        Já tem conta? <a href="/login">Entrar</a>
-      </p>
-      {error && <p style={{ color: 'red', marginTop: 12 }}>Erro: {error}</p>}
-      {info && <p style={{ color: 'green', marginTop: 12 }}>{info}</p>}
-    </div>
+    <Wrapper>
+      <div className="space-y-8">
+        <header className="space-y-2 text-center">
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Crie sua conta</h1>
+          <p className="text-sm text-slate-600">
+            Cadastre-se para começar a enviar e gerenciar seus documentos com segurança.
+          </p>
+        </header>
+
+        <form className="space-y-4" onSubmit={cadastrar} noValidate>
+          <div className="space-y-1">
+            <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+              E-mail
+            </label>
+            <input
+              id="email"
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="seu@email.com"
+              value={email}
+              onChange={event => setEmail(event.target.value)}
+              className="input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+            />
+            <p className="text-xs text-slate-500">Usaremos este endereço para confirmar seu cadastro.</p>
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+              Senha
+            </label>
+            <input
+              id="password"
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              placeholder="Crie uma senha segura"
+              value={password}
+              onChange={event => setPassword(event.target.value)}
+              className="input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+            />
+            <p className="text-xs text-slate-500">Mínimo de 8 caracteres, preferencialmente com letras e números.</p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? 'Cadastrando…' : 'Criar conta'}
+          </button>
+        </form>
+
+        <div className="space-y-3">
+          {error && (
+            <p
+              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600"
+              role="alert"
+              aria-live="assertive"
+            >
+              Erro: {error}
+            </p>
+          )}
+
+          {info && (
+            <p
+              className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-700"
+              role="status"
+              aria-live="polite"
+            >
+              {info}
+            </p>
+          )}
+
+          <p className="text-center text-sm text-slate-600">
+            Já tem conta?{' '}
+            <Link
+              href="/login"
+              className="font-semibold text-brand-600 transition hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+            >
+              Entrar
+            </Link>
+          </p>
+        </div>
+      </div>
+    </Wrapper>
   )
 }
