@@ -18,10 +18,10 @@ type SessionUser = {
 }
 
 const NAV_LINKS = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/settings', label: 'Configurações' },
-  { href: '/orgs', label: 'Organizações' },
-  { href: '/contato', label: 'Contato' },
+  { href: '/dashboard', label: 'Dashboard', requiresAuth: true },
+  { href: '/settings', label: 'Configurações', requiresAuth: true },
+  { href: '/orgs', label: 'Organizações', requiresAuth: true },
+  { href: '/contato', label: 'Contato', requiresAuth: false },
 ]
 
 const LANDING_LINKS = [
@@ -102,12 +102,14 @@ export default function HeaderClient() {
   }, [router, supabase, user])
 
   const navLinks = useMemo(() => {
+    const filteredNavLinks = user ? NAV_LINKS : NAV_LINKS.filter(link => !link.requiresAuth)
+
     if (pathname === '/') {
-      return [...LANDING_LINKS, ...NAV_LINKS]
+      return [...LANDING_LINKS, ...filteredNavLinks]
     }
 
-    return NAV_LINKS
-  }, [pathname])
+    return filteredNavLinks
+  }, [pathname, user])
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur">
