@@ -40,10 +40,10 @@ export default function OrgsPage() {
           Acesse uma organização existente ou cadastre uma nova para começar a convidar membros e aplicar políticas.
         </p>
         <Link
-          href="/dashboard"
+          href="/orgs/new"
           className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-700"
         >
-          Abrir painel
+          Criar organização
         </Link>
       </section>
     </div>
