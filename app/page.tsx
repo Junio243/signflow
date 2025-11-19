@@ -511,7 +511,7 @@ const css = `
 .trusted{background:#fff;border-top:1px solid rgba(148,163,184,.25);border-bottom:1px solid rgba(148,163,184,.25);padding:26px 0 30px}
 .trusted-title{margin:0;text-align:center;font-size:18px;letter-spacing:.08em;text-transform:uppercase;color:#475569}
 .trusted-sub{text-align:center;color:#334155;margin:6px 0 14px}
-.logos-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;align-items:stretch;margin:22px 0 10px}
+.logos-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;align-items:stretch;margin:22px 0 10px}
 .seal-card{--seal-accent:#0f172a;--seal-bg:#f8fafc;display:flex;align-items:center;gap:14px;padding:16px;border-radius:18px;border:1px solid rgba(15,23,42,.12);background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(226,232,240,.55));box-shadow:0 14px 32px rgba(15,23,42,.08);min-height:104px}
 .seal-art{width:56px;height:56px;border-radius:14px;border:2px solid var(--seal-accent);background:var(--seal-bg);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(15,23,42,.12)}
 .seal-svg{width:42px;height:42px}
@@ -537,7 +537,10 @@ const css = `
 .card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;min-height:158px}
 .card-ico{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:var(--ring);color:var(--primary)}
 .card h3{margin:10px 0 6px}
-.card p{margin:0;color:var(--muted)}
+.card p{margin:0;color:var(--muted);line-height:1.6}
+.feature{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.feature h3{margin:0}
+.feature p{margin:0;color:var(--muted);line-height:1.6}
 .demo{margin-top:20px}
 .demo-video{width:100%;max-width:720px;border:1px solid var(--border);border-radius:12px;display:block;margin:0 auto}
 .center{text-align:center}
@@ -550,7 +553,7 @@ const css = `
 .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
 .quote{background:#fff;border:1px solid rgba(148,163,184,.4);border-radius:16px;padding:18px;box-shadow:0 12px 28px rgba(15,23,42,.08);display:flex;flex-direction:column;gap:8px}
 .q-logo{display:flex;align-items:center;gap:8px}
-.q-text{margin:0;color:#1e293b;font-size:16px}
+.q-text{margin:0;color:#1e293b;font-size:16px;line-height:1.6}
 .q-author{color:#475569;font-size:13px;text-transform:uppercase;letter-spacing:.08em}
 
 /* PRICING */
@@ -597,14 +600,19 @@ const css = `
 /* RESPONSIVO */
 @media (max-width: 1080px){
   .hero-grid{grid-template-columns:1fr}
-  .grid-4{grid-template-columns:1fr 1fr}
-  .grid-3{grid-template-columns:1fr}
+  .grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}
   .grid-2{grid-template-columns:1fr}
-  .logos-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .logos-row{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+}
+@media (max-width: 768px){
+  .grid-4,.grid-3{grid-template-columns:1fr;gap:16px}
+  .card,.feature,.quote{padding:14px}
+  .q-text{font-size:15px}
 }
 @media (max-width: 680px){
   .cta-box{flex-direction:column;align-items:flex-start}
-  .logos-row{grid-template-columns:1fr}
+  .logos-row{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
 }
 `
 
