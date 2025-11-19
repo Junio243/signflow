@@ -518,29 +518,44 @@ const css = `
 .trusted{background:#fff;border-top:1px solid rgba(148,163,184,.25);border-bottom:1px solid rgba(148,163,184,.25);padding:26px 0 30px}
 .trusted-title{margin:0;text-align:center;font-size:18px;letter-spacing:.08em;text-transform:uppercase;color:#475569}
 .trusted-sub{text-align:center;color:#334155;margin:6px 0 14px}
-.logos-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;align-items:stretch;margin:22px 0 10px}
-.seal-card{--seal-accent:#0f172a;--seal-bg:#f8fafc;display:flex;align-items:center;gap:14px;padding:16px;border-radius:18px;border:1px solid rgba(15,23,42,.12);background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(226,232,240,.55));box-shadow:0 14px 32px rgba(15,23,42,.08);min-height:104px;transition:transform .22s ease, box-shadow .24s ease, border-color .22s ease;outline:none}
-.seal-card:hover{transform:translateY(-2px) scale(1.01);box-shadow:0 18px 36px rgba(15,23,42,.12);border-color:rgba(0,91,170,.35)}
-.seal-card:focus-visible{transform:translateY(-2px) scale(1.01);box-shadow:0 0 0 4px var(--ring),0 18px 36px rgba(15,23,42,.12);border-color:var(--primary)}
-.seal-art{width:56px;height:56px;border-radius:14px;border:2px solid var(--seal-accent);background:var(--seal-bg);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(15,23,42,.12)}
-.seal-svg{width:42px;height:42px}
-.seal-meta{display:flex;flex-direction:column;gap:4px}
-.seal-name{font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--seal-accent)}
-.seal-desc{font-size:12px;line-height:1.45;color:#1f2937}
-.seal-icp{--seal-accent:#0b5cab;--seal-bg:#e8f1ff}
-.seal-dataprev{--seal-accent:#0b6c4d;--seal-bg:#e0f7eb}
-.seal-govbr{--seal-accent:#0b5cab;--seal-bg:#e3edff}
-.seal-secure{--seal-accent:#0f172a;--seal-bg:#e6fbea}
-.seal-lgpd{--seal-accent:#2563eb;--seal-bg:#e0ecff}
-.logo-chip{display:flex;gap:10px;align-items:center;justify-content:flex-start;border:1px solid transparent;border-radius:12px;padding:4px 6px;transition:transform .2s ease, box-shadow .24s ease, border-color .2s ease;outline:none;background:rgba(255,255,255,.8)}
-.logo-chip:hover{transform:translateY(-2px) scale(1.01);box-shadow:0 12px 28px rgba(15,23,42,.12);border-color:rgba(0,91,170,.28)}
-.logo-chip:focus-visible{transform:translateY(-2px) scale(1.01);box-shadow:0 0 0 4px var(--ring),0 12px 28px rgba(15,23,42,.12);border-color:var(--primary)}
-.logo-chip.compact .logo-name{display:none}
-.logo-svg{width:110px;height:40px;border-radius:10px;box-shadow:0 10px 24px rgba(15,23,42,.08)}
-.logo-name{font-size:12px;color:#334155}
-.compliance{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:18px 0 6px}
-.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:999px;background:#fff;padding:8px 12px;color:var(--txt)}
 
+/* Mantendo a disposição em grid das logos, com colunas responsivas */
+.logos-row{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:16px;
+  align-items:stretch;
+  margin:22px 0 10px;
+}
+
+/* Cartões de selos com transições e foco */
+.seal-card{
+  --seal-accent:#0f172a;
+  --seal-bg:#f8fafc;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:16px;
+  border-radius:18px;
+  border:1px solid rgba(15,23,42,.12);
+  background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(226,232,240,.55));
+  box-shadow:0 14px 32px rgba(15,23,42,.08);
+  min-height:104px;
+  transition:transform .22s ease, box-shadow .24s ease, border-color .22s ease;
+  outline:none;
+}
+
+.seal-card:hover{
+  transform:translateY(-2px) scale(1.01);
+  box-shadow:0 18px 36px rgba(15,23,42,.12);
+  border-color:rgba(0,91,170,.35);
+}
+
+.seal-card:focus-visible{
+  transform:translateY(-2px) scale(1.01);
+  box-shadow:0 0 0 4px var(--ring),0 18px 36px rgba(15,23,42,.12);
+  border-color:var(--primary);
+}
 /* HOW */
 .how{background:#f8fafc;border-top:1px solid #eef2ff;border-bottom:1px solid #eef2ff;padding:52px 0}
 .how h2{margin:0 0 6px}
@@ -548,7 +563,10 @@ const css = `
 .card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;min-height:158px}
 .card-ico{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:var(--ring);color:var(--primary)}
 .card h3{margin:10px 0 6px}
-.card p{margin:0;color:var(--muted)}
+.card p{margin:0;color:var(--muted);line-height:1.6}
+.feature{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.feature h3{margin:0}
+.feature p{margin:0;color:var(--muted);line-height:1.6}
 .demo{margin-top:20px}
 .demo-video{width:100%;max-width:720px;border:1px solid var(--border);border-radius:12px;display:block;margin:0 auto}
 .center{text-align:center}
@@ -561,7 +579,7 @@ const css = `
 .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
 .quote{background:#fff;border:1px solid rgba(148,163,184,.4);border-radius:16px;padding:18px;box-shadow:0 12px 28px rgba(15,23,42,.08);display:flex;flex-direction:column;gap:8px}
 .q-logo{display:flex;align-items:center;gap:8px}
-.q-text{margin:0;color:#1e293b;font-size:16px}
+.q-text{margin:0;color:#1e293b;font-size:16px;line-height:1.6}
 .q-author{color:#475569;font-size:13px;text-transform:uppercase;letter-spacing:.08em}
 
 /* PRICING */
@@ -612,14 +630,19 @@ const css = `
 /* RESPONSIVO */
 @media (max-width: 1080px){
   .hero-grid{grid-template-columns:1fr}
-  .grid-4{grid-template-columns:1fr 1fr}
-  .grid-3{grid-template-columns:1fr}
+  .grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}
   .grid-2{grid-template-columns:1fr}
-  .logos-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .logos-row{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+}
+@media (max-width: 768px){
+  .grid-4,.grid-3{grid-template-columns:1fr;gap:16px}
+  .card,.feature,.quote{padding:14px}
+  .q-text{font-size:15px}
 }
 @media (max-width: 680px){
   .cta-box{flex-direction:column;align-items:flex-start}
-  .logos-row{grid-template-columns:1fr}
+  .logos-row{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
 }
 `
 
