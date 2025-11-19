@@ -278,7 +278,7 @@ function PriceCard({ title, price, bullets, featured, cta }:{
   title:string; price:string; bullets:string[]; featured?:boolean; cta:React.ReactNode
 }) {
   return (
-    <div className={`price ${featured ? 'featured': ''}`}>
+    <div className={`price ${featured ? 'featured': ''}`} tabIndex={0}>
       <div className="price-head">
         <div className="price-title">{title}</div>
         <div className="price-amount">{price}</div>
@@ -305,7 +305,13 @@ function BrandLogo({ variant, label, compact }:{
     gdf: { bg:'#005BAA', fg:'#FFFFFF', txt:'GDF' },
   }[variant]
   return (
-    <div className={`logo-chip ${compact?'compact':''}`} role="listitem" aria-label={label} title={label}>
+    <div
+      className={`logo-chip ${compact?'compact':''}`}
+      role="listitem"
+      aria-label={label}
+      title={label}
+      tabIndex={0}
+    >
       <svg viewBox="0 0 110 40" className="logo-svg" aria-hidden>
         <rect x="0" y="0" width="110" height="40" rx="8" fill={map.bg}/>
         <text x="14" y="26" fontFamily="'Inter', 'Segoe UI', sans-serif" fontSize="18" fontWeight="800" fill={map.fg}>{map.txt}</text>
@@ -388,6 +394,7 @@ function OfficialSeal({ variant, label, description, icon }:OfficialSealProps) {
       role="listitem"
       aria-labelledby={`${baseId}-title`}
       aria-describedby={`${baseId}-desc`}
+      tabIndex={0}
     >
       <div className="seal-art" aria-hidden>
         {icon}
@@ -511,25 +518,44 @@ const css = `
 .trusted{background:#fff;border-top:1px solid rgba(148,163,184,.25);border-bottom:1px solid rgba(148,163,184,.25);padding:26px 0 30px}
 .trusted-title{margin:0;text-align:center;font-size:18px;letter-spacing:.08em;text-transform:uppercase;color:#475569}
 .trusted-sub{text-align:center;color:#334155;margin:6px 0 14px}
-.logos-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;align-items:stretch;margin:22px 0 10px}
-.seal-card{--seal-accent:#0f172a;--seal-bg:#f8fafc;display:flex;align-items:center;gap:14px;padding:16px;border-radius:18px;border:1px solid rgba(15,23,42,.12);background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(226,232,240,.55));box-shadow:0 14px 32px rgba(15,23,42,.08);min-height:104px}
-.seal-art{width:56px;height:56px;border-radius:14px;border:2px solid var(--seal-accent);background:var(--seal-bg);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(15,23,42,.12)}
-.seal-svg{width:42px;height:42px}
-.seal-meta{display:flex;flex-direction:column;gap:4px}
-.seal-name{font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--seal-accent)}
-.seal-desc{font-size:12px;line-height:1.45;color:#1f2937}
-.seal-icp{--seal-accent:#0b5cab;--seal-bg:#e8f1ff}
-.seal-dataprev{--seal-accent:#0b6c4d;--seal-bg:#e0f7eb}
-.seal-govbr{--seal-accent:#0b5cab;--seal-bg:#e3edff}
-.seal-secure{--seal-accent:#0f172a;--seal-bg:#e6fbea}
-.seal-lgpd{--seal-accent:#2563eb;--seal-bg:#e0ecff}
-.logo-chip{display:flex;gap:10px;align-items:center;justify-content:flex-start}
-.logo-chip.compact .logo-name{display:none}
-.logo-svg{width:110px;height:40px;border-radius:10px;box-shadow:0 10px 24px rgba(15,23,42,.08)}
-.logo-name{font-size:12px;color:#334155}
-.compliance{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:18px 0 6px}
-.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:999px;background:#fff;padding:8px 12px;color:var(--txt)}
 
+/* Mantendo a disposição em grid das logos, com colunas responsivas */
+.logos-row{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:16px;
+  align-items:stretch;
+  margin:22px 0 10px;
+}
+
+/* Cartões de selos com transições e foco */
+.seal-card{
+  --seal-accent:#0f172a;
+  --seal-bg:#f8fafc;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:16px;
+  border-radius:18px;
+  border:1px solid rgba(15,23,42,.12);
+  background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(226,232,240,.55));
+  box-shadow:0 14px 32px rgba(15,23,42,.08);
+  min-height:104px;
+  transition:transform .22s ease, box-shadow .24s ease, border-color .22s ease;
+  outline:none;
+}
+
+.seal-card:hover{
+  transform:translateY(-2px) scale(1.01);
+  box-shadow:0 18px 36px rgba(15,23,42,.12);
+  border-color:rgba(0,91,170,.35);
+}
+
+.seal-card:focus-visible{
+  transform:translateY(-2px) scale(1.01);
+  box-shadow:0 0 0 4px var(--ring),0 18px 36px rgba(15,23,42,.12);
+  border-color:var(--primary);
+}
 /* HOW */
 .how{background:#f8fafc;border-top:1px solid #eef2ff;border-bottom:1px solid #eef2ff;padding:52px 0}
 .how h2{margin:0 0 6px}
@@ -559,8 +585,12 @@ const css = `
 /* PRICING */
 .pricing{background:#fff;padding:56px 0}
 .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-.price{background:#fff;border:1px solid rgba(148,163,184,.4);border-radius:14px;padding:22px;box-shadow:0 8px 24px rgba(15,23,42,.08)}
+.price{background:#fff;border:1px solid rgba(148,163,184,.4);border-radius:14px;padding:22px;box-shadow:0 8px 24px rgba(15,23,42,.08);transition:transform .2s ease, box-shadow .24s ease, border-color .2s ease;outline:none}
+.price:hover{transform:translateY(-3px) scale(1.01);box-shadow:0 12px 30px rgba(15,23,42,.12);border-color:rgba(0,91,170,.3)}
+.price:focus-visible{transform:translateY(-3px) scale(1.01);box-shadow:0 0 0 4px var(--ring),0 12px 30px rgba(15,23,42,.12);border-color:var(--primary)}
 .price.featured{border-color:var(--primary);box-shadow:0 10px 30px rgba(0,91,170,.18)}
+.price.featured:hover{box-shadow:0 14px 36px rgba(0,91,170,.22)}
+.price.featured:focus-visible{box-shadow:0 0 0 4px var(--ring),0 14px 36px rgba(0,91,170,.22)}
 .price-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
 .price-title{font-weight:800}
 .price-amount{font-weight:900;font-size:22px}
