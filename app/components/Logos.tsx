@@ -10,7 +10,7 @@ const baseClass = (className?: string) => ['logo-img', className].filter(Boolean
 export function BancoDoBrasilLogo({ className, priority }: LogoProps) {
   return (
     <Image
-      src="/logos/banco-do-brasil.svg"
+      src="/logos/banco-do-brasil.png"
       alt="Banco do Brasil"
       width={150}
       height={50}
@@ -23,7 +23,7 @@ export function BancoDoBrasilLogo({ className, priority }: LogoProps) {
 export function HospitalEinsteinLogo({ className, priority }: LogoProps) {
   return (
     <Image
-      src="/logos/hospital-einstein.svg"
+      src="/logos/hospital-einstein.png"
       alt="Hospital Israelita Albert Einstein"
       width={150}
       height={50}
@@ -36,7 +36,7 @@ export function HospitalEinsteinLogo({ className, priority }: LogoProps) {
 export function MagazineLuizaLogo({ className, priority }: LogoProps) {
   return (
     <Image
-      src="/logos/magazine-luiza.svg"
+      src="/logos/magazine-luiza.png"
       alt="Magazine Luiza"
       width={150}
       height={50}
@@ -49,7 +49,7 @@ export function MagazineLuizaLogo({ className, priority }: LogoProps) {
 export function GovBrLogo({ className, priority }: LogoProps) {
   return (
     <Image
-      src="/logos/govbr.svg"
+      src="/logos/govbr.png"
       alt="Gov.br"
       width={150}
       height={50}
