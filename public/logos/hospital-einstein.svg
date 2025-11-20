@@ -1,0 +1,8 @@
+<svg width="180" height="60" viewBox="0 0 180 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="180" height="60" rx="12" fill="#E7F0FB"/>
+  <circle cx="40" cy="30" r="18" fill="#0F6CBD"/>
+  <path d="M40 16v28M26 30h28" stroke="#E7F0FB" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M34 22l12 16M46 22L34 38" stroke="#E7F0FB" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="74" y="34" font-family="'Inter','Segoe UI',sans-serif" font-size="15" font-weight="800" fill="#0F2D52">Hospital Israelita</text>
+  <text x="74" y="48" font-family="'Inter','Segoe UI',sans-serif" font-size="12" font-weight="700" fill="#0F6CBD">Albert Einstein</text>
+</svg>
