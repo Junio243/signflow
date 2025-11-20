@@ -95,14 +95,21 @@ export default function HomePage() {
             <StepCard icon={<ShieldIcon/>} title="4) Valide publicamente" text="Conferência instantânea em /validate/{id}."/>
           </div>
 
-          {/* Mini-demo (placeholder) */}
+          {/* Mini‑demo: demonstração do fluxo de upload, assinatura, QR e validação. */}
           <div className="demo">
-            <video className="demo-video" playsInline muted loop autoPlay aria-label="Demonstração rápida do fluxo">
-              <source src="" type="video/mp4" />
+            <video
+              className="demo-video"
+              playsInline
+              muted
+              loop
+              autoPlay
+              aria-label="Demonstração rápida do fluxo"
+            >
+              {/* O arquivo MP4 está no diretório public/videos e é distribuído diretamente pelo Next.js */}
+              <source src="/videos/demo-signflow.mp4" type="video/mp4" />
+              {/* Fallback para navegadores que não suportam a tag <video> */}
+              Seu navegador não suporta vídeos embutidos.
             </video>
-            <div className="demo-note muted small">
-              (Insira um vídeo curto: 10–20s mostrando upload → assinatura → QR → validação)
-            </div>
           </div>
         </div>
       </section>
@@ -291,7 +298,7 @@ function PriceCard({ title, price, bullets, featured, cta }:{
   )
 }
 
-/* ===== LOGOS “REAI S” (estilizados/otimizados em SVG) ===== */
+/* ===== LOGOS “REAIS” (estilizados/otimizados em SVG) ===== */
 function BrandLogo({ variant, label, compact }:{
   variant:'bb'|'ein'|'nub'|'mgl'|'dtp'|'gdf';
   label:string; compact?:boolean
@@ -337,7 +344,7 @@ function DocMock() {
         <rect x="18" y="84" width="300" height="10" rx="4" fill="#e5e7eb"/>
 
         {[...Array(8)].map((_,i)=>(
-          <rect key={i} x="18" y={118+i*14} width={i%3===0?360:360-(i%4)*24} height="8" rx="3" fill="#eef2f7"/>
+          <rect key={i} x={18} y={118+i*14} width={i%3===0?360:360-(i%4)*24} height="8" rx="3" fill="#eef2f7"/>
         ))}
 
         {/* Quadro de autenticidade */}
@@ -505,7 +512,7 @@ const css = `
 .hero{position:relative;overflow:hidden;background:linear-gradient(180deg,#f8fbff 0%,#ffffff 48%,#f2f6ff 100%)}
 .hero-bg{position:absolute;inset:-10% -20% auto -20%;height:560px;opacity:.55;
   background:radial-gradient(780px 400px at -20% -10%, rgba(0,91,170,.35) 18%, transparent 65%),
-             radial-gradient(780px 400px at 120% -20%, rgba(0,51,102,.28) 18%, transparent 62%);}
+             radial-gradient(780px 400px at 120% -20%, rgba(0,51,102,.28) 18%, transparent 62%);} 
 .hero-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:clamp(28px,5vw,60px);align-items:center;padding:clamp(76px,12vw,120px) 0 clamp(40px,8vw,72px)}
 .hero-copy h1{font-size:clamp(36px,4.6vw,48px);line-height:1.05;margin:8px 0;letter-spacing:-.6px;color:#0b1529}
 .sub{color:#1f2937;margin:0;font-size:clamp(16px,2vw,18px);max-width:560px;line-height:1.6}
@@ -518,8 +525,6 @@ const css = `
 .trusted{background:#fff;border-top:1px solid rgba(148,163,184,.25);border-bottom:1px solid rgba(148,163,184,.25);padding:26px 0 30px}
 .trusted-title{margin:0;text-align:center;font-size:18px;letter-spacing:.08em;text-transform:uppercase;color:#475569}
 .trusted-sub{text-align:center;color:#334155;margin:6px 0 14px}
-
-/* Mantendo a disposição em grid das logos, com colunas responsivas */
 .logos-row{
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
@@ -527,8 +532,6 @@ const css = `
   align-items:stretch;
   margin:22px 0 10px;
 }
-
-/* Cartões de selos com transições e foco */
 .seal-card{
   --seal-accent:#0f172a;
   --seal-bg:#f8fafc;
@@ -544,18 +547,35 @@ const css = `
   transition:transform .22s ease, box-shadow .24s ease, border-color .22s ease;
   outline:none;
 }
-
 .seal-card:hover{
   transform:translateY(-2px) scale(1.01);
   box-shadow:0 18px 36px rgba(15,23,42,.12);
   border-color:rgba(0,91,170,.35);
 }
-
 .seal-card:focus-visible{
   transform:translateY(-2px) scale(1.01);
   box-shadow:0 0 0 4px var(--ring),0 18px 36px rgba(15,23,42,.12);
   border-color:var(--primary);
 }
+.seal-art{width:56px;height:56px;border-radius:14px;border:2px solid var(--seal-accent);background:var(--seal-bg);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(15,23,42,.12)}
+.seal-svg{width:42px;height:42px}
+.seal-meta{display:flex;flex-direction:column;gap:4px}
+.seal-name{font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--seal-accent)}
+.seal-desc{font-size:12px;line-height:1.45;color:#1f2937}
+.seal-icp{--seal-accent:#0b5cab;--seal-bg:#e8f1ff}
+.seal-dataprev{--seal-accent:#0b6c4d;--seal-bg:#e0f7eb}
+.seal-govbr{--seal-accent:#0b5cab;--seal-bg:#e3edff}
+.seal-secure{--seal-accent:#0f172a;--seal-bg:#e6fbea}
+.seal-lgpd{--seal-accent:#2563eb;--seal-bg:#e0ecff}
+.logo-chip{display:flex;gap:10px;align-items:center;justify-content:flex-start;border:1px solid transparent;border-radius:12px;padding:4px 6px;transition:transform .2s ease, box-shadow .24s ease, border-color .2s ease;outline:none;background:rgba(255,255,255,.8)}
+.logo-chip:hover{transform:translateY(-2px) scale(1.01);box-shadow:0 12px 28px rgba(15,23,42,.12);border-color:rgba(0,91,170,.28)}
+.logo-chip:focus-visible{transform:translateY(-2px) scale(1.01);box-shadow:0 0 0 4px var(--ring),0 12px 28px rgba(15,23,42,.12);border-color:var(--primary)}
+.logo-chip.compact .logo-name{display:none}
+.logo-svg{width:110px;height:40px;border-radius:10px;box-shadow:0 10px 24px rgba(15,23,42,.08)}
+.logo-name{font-size:12px;color:#334155}
+.compliance{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:18px 0 6px}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:999px;background:#fff;padding:8px 12px;color:var(--txt)}
+
 /* HOW */
 .how{background:#f8fafc;border-top:1px solid #eef2ff;border-bottom:1px solid #eef2ff;padding:52px 0}
 .how h2{margin:0 0 6px}
