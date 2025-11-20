@@ -1,0 +1,6 @@
+<svg width="180" height="60" viewBox="0 0 180 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="180" height="60" rx="12" fill="#FFDD00"/>
+  <path d="M60 15l30 15-30 15 10 6 30-15-30-18-10-3z" fill="#0A2F73"/>
+  <path d="M90 21l30 15-30 15 10 6 30-15-30-18-10-3z" fill="#0A2F73" opacity="0.9"/>
+  <text x="22" y="34" font-family="'Inter','Segoe UI',sans-serif" font-size="14" font-weight="800" fill="#0A2F73">Banco do Brasil</text>
+</svg>

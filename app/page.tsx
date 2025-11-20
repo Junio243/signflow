@@ -2,6 +2,13 @@
 
 import Link from 'next/link'
 
+import {
+  BancoDoBrasilLogo,
+  GovBrLogo,
+  HospitalEinsteinLogo,
+  MagazineLuizaLogo,
+} from './components/Logos'
+
 export default function HomePage() {
   return (
     <main className="pro-root">
@@ -145,19 +152,19 @@ export default function HomePage() {
           <h2 id="testi-title">Quem usa, aprova</h2>
           <div className="grid-3">
             <Quote
-              logo={<BrandLogo variant="bb" compact label="Banco do Brasil"/>}
+              logo={<BancoDoBrasilLogo />}
               text="Automatizamos a assinatura de contratos nacionais mantendo trilha de auditoria alinhada à Dataprev."
               author="Banco do Brasil"
               role="Diretoria de Operações Digitais"
             />
             <Quote
-              logo={<BrandLogo variant="ein" compact label="Hospital Israelita Albert Einstein"/>}
+              logo={<HospitalEinsteinLogo />}
               text="Reduzimos em 67% o tempo de liberação de laudos clínicos com validação pública e QR em todas as páginas."
               author="Hospital Israelita Albert Einstein"
               role="TI Clínica"
             />
             <Quote
-              logo={<BrandLogo variant="mgl" compact label="Magazine Luiza"/>}
+              logo={<MagazineLuizaLogo />}
               text="Escalamos as aprovações de onboarding corporativo com carimbo e cancelamento rastreável em segundos."
               author="Magazine Luiza"
               role="People & Legal Ops"
@@ -294,36 +301,6 @@ function PriceCard({ title, price, bullets, featured, cta }:{
         {bullets.map((b,i)=><li key={i}><CheckIcon/>{b}</li>)}
       </ul>
       <div>{cta}</div>
-    </div>
-  )
-}
-
-/* ===== LOGOS “REAIS” (estilizados/otimizados em SVG) ===== */
-function BrandLogo({ variant, label, compact }:{
-  variant:'bb'|'ein'|'nub'|'mgl'|'dtp'|'gdf';
-  label:string; compact?:boolean
-}) {
-  const map = {
-    bb:  { bg:'#003399', fg:'#FFD400', txt:'BB' },
-    ein: { bg:'#005EB8', fg:'#FFFFFF', txt:'EIN' },
-    nub: { bg:'#8A05BE', fg:'#FFFFFF', txt:'NU' },
-    mgl: { bg:'#00AEEF', fg:'#FFFFFF', txt:'MGLU' },
-    dtp: { bg:'#0B6C4D', fg:'#FFFFFF', txt:'DTP' },
-    gdf: { bg:'#005BAA', fg:'#FFFFFF', txt:'GDF' },
-  }[variant]
-  return (
-    <div
-      className={`logo-chip ${compact?'compact':''}`}
-      role="listitem"
-      aria-label={label}
-      title={label}
-      tabIndex={0}
-    >
-      <svg viewBox="0 0 110 40" className="logo-svg" aria-hidden>
-        <rect x="0" y="0" width="110" height="40" rx="8" fill={map.bg}/>
-        <text x="14" y="26" fontFamily="'Inter', 'Segoe UI', sans-serif" fontSize="18" fontWeight="800" fill={map.fg}>{map.txt}</text>
-      </svg>
-      {!compact && <span className="logo-name">{label}</span>}
     </div>
   )
 }
@@ -567,12 +544,7 @@ const css = `
 .seal-govbr{--seal-accent:#0b5cab;--seal-bg:#e3edff}
 .seal-secure{--seal-accent:#0f172a;--seal-bg:#e6fbea}
 .seal-lgpd{--seal-accent:#2563eb;--seal-bg:#e0ecff}
-.logo-chip{display:flex;gap:10px;align-items:center;justify-content:flex-start;border:1px solid transparent;border-radius:12px;padding:4px 6px;transition:transform .2s ease, box-shadow .24s ease, border-color .2s ease;outline:none;background:rgba(255,255,255,.8)}
-.logo-chip:hover{transform:translateY(-2px) scale(1.01);box-shadow:0 12px 28px rgba(15,23,42,.12);border-color:rgba(0,91,170,.28)}
-.logo-chip:focus-visible{transform:translateY(-2px) scale(1.01);box-shadow:0 0 0 4px var(--ring),0 12px 28px rgba(15,23,42,.12);border-color:var(--primary)}
-.logo-chip.compact .logo-name{display:none}
-.logo-svg{width:110px;height:40px;border-radius:10px;box-shadow:0 10px 24px rgba(15,23,42,.08)}
-.logo-name{font-size:12px;color:#334155}
+.logo-img{display:block;width:150px;height:auto;border-radius:12px;box-shadow:0 10px 24px rgba(15,23,42,.08);background:#fff}
 .compliance{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:18px 0 6px}
 .chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:999px;background:#fff;padding:8px 12px;color:var(--txt)}
 
