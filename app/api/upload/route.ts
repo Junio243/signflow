@@ -1,12 +1,16 @@
 // app/api/upload/route.ts
 export const runtime = 'nodejs';
 
+import { createHash } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
-function sha256Hex(input: string) {
-  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
-    .then(buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join(''));
+async function sha256Hex(input: string) {
+  try {
+    return createHash('sha256').update(input, 'utf8').digest('hex');
+  } catch (error) {
+    return Promise.reject(error);
+  }
 }
 
 export async function POST(req: NextRequest) {
