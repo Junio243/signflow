@@ -658,8 +658,18 @@ export default function EditorPage() {
       const dims = pageSizes[pos.page - 1] ?? pageSizes[0] ?? { width: 595, height: 842 }
       const cw = dims.width
       const ch = dims.height
-      const nx = typeof pos.nx === 'number' ? pos.nx : 0.5
-      const ny = typeof pos.ny === 'number' ? pos.ny : 0.5
+      const nx =
+        typeof pos.nx === 'number' && Number.isFinite(pos.nx)
+          ? Math.max(0, Math.min(1, pos.nx))
+          : typeof pos.x === 'number' && Number.isFinite(pos.x)
+            ? Math.max(0, Math.min(1, pos.x / cw))
+            : 0.5
+      const ny =
+        typeof pos.ny === 'number' && Number.isFinite(pos.ny)
+          ? Math.max(0, Math.min(1, pos.ny))
+          : typeof pos.y === 'number' && Number.isFinite(pos.y)
+            ? Math.max(0, Math.min(1, pos.y / ch))
+            : 0.5
 
       return {
         page: pos.page,
