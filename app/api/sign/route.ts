@@ -189,17 +189,32 @@ export async function POST(req: NextRequest) {
       const pageWidth = page.getWidth();
       const pageHeight = page.getHeight();
 
-      const nx = typeof pos.nx === 'number' ? pos.nx : null;
-      const ny = typeof pos.ny === 'number' ? pos.ny : null;
-      let centerX = typeof pos.x === 'number' ? pos.x : null;
-      let centerY = typeof pos.y === 'number' ? pos.y : null;
+      const pageWidthRef = typeof pos.page_width === 'number' && Number.isFinite(pos.page_width)
+        ? pos.page_width
+        : pageWidth;
+      const pageHeightRef = typeof pos.page_height === 'number' && Number.isFinite(pos.page_height)
+        ? pos.page_height
+        : pageHeight;
 
-      if (centerX === null) {
-        centerX = nx !== null ? nx * pageWidth : pageWidth / 2;
-      }
-      if (centerY === null) {
-        centerY = ny !== null ? pageHeight - ny * pageHeight : pageHeight / 2;
-      }
+      const nx =
+        typeof pos.nx === 'number' && Number.isFinite(pos.nx)
+          ? Math.max(0, Math.min(1, pos.nx))
+          : typeof pos.x === 'number' && Number.isFinite(pos.x)
+            ? Math.max(0, Math.min(1, pos.x / pageWidthRef))
+            : null;
+
+      const ny =
+        typeof pos.ny === 'number' && Number.isFinite(pos.ny)
+          ? Math.max(0, Math.min(1, pos.ny))
+          : typeof pos.y === 'number' && Number.isFinite(pos.y)
+            ? Math.max(0, Math.min(1, pos.y / pageHeightRef))
+            : null;
+
+      const normalizedNx = nx !== null ? nx : 0.5;
+      const normalizedNy = ny !== null ? ny : 0.5;
+
+      const centerX = normalizedNx * pageWidth;
+      const centerY = pageHeight - normalizedNy * pageHeight;
 
       const scale = typeof pos.scale === 'number' ? pos.scale : 1;
       const rotation = typeof pos.rotation === 'number' ? pos.rotation : 0;
@@ -272,7 +287,22 @@ export async function POST(req: NextRequest) {
 
     // URLs públicas
     const pubSigned = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/signed.pdf`);
+    if (pubSigned.error || !pubSigned.data?.publicUrl) {
+      console.error('Erro ao gerar URL pública do PDF assinado:', pubSigned.error);
+      return NextResponse.json(
+        { error: pubSigned.error?.message || 'Falha ao gerar URL pública do PDF assinado.' },
+        { status: 500 },
+      );
+    }
+
     const pubQr = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/qr.png`);
+    if (pubQr.error || !pubQr.data?.publicUrl) {
+      console.error('Erro ao gerar URL pública do QR code:', pubQr.error);
+      return NextResponse.json(
+        { error: pubQr.error?.message || 'Falha ao gerar URL pública do QR code.' },
+        { status: 500 },
+      );
+    }
 
     // atualiza registro
     // @ts-ignore (evita never do types gerados no build)
