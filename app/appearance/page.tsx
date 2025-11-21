@@ -10,6 +10,7 @@ export default function AppearancePage() {
   const router = useRouter()
   const supabaseClient = supabase
   const [loading, setLoading] = useState(true)
+  const [hasSession, setHasSession] = useState(false)
   // Form
   const [name, setName] = useState('')
   const [type, setType] = useState<'medico'|'faculdade'|'generico'>('generico')
@@ -33,7 +34,13 @@ export default function AppearancePage() {
         return
       }
       const s = await supabaseClient.auth.getSession()
-      if (!s.data?.session) { window.location.href = '/login?next=/appearance'; return }
+      if (!s.data?.session) {
+        setInfo('É necessário estar logado para criar um perfil. Acesse /login para continuar.')
+        setHasSession(false)
+        setLoading(false)
+        return
+      }
+      setHasSession(true)
       const { data } = await supabaseClient.from('validation_profiles').select('id, name, type, theme').order('created_at', { ascending: false })
       setProfiles((data || []) as Profile[])
       setLoading(false)
@@ -55,6 +62,10 @@ export default function AppearancePage() {
   }
 
   const createProfile = async () => {
+    if (!hasSession) {
+      setInfo('É necessário estar logado para criar um perfil. Acesse /login para continuar.')
+      return
+    }
     try {
       setInfo(null)
       const logo = await uploadLogoIfAny()
@@ -106,34 +117,36 @@ export default function AppearancePage() {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
         <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, padding:16 }}>
           <h2 style={{ fontSize:16, marginTop:0 }}>Novo perfil</h2>
-          <div style={{ display:'grid', gap:8 }}>
-            <input placeholder="Nome do perfil (ex.: Médico CRM/DF)" value={name} onChange={e=>setName(e.target.value)} style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8 }} />
-            <div>
-              <label><input type="radio" checked={type==='medico'} onChange={()=>setType('medico')} /> Médico</label>{' '}
-              <label><input type="radio" checked={type==='faculdade'} onChange={()=>setType('faculdade')} /> Faculdade</label>{' '}
-              <label><input type="radio" checked={type==='generico'} onChange={()=>setType('generico')} /> Genérico</label>
+          <fieldset disabled={!hasSession} style={{ border:'none', padding:0, margin:0 }}>
+            <div style={{ display:'grid', gap:8 }}>
+              <input placeholder="Nome do perfil (ex.: Médico CRM/DF)" value={name} onChange={e=>setName(e.target.value)} style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8 }} />
+              <div>
+                <label><input type="radio" checked={type==='medico'} onChange={()=>setType('medico')} /> Médico</label>{' '}
+                <label><input type="radio" checked={type==='faculdade'} onChange={()=>setType('faculdade')} /> Faculdade</label>{' '}
+                <label><input type="radio" checked={type==='generico'} onChange={()=>setType('generico')} /> Genérico</label>
+              </div>
+              <input type="color" value={color} onChange={e=>setColor(e.target.value)} title="Cor do tema" />
+              <input placeholder="Instituição/Profissional" value={issuer} onChange={e=>setIssuer(e.target.value)} style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8 }} />
+              <input placeholder="Registro (CRM/CRP/OAB/CNPJ)" value={reg} onChange={e=>setReg(e.target.value)} style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8 }} />
+              <input placeholder="Tipo de certificado (ex.: ICP-Brasil A3)" value={certificateType} onChange={e=>setCertificateType(e.target.value)} style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8 }} />
+              <div>
+                <label style={{ display:'block', fontSize:12, color:'#6b7280', marginBottom:4 }}>Validade do certificado</label>
+                <input
+                  type="date"
+                  value={certificateValidUntil}
+                  onChange={e=>setCertificateValidUntil(e.target.value)}
+                  style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8, width:'100%' }}
+                />
+              </div>
+              <textarea placeholder="Rodapé" value={footer} onChange={e=>setFooter(e.target.value)} style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8 }} />
+              <div>
+                <div>Logo (opcional):</div>
+                <input type="file" accept="image/*" onChange={e=>setLogoFile(e.target.files?.[0]||null)} />
+              </div>
+              <button onClick={createProfile} disabled={!name || !hasSession}>Salvar perfil</button>
             </div>
-            <input type="color" value={color} onChange={e=>setColor(e.target.value)} title="Cor do tema" />
-            <input placeholder="Instituição/Profissional" value={issuer} onChange={e=>setIssuer(e.target.value)} style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8 }} />
-            <input placeholder="Registro (CRM/CRP/OAB/CNPJ)" value={reg} onChange={e=>setReg(e.target.value)} style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8 }} />
-            <input placeholder="Tipo de certificado (ex.: ICP-Brasil A3)" value={certificateType} onChange={e=>setCertificateType(e.target.value)} style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8 }} />
-            <div>
-              <label style={{ display:'block', fontSize:12, color:'#6b7280', marginBottom:4 }}>Validade do certificado</label>
-              <input
-                type="date"
-                value={certificateValidUntil}
-                onChange={e=>setCertificateValidUntil(e.target.value)}
-                style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8, width:'100%' }}
-              />
-            </div>
-            <textarea placeholder="Rodapé" value={footer} onChange={e=>setFooter(e.target.value)} style={{ padding:10, border:'1px solid #e5e7eb', borderRadius:8 }} />
-            <div>
-              <div>Logo (opcional):</div>
-              <input type="file" accept="image/*" onChange={e=>setLogoFile(e.target.files?.[0]||null)} />
-            </div>
-            <button onClick={createProfile} disabled={!name}>Salvar perfil</button>
-            {info && <p>{info}</p>}
-          </div>
+          </fieldset>
+          {info && <p>{info}</p>}
         </div>
 
         <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, padding:16 }}>
