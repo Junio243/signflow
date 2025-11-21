@@ -12,6 +12,12 @@ import {
   translate
 } from 'pdf-lib';
 import QRCode from 'qrcode';
+import {
+  Metadata,
+  Position,
+  documentIdSchema,
+  storedMetadataSchema,
+} from '@/lib/validation/documentSchemas';
 
 type SignerMetadata = {
   name: string;
@@ -39,49 +45,17 @@ function toIsoOrNull(value: unknown): string | null {
   return null;
 }
 
-function extractSignersFromMetadata(doc: any): SignerMetadata[] {
-  const metadata = doc && typeof doc.metadata === 'object' && doc.metadata
-    ? (doc.metadata as Record<string, any>)
-    : {};
-
-  const rawSigners = Array.isArray((metadata as any).signers)
-    ? ((metadata as any).signers as any[])
-    : [];
-
-  const sanitized = rawSigners
-    .map(raw => {
-      if (!raw || typeof raw !== 'object') return null;
-      const name = typeof raw.name === 'string' ? raw.name.trim() : '';
-      if (!name) return null;
-
-      const reg = typeof raw.reg === 'string' && raw.reg.trim() ? raw.reg.trim() : null;
-      const certificate_type =
-        typeof raw.certificate_type === 'string' && raw.certificate_type.trim()
-          ? raw.certificate_type.trim()
-          : null;
-      const certificate_valid_until =
-        typeof raw.certificate_valid_until === 'string' && raw.certificate_valid_until.trim()
-          ? raw.certificate_valid_until.trim()
-          : null;
-      const certificate_issuer =
-        typeof raw.certificate_issuer === 'string' && raw.certificate_issuer.trim()
-          ? raw.certificate_issuer.trim()
-          : null;
-      const logo_url = typeof raw.logo_url === 'string' && raw.logo_url.trim() ? raw.logo_url.trim() : null;
-      const email = typeof raw.email === 'string' && raw.email.trim() ? raw.email.trim() : null;
-
-      return {
-        name,
-        reg,
-        certificate_type,
-        certificate_valid_until,
-        certificate_issuer,
-        logo_url,
-        email,
-        metadata: raw as Record<string, unknown>,
-      } satisfies SignerMetadata;
-    })
-    .filter(Boolean) as SignerMetadata[];
+function extractSignersFromMetadata(metadata: Metadata): SignerMetadata[] {
+  const sanitized = (metadata.signers || []).map(signer => ({
+    name: signer.name,
+    reg: signer.reg ?? null,
+    certificate_type: signer.certificate_type ?? null,
+    certificate_valid_until: signer.certificate_valid_until ?? null,
+    certificate_issuer: signer.certificate_issuer ?? null,
+    logo_url: signer.logo_url ?? null,
+    email: signer.email ?? null,
+    metadata: signer as Record<string, unknown>,
+  } satisfies SignerMetadata));
 
   if (sanitized.length) {
     return sanitized;
@@ -146,10 +120,11 @@ export async function POST(req: NextRequest) {
     const supabaseAdmin = getSupabaseAdmin(); // ← client dentro do handler
 
     const form = await req.formData();
-    const id = form.get('id')?.toString();
-    if (!id) {
-      return NextResponse.json({ error: 'id é obrigatório' }, { status: 400 });
+    const idResult = documentIdSchema.safeParse(form.get('id')?.toString());
+    if (!idResult.success) {
+      return NextResponse.json({ error: 'id é obrigatório e deve ser um UUID válido' }, { status: 400 });
     }
+    const id = idResult.data;
 
     // busca doc
     const docRes = await supabaseAdmin
@@ -187,24 +162,19 @@ export async function POST(req: NextRequest) {
     const pages = pdfDoc.getPages();
 
     // desenha assinaturas
-    const metadata = (doc?.metadata || {}) as any;
-    let positions: Array<any> = [];
-    let signatureMeta: { width?: number; height?: number } | null = null;
+    const metadataParsed = storedMetadataSchema.safeParse(doc?.metadata);
 
-    if (Array.isArray(metadata)) {
-      positions = metadata as any[];
-    } else if (metadata && typeof metadata === 'object') {
-      if (Array.isArray(metadata.positions)) {
-        positions = metadata.positions as any[];
-      }
-      if (metadata.signature_meta && typeof metadata.signature_meta === 'object') {
-        signatureMeta = metadata.signature_meta as any;
-      }
+    if (!metadataParsed.success) {
+      return NextResponse.json({ error: 'Metadados inválidos' }, { status: 400 });
     }
 
-    if (!positions.length && Array.isArray(doc?.metadata)) {
-      positions = doc?.metadata as any[];
-    }
+    const normalizedMetadata: Metadata = Array.isArray(metadataParsed.data)
+      ? { positions: metadataParsed.data as Position[] }
+      : (metadataParsed.data as Metadata) || { positions: [] };
+
+    const positions = normalizedMetadata.positions || [];
+    const signatureMeta: { width?: number; height?: number } | null =
+      (normalizedMetadata.signature_meta as any) || null;
 
     let sigImage: any = null;
     if (sigBytes) {
@@ -349,7 +319,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: upd.error.message }, { status: 500 });
     }
 
-    const signers = extractSignersFromMetadata(doc);
+    const signers = extractSignersFromMetadata(normalizedMetadata);
     const nowIso = new Date().toISOString();
     if (signers.length) {
       const payload = signers.map(signer => ({

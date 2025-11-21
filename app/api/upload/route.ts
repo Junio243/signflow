@@ -4,6 +4,12 @@ export const runtime = 'nodejs';
 import { createHash, randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import {
+  documentIdSchema,
+  metadataSchema,
+  positionSchema,
+  signerSchema,
+} from '@/lib/validation/documentSchemas';
 
 const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB
 const MAX_SIGNATURE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -40,6 +46,18 @@ function structuredLog(level: 'info' | 'warn' | 'error', ctx: Record<string, any
   }
 }
 
+/** Helper para parsear JSON com erro legível */
+const parseJsonField = (
+  raw: string,
+  fieldName: string
+): { success: true; data: unknown } | { success: false; error: string } => {
+  try {
+    return { success: true, data: JSON.parse(raw) };
+  } catch {
+    return { success: false, error: `${fieldName} deve ser um JSON válido` };
+  }
+};
+
 export async function POST(req: NextRequest) {
   const reqId = randomUUID();
   const baseCtx = { reqId, route: 'POST /api/upload' };
@@ -50,7 +68,8 @@ export async function POST(req: NextRequest) {
     const supabaseAdmin = getSupabaseAdmin(); // ← client dentro do handler
 
     // Extração robusta do IP (x-forwarded-for pode ser lista)
-    const ipHeader = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || (req as any).ip;
+    const ipHeader =
+      (req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || (req as any).ip) ?? '';
     const ip = ipHeader ? (ipHeader as string).split(',')[0].trim() : '0.0.0.0';
     structuredLog('info', { ...baseCtx, event: 'client_ip', ip });
 
@@ -132,7 +151,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Gera ID do documento cedo para correlacionar logs de upload
-    const id = randomUUID();
+    const id = documentIdSchema.parse(randomUUID());
 
     // Gera hash do IP
     let ip_hash = 'unknown';
@@ -186,72 +205,54 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // cria registro
-    let positions: any[] = [];
-    try {
-      const parsed = JSON.parse(positionsRaw || '[]');
-      positions = Array.isArray(parsed) ? parsed : [];
-    } catch (err: any) {
-      structuredLog('warn', { ...baseCtx, event: 'positions_parse_failed', documentId: id, error: String(err?.message || err) });
-      positions = [];
+    // --- validação de metadados via schemas ---
+    const parsedPositions = parseJsonField(positionsRaw || '[]', 'positions');
+    if (!parsedPositions.success || !Array.isArray(parsedPositions.data)) {
+      return NextResponse.json(
+        { error: parsedPositions.success ? 'positions deve ser um array' : parsedPositions.error },
+        { status: 400 }
+      );
     }
 
-    let signatureMeta: any = null;
-    try {
-      signatureMeta = JSON.parse(signatureMetaRaw || 'null');
-    } catch {
-      signatureMeta = null;
+    const parsedSignatureMeta = parseJsonField(signatureMetaRaw || 'null', 'signature_meta');
+    if (!parsedSignatureMeta.success) {
+      return NextResponse.json({ error: parsedSignatureMeta.error }, { status: 400 });
     }
 
-    let validationTheme: any = null;
-    try {
-      validationTheme = JSON.parse(validationThemeRaw || 'null');
-    } catch {
-      validationTheme = null;
+    const parsedValidationTheme = parseJsonField(validationThemeRaw || 'null', 'validation_theme_snapshot');
+    if (!parsedValidationTheme.success) {
+      return NextResponse.json({ error: parsedValidationTheme.error }, { status: 400 });
     }
 
-    let signers: any[] = [];
-    try {
-      const parsed = JSON.parse(signersRaw || '[]');
-      signers = Array.isArray(parsed) ? parsed : [];
-    } catch (err: any) {
-      structuredLog('warn', { ...baseCtx, event: 'signers_parse_failed', documentId: id, error: String(err?.message || err) });
-      signers = [];
+    const parsedSigners = parseJsonField(signersRaw || '[]', 'signers');
+    if (!parsedSigners.success || !Array.isArray(parsedSigners.data)) {
+      return NextResponse.json(
+        { error: parsedSigners.success ? 'signers deve ser um array' : parsedSigners.error },
+        { status: 400 }
+      );
     }
 
-    const sanitizedSigners = signers
-      .map(raw => {
-        if (!raw || typeof raw !== 'object') return null;
-        const name = typeof raw.name === 'string' ? raw.name.trim() : '';
-        if (!name) return null;
+    const metadataResult = metadataSchema.safeParse({
+      positions: parsedPositions.data,
+      signature_meta: parsedSignatureMeta.data,
+      validation_theme_snapshot: parsedValidationTheme.data,
+      validation_profile_id: validationProfileId,
+      signers: parsedSigners.data,
+    });
 
-        const reg = typeof raw.reg === 'string' && raw.reg.trim() ? raw.reg.trim() : null;
-        const certificate_type =
-          typeof raw.certificate_type === 'string' && raw.certificate_type.trim()
-            ? raw.certificate_type.trim()
-            : null;
-        const certificate_valid_until =
-          typeof raw.certificate_valid_until === 'string' && raw.certificate_valid_until.trim()
-            ? raw.certificate_valid_until.trim()
-            : null;
-        const certificate_issuer =
-          typeof raw.certificate_issuer === 'string' && raw.certificate_issuer.trim()
-            ? raw.certificate_issuer.trim()
-            : null;
-        const email = typeof raw.email === 'string' && raw.email.trim() ? raw.email.trim() : null;
-        const logo_url = typeof raw.logo_url === 'string' && raw.logo_url.trim() ? raw.logo_url.trim() : null;
+    if (!metadataResult.success) {
+      return NextResponse.json(
+        { error: 'Metadados inválidos', details: metadataResult.error.format() },
+        { status: 400 }
+      );
+    }
 
-        return {
-          name,
-          reg,
-          certificate_type,
-          certificate_valid_until,
-          certificate_issuer,
-          email,
-          logo_url,
-        };
-      })
-      .filter(Boolean);
+    // extrai/valida posições e signers via schemas individuais
+    const positions = metadataResult.data.positions.map((pos: unknown) => positionSchema.parse(pos));
+    const signatureMeta = metadataResult.data.signature_meta ?? null;
+    const validationTheme = metadataResult.data.validation_theme_snapshot ?? null;
+    const validationProfileIdSanitized = metadataResult.data.validation_profile_id ?? null;
+    const sanitizedSigners = (metadataResult.data.signers || []).map((signer: unknown) => signerSchema.parse(signer));
 
     structuredLog('info', {
       ...baseCtx,
@@ -269,7 +270,7 @@ export async function POST(req: NextRequest) {
     const metadata: Record<string, any> = { positions };
     if (signatureMeta) metadata.signature_meta = signatureMeta;
     if (validationTheme) metadata.validation_theme_snapshot = validationTheme;
-    if (validationProfileId) metadata.validation_profile_id = validationProfileId;
+    if (validationProfileIdSanitized) metadata.validation_profile_id = validationProfileIdSanitized;
     if (sanitizedSigners.length) metadata.signers = sanitizedSigners;
 
     const basePayload: Record<string, any> = {
@@ -288,8 +289,8 @@ export async function POST(req: NextRequest) {
     if (validationTheme) {
       basePayload.validation_theme_snapshot = validationTheme;
     }
-    if (validationProfileId) {
-      basePayload.validation_profile_id = validationProfileId;
+    if (validationProfileIdSanitized) {
+      basePayload.validation_profile_id = validationProfileIdSanitized;
     }
 
     structuredLog('info', { ...baseCtx, event: 'db_insert_start', documentId: id });
