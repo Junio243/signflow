@@ -41,23 +41,36 @@ export default function AppearancePage() {
     boot()
   }, [])
 
-  const uploadLogoIfAny = async (): Promise<string | null> => {
-    if (!logoFile) return null
+  const uploadLogoIfAny = async (): Promise<{ url: string | null; ok: boolean }> => {
+    if (!logoFile) return { url: null, ok: true }
+
     const key = `branding/${Date.now()}-${logoFile.name}`
     if (!supabaseClient) {
       setInfo('Serviço de armazenamento indisponível.');
-      return null
+      return { url: null, ok: false }
     }
+
     const up = await supabaseClient.storage.from('signflow').upload(key, logoFile, { contentType: logoFile.type, upsert: true })
-    if (up.error) { setInfo('Não consegui subir o logo.'); return null }
+    if (up.error) {
+      setInfo('Não consegui subir o logo.')
+      return { url: null, ok: false }
+    }
+
     const pub = await supabaseClient.storage.from('signflow').getPublicUrl(key)
-    return pub.data?.publicUrl ?? null
+    if (pub.error || !pub.data?.publicUrl) {
+      console.error('Erro ao gerar URL pública do logo:', pub.error)
+      setInfo('Não consegui gerar a URL pública do logo. Tente novamente mais tarde.')
+      return { url: null, ok: false }
+    }
+
+    return { url: pub.data.publicUrl, ok: true }
   }
 
   const createProfile = async () => {
     try {
       setInfo(null)
-      const logo = await uploadLogoIfAny()
+      const { url: logo, ok: uploaded } = await uploadLogoIfAny()
+      if (!uploaded) return
       const normalizedCertificateValidUntil = certificateValidUntil.trim() || null
 
       const theme = {

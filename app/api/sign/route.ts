@@ -302,7 +302,22 @@ export async function POST(req: NextRequest) {
 
     // URLs públicas
     const pubSigned = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/signed.pdf`);
+    if (pubSigned.error || !pubSigned.data?.publicUrl) {
+      console.error('Erro ao gerar URL pública do PDF assinado:', pubSigned.error);
+      return NextResponse.json(
+        { error: pubSigned.error?.message || 'Falha ao gerar URL pública do PDF assinado.' },
+        { status: 500 },
+      );
+    }
+
     const pubQr = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/qr.png`);
+    if (pubQr.error || !pubQr.data?.publicUrl) {
+      console.error('Erro ao gerar URL pública do QR code:', pubQr.error);
+      return NextResponse.json(
+        { error: pubQr.error?.message || 'Falha ao gerar URL pública do QR code.' },
+        { status: 500 },
+      );
+    }
 
     // atualiza registro
     // @ts-ignore (evita never do types gerados no build)
