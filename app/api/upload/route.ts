@@ -4,6 +4,11 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
+const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB
+const MAX_SIGNATURE_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_PDF_TYPES = ['application/pdf'];
+const ALLOWED_SIGNATURE_TYPES = ['image/png', 'image/jpeg'];
+
 function sha256Hex(input: string) {
   return crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
     .then(buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join(''));
@@ -28,6 +33,32 @@ export async function POST(req: NextRequest) {
 
     if (!pdf) {
       return NextResponse.json({ error: 'PDF é obrigatório' }, { status: 400 });
+    }
+
+    if (!(pdf instanceof File)) {
+      return NextResponse.json({ error: 'PDF inválido: arquivo não reconhecido.' }, { status: 400 });
+    }
+
+    if (!ALLOWED_PDF_TYPES.includes(pdf.type)) {
+      return NextResponse.json({ error: 'PDF inválido: envie um arquivo application/pdf.' }, { status: 400 });
+    }
+
+    if (pdf.size > MAX_PDF_BYTES) {
+      return NextResponse.json({ error: 'PDF inválido: tamanho máximo de 20MB.' }, { status: 400 });
+    }
+
+    if (signature) {
+      if (!(signature instanceof File)) {
+        return NextResponse.json({ error: 'Assinatura inválida: arquivo não reconhecido.' }, { status: 400 });
+      }
+
+      if (!ALLOWED_SIGNATURE_TYPES.includes(signature.type)) {
+        return NextResponse.json({ error: 'Assinatura inválida: use imagem PNG ou JPG.' }, { status: 400 });
+      }
+
+      if (signature.size > MAX_SIGNATURE_BYTES) {
+        return NextResponse.json({ error: 'Assinatura inválida: tamanho máximo de 5MB.' }, { status: 400 });
+      }
     }
 
     const id = crypto.randomUUID();
