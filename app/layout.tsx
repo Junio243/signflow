@@ -6,7 +6,7 @@ import HeaderClient from '@/components/HeaderClient';
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body className="min-h-screen bg-gradient-to-b from-slate-50 to-white text-slate-900 antialiased" style={{ fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif' }}>
+      <body className="min-h-screen bg-gradient-to-b from-slate-50 to-white text-slate-900 antialiased">
         <a
           href="#conteudo-principal"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:rounded-lg focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-white"

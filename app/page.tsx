@@ -371,7 +371,16 @@ type OfficialSealProps = {
 
 function OfficialSeal({ variant, label, description, icon }:OfficialSealProps) {
   const baseId = `seal-${variant}`
-  const variantClass = styles[`seal${variant.charAt(0).toUpperCase() + variant.slice(1)}`]
+  // Map variants to CSS Module class names
+  const variantClassMap: Record<string, string> = {
+    'icp': styles.sealIcp,
+    'dataprev': styles.sealDataprev,
+    'govbr': styles.sealGovbr,
+    'secure': styles.sealSecure,
+    'lgpd': styles.sealLgpd,
+  }
+  const variantClass = variantClassMap[variant] || ''
+  
   return (
     <figure
       className={`${styles.sealCard} ${variantClass}`}
