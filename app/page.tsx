@@ -1,6 +1,7 @@
 /* Landing PRO — foco enterprise, hierarquia forte e estética de portal oficial */
 
 import Link from 'next/link'
+import styles from './page.module.css'
 
 import {
   BancoDoBrasilLogo,
@@ -11,40 +12,40 @@ import {
 
 export default function HomePage() {
   return (
-    <main className="pro-root">
+    <main className={styles.proRoot}>
       {/* ===== HERO ===== */}
-      <section className="hero" aria-labelledby="hero-title">
-        <div className="hero-bg" />
-        <div className="wrap hero-grid">
-          <div className="hero-copy">
-            <div className="badge"><ShieldIcon/> Segurança por design • LGPD-ready</div>
+      <section className={styles.hero} aria-labelledby="hero-title">
+        <div className={styles.heroBg} />
+        <div className={`${styles.wrap} ${styles.heroGrid}`}>
+          <div className={styles.heroCopy}>
+            <div className={styles.badge}><ShieldIcon/> Segurança por design • LGPD-ready</div>
             <h1 id="hero-title">Assinaturas eletrônicas com validação pública instantânea e selo ICP-Brasil</h1>
-            <p className="sub">
+            <p className={styles.sub}>
               Acelere fluxos jurídicos, médicos e acadêmicos com QR Code em cada página.
               Infraestrutura auditável integrada à Dataprev.
             </p>
-            <div className="cta-row">
-              <Link href="/editor" className="btn btn-primary"><BoltIcon/> Assinar documento</Link>
-              <Link href="/validate/demo" className="btn btn-ghost"><QrIcon/> Ver demonstração</Link>
+            <div className={styles.ctaRow}>
+              <Link href="/editor" className={`${styles.landingBtn} ${styles.btnPrimary}`}><BoltIcon/> Assinar documento</Link>
+              <Link href="/validate/demo" className={`${styles.landingBtn} ${styles.btnGhost}`}><QrIcon/> Ver demonstração</Link>
             </div>
-            <ul className="bullets" aria-label="Benefícios principais">
+            <ul className={styles.bullets} aria-label="Benefícios principais">
               <li><CheckIcon/> Assinatura manuscrita ou certificada com hash SHA-256</li>
               <li><CheckIcon/> QR Code em todas as páginas do PDF</li>
               <li><CheckIcon/> Perfis por área (Saúde, Educação, Jurídico, Corporativo)</li>
             </ul>
           </div>
-          <div className="hero-mock">
+          <div className={styles.heroMock}>
             <DocMock/>
           </div>
         </div>
       </section>
 
       {/* ===== TRUST: Logos Reais + Selos ===== */}
-      <section className="trusted" id="seguranca" aria-labelledby="trusted-title">
-        <div className="wrap">
-          <h2 id="trusted-title" className="trusted-title">Confiado por instituições de missão crítica</h2>
-          <p className="trusted-sub">Infraestrutura auditável, LGPD, ISO 27001 e ICP-Brasil — com validação pública por QR.</p>
-          <div className="logos-row" role="list" aria-label="Selos oficiais de segurança e conformidade">
+      <section className={styles.trusted} id="seguranca" aria-labelledby="trusted-title">
+        <div className={styles.wrap}>
+          <h2 id="trusted-title" className={styles.trustedTitle}>Confiado por instituições de missão crítica</h2>
+          <p className={styles.trustedSub}>Infraestrutura auditável, LGPD, ISO 27001 e ICP-Brasil — com validação pública por QR.</p>
+          <div className={styles.logosRow} role="list" aria-label="Selos oficiais de segurança e conformidade">
             <OfficialSeal
               variant="icp"
               label="ICP-Brasil"
@@ -77,25 +78,25 @@ export default function HomePage() {
             />
           </div>
 
-          <div className="compliance">
+          <div className={styles.compliance}>
             <Chip><PolicyIcon/> LGPD</Chip>
             <Chip><IsoIcon/> ISO 27001</Chip>
             <Chip><IcpiIcon/> ICP-Brasil</Chip>
             <Chip><DataprevIcon/> Integração Dataprev</Chip>
           </div>
 
-          <p className="muted small center">
+          <p className={`${styles.muted} ${styles.small} ${styles.center}`}>
             “Infraestrutura auditável integrada a provedores públicos, com trilhas imutáveis e criptografia SHA-256.”
           </p>
         </div>
       </section>
 
       {/* ===== COMO FUNCIONA (4 passos visuais) ===== */}
-      <section className="how" id="como-funciona" aria-labelledby="how-title">
-        <div className="wrap">
+      <section className={styles.how} id="como-funciona" aria-labelledby="how-title">
+        <div className={styles.wrap}>
           <h2 id="how-title">Como funciona</h2>
-          <p className="sub">Fluxo visual e direto — do upload até a validação pública.</p>
-          <div className="grid-4">
+          <p className={styles.sub}>Fluxo visual e direto — do upload até a validação pública.</p>
+          <div className={styles.grid4}>
             <StepCard icon={<UploadIcon/>} title="1) Envie o PDF" text="Upload seguro e suporte a múltiplas páginas."/>
             <StepCard icon={<PenIcon/>} title="2) Assine & personalize" text="Desenhe ou importe assinatura. Ajuste QR e selecione perfil."/>
             <StepCard icon={<QrIcon/>} title="3) QR em todas as páginas" text="Gerado automaticamente e inserido no rodapé."/>
@@ -103,9 +104,9 @@ export default function HomePage() {
           </div>
 
           {/* Mini‑demo: demonstração do fluxo de upload, assinatura, QR e validação. */}
-          <div className="demo">
+          <div className={styles.demo}>
             <video
-              className="demo-video"
+              className={styles.demoVideo}
               playsInline
               muted
               loop
@@ -122,10 +123,10 @@ export default function HomePage() {
       </section>
 
       {/* ===== DIFERENCIAIS ===== */}
-      <section className="diff" aria-labelledby="diff-title">
-        <div className="wrap">
+      <section className={styles.diff} aria-labelledby="diff-title">
+        <div className={styles.wrap}>
           <h2 id="diff-title">Diferenciais corporativos</h2>
-          <div className="grid-4">
+          <div className={styles.grid4}>
             <Feature
               title="Validade Jurídica"
               text="Documentos com selo ICP-Brasil e metadados prontos para reconhecimento cartorial imediato."
@@ -147,10 +148,10 @@ export default function HomePage() {
       </section>
 
       {/* ===== DEPOIMENTOS (com “logos”) ===== */}
-      <section className="testi" aria-labelledby="testi-title">
-        <div className="wrap">
+      <section className={styles.testi} aria-labelledby="testi-title">
+        <div className={styles.wrap}>
           <h2 id="testi-title">Quem usa, aprova</h2>
-          <div className="grid-3">
+          <div className={styles.grid3}>
             <Quote
               logo={<BancoDoBrasilLogo />}
               text="Automatizamos a assinatura de contratos nacionais mantendo trilha de auditoria alinhada à Dataprev."
@@ -174,50 +175,50 @@ export default function HomePage() {
       </section>
 
       {/* ===== PLANOS ===== */}
-      <section className="pricing" id="precos" aria-labelledby="planos-title">
-        <div className="wrap">
+      <section className={styles.pricing} id="precos" aria-labelledby="planos-title">
+        <div className={styles.wrap}>
           <h2 id="planos-title">Planos</h2>
-          <p className="sub">Comece grátis. Evolua quando precisar.</p>
-          <div className="grid-2">
+          <p className={styles.sub}>Comece grátis. Evolua quando precisar.</p>
+          <div className={styles.grid2}>
             <PriceCard
               title="Gratuito"
               price="R$ 0"
               bullets={['Assinatura com QR em todas as páginas', 'Validação pública', 'Perfis básicos']}
-              cta={<Link href="/editor" className="btn btn-primary">Assinar agora</Link>}
+              cta={<Link href="/editor" className={`${styles.landingBtn} ${styles.btnPrimary}`}>Assinar agora</Link>}
             />
             <PriceCard
               title="Profissional"
               price="Em breve"
               bullets={['Perfis avançados', 'Histórico estendido', 'Suporte prioritário']}
               featured
-              cta={<Link href="/login" className="btn btn-ghost">Ser notificado</Link>}
+              cta={<Link href="/login" className={`${styles.landingBtn} ${styles.btnGhost}`}>Ser notificado</Link>}
             />
           </div>
         </div>
       </section>
 
       {/* ===== CTA FINAL ===== */}
-      <section className="cta" aria-labelledby="cta-title">
-        <div className="wrap cta-box">
+      <section className={styles.cta} aria-labelledby="cta-title">
+        <div className={`${styles.wrap} ${styles.ctaBox}`}>
           <div>
             <h2 id="cta-title">Pronto para assinar com confiança?</h2>
-            <p className="sub">Gere QR, valide publicamente e mantenha trilhas imutáveis.</p>
+            <p className={styles.sub}>Gere QR, valide publicamente e mantenha trilhas imutáveis.</p>
           </div>
-          <div className="cta-actions">
-            <Link href="/editor" className="btn btn-primary"><BoltIcon/> Assinar documento</Link>
-            <Link href="/validate/demo" className="btn btn-ghost">Ver demonstração</Link>
+          <div className={styles.ctaActions}>
+            <Link href="/editor" className={`${styles.landingBtn} ${styles.btnPrimary}`}><BoltIcon/> Assinar documento</Link>
+            <Link href="/validate/demo" className={`${styles.landingBtn} ${styles.btnGhost}`}>Ver demonstração</Link>
           </div>
         </div>
       </section>
 
       {/* ===== FOOTER técnico ===== */}
-      <footer className="foot" id="suporte">
-        <div className="wrap foot-row">
-          <div className="foot-brand">
-            <span className="glyph">◆</span> <b>SignFlow</b>
-            <div className="muted small">Assinatura eletrônica com QR e validação pública.</div>
+      <footer className={styles.foot} id="suporte">
+        <div className={`${styles.wrap} ${styles.footRow}`}>
+          <div className={styles.footBrand}>
+            <span className={styles.glyph}>◆</span> <b>SignFlow</b>
+            <div className={`${styles.muted} ${styles.small}`}>Assinatura eletrônica com QR e validação pública.</div>
           </div>
-          <nav className="foot-nav" aria-label="Rodapé">
+          <nav className={styles.footNav} aria-label="Rodapé">
             <Link href="/security">Política de Segurança</Link>
             <Link href="/docs/immutability">Como garantimos a imutabilidade?</Link>
             <Link href="/status">SLA & Uptime</Link>
@@ -227,8 +228,8 @@ export default function HomePage() {
           </nav>
         </div>
 
-        <div className="wrap foot-legal" aria-label="Informações corporativas">
-          <div className="legal-block">
+        <div className={`${styles.wrap} ${styles.footLegal}`} aria-label="Informações corporativas">
+          <div className={styles.legalBlock}>
             <div><strong>SignFlow Serviços Digitais S.A.</strong></div>
             <div>CNPJ 12.345.678/0001-99 · Av. das Nações Unidas, 1000 — São Paulo/SP · CEP 04578-000</div>
             <div>Suporte corporativo: suporte@signflow.com.br · (11) 5555-0000</div>
@@ -236,24 +237,22 @@ export default function HomePage() {
         </div>
 
         {/* Selo final */}
-        <div className="wrap seal">
-          <div className="seal-badge" role="note" aria-label="Selo de verificação digital">
-            <span className="seal-icon"><GovShieldIcon/></span>
-            <div className="seal-text">
-              <div className="seal-title">Selo de Verificação Digital • Portal SignFlow</div>
-              <div className="seal-sub">Consulta oficial · QR Code verificado · Certificado ICP-Brasil emitido pela AC Dataprev ✔</div>
+        <div className={`${styles.wrap} ${styles.seal}`}>
+          <div className={styles.sealBadge} role="note" aria-label="Selo de verificação digital">
+            <span className={styles.sealIcon}><GovShieldIcon/></span>
+            <div className={styles.sealText}>
+              <div className={styles.sealTitle}>Selo de Verificação Digital • Portal SignFlow</div>
+              <div className={styles.sealSub}>Consulta oficial · QR Code verificado · Certificado ICP-Brasil emitido pela AC Dataprev ✔</div>
             </div>
-            <span className="seal-check" aria-hidden>✔</span>
+            <span className={styles.sealCheck} aria-hidden>✔</span>
           </div>
-          <div className="seal-chips" role="list" aria-label="Selos de conformidade">
+          <div className={styles.sealChips} role="list" aria-label="Selos de conformidade">
             <Chip><IcpiIcon/> ICP-Brasil homologado</Chip>
             <Chip><DataprevIcon/> Integração Dataprev</Chip>
             <Chip><LockIcon/> Certificado SSL EV</Chip>
           </div>
         </div>
       </footer>
-
-      <style>{css}</style>
     </main>
   )
 }
@@ -262,8 +261,8 @@ export default function HomePage() {
 
 function StepCard({ icon, title, text }:{ icon:React.ReactNode; title:string; text:string }) {
   return (
-    <div className="card">
-      <div className="card-ico">{icon}</div>
+    <div className={styles.stepCard}>
+      <div className={styles.cardIco}>{icon}</div>
       <h3>{title}</h3>
       <p>{text}</p>
     </div>
@@ -271,7 +270,7 @@ function StepCard({ icon, title, text }:{ icon:React.ReactNode; title:string; te
 }
 function Feature({ title, text }:{ title:string; text:string }) {
   return (
-    <div className="feature">
+    <div className={styles.feature}>
       <h3>{title}</h3>
       <p>{text}</p>
     </div>
@@ -281,10 +280,10 @@ function Quote({ logo, text, author, role }:{
   logo: React.ReactNode; text:string; author:string; role?:string
 }) {
   return (
-    <div className="quote">
-      <div className="q-logo">{logo}</div>
-      <p className="q-text">“{text}”</p>
-      <div className="q-author">— {author}{role ? ` · ${role}` : ''}</div>
+    <div className={styles.quote}>
+      <div className={styles.qLogo}>{logo}</div>
+      <p className={styles.qText}>“{text}”</p>
+      <div className={styles.qAuthor}>— {author}{role ? ` · ${role}` : ''}</div>
     </div>
   )
 }
@@ -292,12 +291,12 @@ function PriceCard({ title, price, bullets, featured, cta }:{
   title:string; price:string; bullets:string[]; featured?:boolean; cta:React.ReactNode
 }) {
   return (
-    <div className={`price ${featured ? 'featured': ''}`} tabIndex={0}>
-      <div className="price-head">
-        <div className="price-title">{title}</div>
-        <div className="price-amount">{price}</div>
+    <div className={`${styles.price} ${featured ? styles.featured : ''}`} tabIndex={0}>
+      <div className={styles.priceHead}>
+        <div className={styles.priceTitle}>{title}</div>
+        <div className={styles.priceAmount}>{price}</div>
       </div>
-      <ul className="price-list">
+      <ul className={styles.priceList}>
         {bullets.map((b,i)=><li key={i}><CheckIcon/>{b}</li>)}
       </ul>
       <div>{cta}</div>
@@ -308,12 +307,12 @@ function PriceCard({ title, price, bullets, featured, cta }:{
 /* ===== DOC MOCK ===== */
 function DocMock() {
   return (
-    <div className="doc" aria-label="Pré-visualização de documento assinado">
-      <div className="doc-bar">
-        <div className="dots" aria-hidden><span/><span/><span/></div>
-        <div className="doc-title">Laudo/Termo — Pré-visualização</div>
+    <div className={styles.doc} aria-label="Pré-visualização de documento assinado">
+      <div className={styles.docBar}>
+        <div className={styles.dots} aria-hidden><span/><span/><span/></div>
+        <div className={styles.docTitle}>Laudo/Termo — Pré-visualização</div>
       </div>
-      <svg viewBox="0 0 420 560" className="doc-svg" aria-hidden>
+      <svg viewBox="0 0 420 560" className={styles.docSvg} aria-hidden>
         <rect x="0" y="0" width="420" height="560" rx="8" fill="#fff"/>
         <rect x="18" y="18" width="384" height="20" rx="4" fill="#e5e7eb"/>
         <rect x="18" y="48" width="280" height="10" rx="4" fill="#e5e7eb"/>
@@ -354,7 +353,7 @@ function DocMock() {
                 stroke="#0f172a" strokeWidth="2" fill="none" opacity="0.9"/>
         </g>
       </svg>
-      <div className="doc-legend">
+      <div className={styles.docLegend}>
         <span title="Selo ICP-Brasil visível no documento"><IcpiIcon/> ICP-Brasil</span>
         <span title="QR válido para validação pública"><QrIcon/> QR por página</span>
         <span title="Hash seguro para integridade"><HashIcon/> SHA-256</span>
@@ -372,20 +371,30 @@ type OfficialSealProps = {
 
 function OfficialSeal({ variant, label, description, icon }:OfficialSealProps) {
   const baseId = `seal-${variant}`
+  // Map variants to CSS Module class names
+  const variantClassMap: Record<string, string> = {
+    'icp': styles.sealIcp,
+    'dataprev': styles.sealDataprev,
+    'govbr': styles.sealGovbr,
+    'secure': styles.sealSecure,
+    'lgpd': styles.sealLgpd,
+  }
+  const variantClass = variantClassMap[variant] || ''
+  
   return (
     <figure
-      className={`seal-card seal-${variant}`}
+      className={`${styles.sealCard} ${variantClass}`}
       role="listitem"
       aria-labelledby={`${baseId}-title`}
       aria-describedby={`${baseId}-desc`}
       tabIndex={0}
     >
-      <div className="seal-art" aria-hidden>
+      <div className={styles.sealArt} aria-hidden>
         {icon}
       </div>
-      <figcaption className="seal-meta">
-        <span id={`${baseId}-title`} className="seal-name">{label}</span>
-        <span id={`${baseId}-desc`} className="seal-desc">{description}</span>
+      <figcaption className={styles.sealMeta}>
+        <span id={`${baseId}-title`} className={styles.sealName}>{label}</span>
+        <span id={`${baseId}-desc`} className={styles.sealDesc}>{description}</span>
       </figcaption>
     </figure>
   )
@@ -393,7 +402,7 @@ function OfficialSeal({ variant, label, description, icon }:OfficialSealProps) {
 
 function IcpBrasilSealIcon(){
   return (
-    <svg viewBox="0 0 48 48" className="seal-svg" aria-hidden>
+    <svg viewBox="0 0 48 48" className={styles.sealSvg} aria-hidden>
       <circle cx="24" cy="24" r="22" fill="#ffffff" stroke="#0b5cab" strokeWidth="2.6"/>
       <path d="M16 20l8-8 8 8-8 8-8-8z" fill="#f7c948"/>
       <path d="M17 28l7 7 7-7" fill="#0f9d58"/>
@@ -404,7 +413,7 @@ function IcpBrasilSealIcon(){
 
 function DataprevSealIcon(){
   return (
-    <svg viewBox="0 0 48 48" className="seal-svg" aria-hidden>
+    <svg viewBox="0 0 48 48" className={styles.sealSvg} aria-hidden>
       <rect x="6" y="10" width="36" height="28" rx="6" fill="#0b6c4d"/>
       <rect x="10" y="16" width="28" height="4" rx="2" fill="#ffffff" opacity="0.9"/>
       <rect x="10" y="22" width="20" height="4" rx="2" fill="#c7f9e3"/>
@@ -416,7 +425,7 @@ function DataprevSealIcon(){
 
 function GovBrSealIcon(){
   return (
-    <svg viewBox="0 0 48 48" className="seal-svg" aria-hidden>
+    <svg viewBox="0 0 48 48" className={styles.sealSvg} aria-hidden>
       <rect x="6" y="12" width="36" height="24" rx="12" fill="#0b5cab"/>
       <path d="M12 30c4-6 8-9 12-9s8 3 12 9" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
       <circle cx="24" cy="21" r="4" fill="#f7c948"/>
@@ -426,7 +435,7 @@ function GovBrSealIcon(){
 
 function SecureSiteSealIcon(){
   return (
-    <svg viewBox="0 0 48 48" className="seal-svg" aria-hidden>
+    <svg viewBox="0 0 48 48" className={styles.sealSvg} aria-hidden>
       <rect x="10" y="18" width="28" height="18" rx="6" fill="#0f172a"/>
       <path d="M18 18v-3a6 6 0 1112 0v3" stroke="#4ade80" strokeWidth="2.4" strokeLinecap="round"/>
       <path d="M24 26v4" stroke="#4ade80" strokeWidth="2.6" strokeLinecap="round"/>
@@ -437,7 +446,7 @@ function SecureSiteSealIcon(){
 
 function LgpdSealIcon(){
   return (
-    <svg viewBox="0 0 48 48" className="seal-svg" aria-hidden>
+    <svg viewBox="0 0 48 48" className={styles.sealSvg} aria-hidden>
       <path d="M24 6l16 7v9c0 9-7 16-16 20-9-4-16-11-16-20v-9l16-7z" fill="#2563eb"/>
       <path d="M18 24l4 4 8-10" stroke="#bfdbfe" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
       <circle cx="24" cy="16" r="3" fill="#bfdbfe"/>
@@ -462,181 +471,5 @@ function IcpiIcon(){return <IconBase><circle cx="12" cy="12" r="9"/><path d="M8 
 function DataprevIcon(){return <IconBase><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h10M7 14h6"/></IconBase>}
 function HashIcon(){return <IconBase><path d="M5 9h14M5 15h14M9 5l-2 14M17 5l-2 14"/></IconBase>}
 
-/* ===== CSS ===== */
-const css = `
-:root{
-  --paper:#fff; --border:#e5e7eb; --muted:#475569; --txt:#0f172a;
-  --primary:#005BAA; --primary-dark:#003366; --ring:#dbeafe; --bg:#f7f9fc;
-}
-*{box-sizing:border-box} html,body{margin:0} a{color:inherit;text-decoration:none}
-.wrap{max-width:1180px;margin:0 auto;padding:0 16px}
-
-/* NAV */
-.pro-nav{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.9);backdrop-filter:blur(18px);border-bottom:1px solid rgba(148,163,184,.35)}
-.nav-row{display:flex;align-items:center;justify-content:space-between;height:66px}
-.brand{display:flex;align-items:center;gap:10px;color:var(--txt);font-weight:800}
-.glyph{display:inline-flex;width:22px;height:22px;border:2px solid var(--txt);border-radius:5px;align-items:center;justify-content:center}
-.links{display:flex;gap:18px}
-.links a{color:#111827;opacity:.9}
-.links a:hover{opacity:1}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:#fff;font-weight:700}
-.btn-primary{background:var(--primary);color:#fff;border-color:#003d84;box-shadow:0 6px 18px rgba(0,91,170,.28)}
-.btn-primary:hover{background:var(--primary-dark)}
-.btn-ghost{background:#fff}
-.btn-ghost:hover{box-shadow:0 2px 10px rgba(0,0,0,.06)}
-
-/* HERO */
-.hero{position:relative;overflow:hidden;background:linear-gradient(180deg,#f8fbff 0%,#ffffff 48%,#f2f6ff 100%)}
-.hero-bg{position:absolute;inset:-10% -20% auto -20%;height:560px;opacity:.55;
-  background:radial-gradient(780px 400px at -20% -10%, rgba(0,91,170,.35) 18%, transparent 65%),
-             radial-gradient(780px 400px at 120% -20%, rgba(0,51,102,.28) 18%, transparent 62%);} 
-.hero-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:clamp(28px,5vw,60px);align-items:center;padding:clamp(76px,12vw,120px) 0 clamp(40px,8vw,72px)}
-.hero-copy h1{font-size:clamp(36px,4.6vw,48px);line-height:1.05;margin:8px 0;letter-spacing:-.6px;color:#0b1529}
-.sub{color:#1f2937;margin:0;font-size:clamp(16px,2vw,18px);max-width:560px;line-height:1.6}
-.badge{display:inline-flex;align-items:center;gap:8px;color:var(--primary);margin-bottom:14px;padding:6px 12px;border:1px solid rgba(0,91,170,.32);border-radius:999px;background:rgba(219,234,254,.8)}
-.cta-row{display:flex;gap:12px;margin:18px 0;flex-wrap:wrap}
-.bullets{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:8px;color:#1f2937;font-size:15px}
-.hero-mock{display:flex;justify-content:center}
-
-/* TRUST */
-.trusted{background:#fff;border-top:1px solid rgba(148,163,184,.25);border-bottom:1px solid rgba(148,163,184,.25);padding:26px 0 30px}
-.trusted-title{margin:0;text-align:center;font-size:18px;letter-spacing:.08em;text-transform:uppercase;color:#475569}
-.trusted-sub{text-align:center;color:#334155;margin:6px 0 14px}
-.logos-row{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-  gap:16px;
-  align-items:stretch;
-  margin:22px 0 10px;
-}
-.seal-card{
-  --seal-accent:#0f172a;
-  --seal-bg:#f8fafc;
-  display:flex;
-  align-items:center;
-  gap:14px;
-  padding:16px;
-  border-radius:18px;
-  border:1px solid rgba(15,23,42,.12);
-  background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(226,232,240,.55));
-  box-shadow:0 14px 32px rgba(15,23,42,.08);
-  min-height:104px;
-  transition:transform .22s ease, box-shadow .24s ease, border-color .22s ease;
-  outline:none;
-}
-.seal-card:hover{
-  transform:translateY(-2px) scale(1.01);
-  box-shadow:0 18px 36px rgba(15,23,42,.12);
-  border-color:rgba(0,91,170,.35);
-}
-.seal-card:focus-visible{
-  transform:translateY(-2px) scale(1.01);
-  box-shadow:0 0 0 4px var(--ring),0 18px 36px rgba(15,23,42,.12);
-  border-color:var(--primary);
-}
-.seal-art{width:56px;height:56px;border-radius:14px;border:2px solid var(--seal-accent);background:var(--seal-bg);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(15,23,42,.12)}
-.seal-svg{width:42px;height:42px}
-.seal-meta{display:flex;flex-direction:column;gap:4px}
-.seal-name{font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--seal-accent)}
-.seal-desc{font-size:12px;line-height:1.45;color:#1f2937}
-.seal-icp{--seal-accent:#0b5cab;--seal-bg:#e8f1ff}
-.seal-dataprev{--seal-accent:#0b6c4d;--seal-bg:#e0f7eb}
-.seal-govbr{--seal-accent:#0b5cab;--seal-bg:#e3edff}
-.seal-secure{--seal-accent:#0f172a;--seal-bg:#e6fbea}
-.seal-lgpd{--seal-accent:#2563eb;--seal-bg:#e0ecff}
-.logo-img{display:block;width:150px;height:auto;border-radius:12px;box-shadow:0 10px 24px rgba(15,23,42,.08);background:#fff}
-.compliance{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:18px 0 6px}
-.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:999px;background:#fff;padding:8px 12px;color:var(--txt)}
-
-/* HOW */
-.how{background:#f8fafc;border-top:1px solid #eef2ff;border-bottom:1px solid #eef2ff;padding:52px 0}
-.how h2{margin:0 0 6px}
-.grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
-.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;min-height:158px}
-.card-ico{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:var(--ring);color:var(--primary)}
-.card h3{margin:10px 0 6px}
-.card p{margin:0;color:var(--muted);line-height:1.6}
-.feature{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px}
-.feature h3{margin:0}
-.feature p{margin:0;color:var(--muted);line-height:1.6}
-.demo{margin-top:20px}
-.demo-video{width:100%;max-width:720px;border:1px solid var(--border);border-radius:12px;display:block;margin:0 auto}
-.center{text-align:center}
-
-/* DIFFERENTIALS */
-.diff{background:#fff;padding:52px 0}
-
-/* TESTI */
-.testi{background:#f8fafc;border-top:1px solid #eef2ff;border-bottom:1px solid #eef2ff;padding:46px 0}
-.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
-.quote{background:#fff;border:1px solid rgba(148,163,184,.4);border-radius:16px;padding:18px;box-shadow:0 12px 28px rgba(15,23,42,.08);display:flex;flex-direction:column;gap:8px}
-.q-logo{display:flex;align-items:center;gap:8px}
-.q-text{margin:0;color:#1e293b;font-size:16px;line-height:1.6}
-.q-author{color:#475569;font-size:13px;text-transform:uppercase;letter-spacing:.08em}
-
-/* PRICING */
-.pricing{background:#fff;padding:56px 0}
-.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-.price{background:#fff;border:1px solid rgba(148,163,184,.4);border-radius:14px;padding:22px;box-shadow:0 8px 24px rgba(15,23,42,.08);transition:transform .2s ease, box-shadow .24s ease, border-color .2s ease;outline:none}
-.price:hover{transform:translateY(-3px) scale(1.01);box-shadow:0 12px 30px rgba(15,23,42,.12);border-color:rgba(0,91,170,.3)}
-.price:focus-visible{transform:translateY(-3px) scale(1.01);box-shadow:0 0 0 4px var(--ring),0 12px 30px rgba(15,23,42,.12);border-color:var(--primary)}
-.price.featured{border-color:var(--primary);box-shadow:0 10px 30px rgba(0,91,170,.18)}
-.price.featured:hover{box-shadow:0 14px 36px rgba(0,91,170,.22)}
-.price.featured:focus-visible{box-shadow:0 0 0 4px var(--ring),0 14px 36px rgba(0,91,170,.22)}
-.price-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
-.price-title{font-weight:800}
-.price-amount{font-weight:900;font-size:22px}
-.price-list{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:6px;color:#334155}
-
-/* DOC MOCK */
-.doc{width:100%;max-width:520px;border:1px solid rgba(148,163,184,.35);border-radius:16px;background:#fff;box-shadow:0 20px 44px rgba(15,23,42,.12);padding:12px}
-.doc-bar{display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--border);background:#f8fafc;border-radius:12px 12px 0 0}
-.dots span{display:inline-block;width:8px;height:8px;background:#e2e8f0;border-radius:999px;margin-right:6px}
-.doc-title{margin-left:auto;font-size:12px;color:#6b7280}
-.doc-svg{display:block;width:100%;height:auto}
-.doc-legend{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-start;margin-top:8px}
-.doc-legend span{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#334155}
-
-/* CTA */
-.cta{background:linear-gradient(180deg,#f8fafc,#ffffff);padding:46px 0}
-.cta-box{background:#fff;border:1px solid rgba(148,163,184,.35);border-radius:14px;padding:24px;display:flex;align-items:center;justify-content:space-between;gap:16px;box-shadow:0 14px 32px rgba(15,23,42,.08)}
-.cta-actions{display:flex;gap:12px;flex-wrap:wrap}
-
-/* FOOTER */
-.foot{border-top:1px solid rgba(148,163,184,.35);background:#fff}
-.foot-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 0;flex-wrap:wrap}
-.foot-nav{display:flex;gap:14px;flex-wrap:wrap}
-.foot-legal{padding:0 0 18px;color:var(--muted)}
-.legal-block{display:flex;flex-direction:column;gap:4px;font-size:12px;line-height:1.5;text-align:center}
-.muted{color:var(--muted)} .small{font-size:12px}
-
-/* SEAL */
-.seal{padding:8px 0 28px}
-.seal-badge{display:flex;gap:12px;align-items:center;justify-content:center;padding:14px 18px;border:1px solid rgba(0,91,170,.32);border-radius:16px;background:linear-gradient(135deg,rgba(219,234,254,.9),#ffffff);box-shadow:0 12px 34px rgba(0,91,170,.16)}
-.seal-icon{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:12px;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
-.seal-title{font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--primary)}
-.seal-sub{font-size:12px;color:#0f172a}
-.seal-check{font-size:24px;color:#16a34a;font-weight:900;margin-left:6px}
-.seal-chips{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-
-/* RESPONSIVO */
-@media (max-width: 1080px){
-  .hero-grid{grid-template-columns:1fr}
-  .grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .grid-2{grid-template-columns:1fr}
-  .logos-row{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-}
-@media (max-width: 768px){
-  .grid-4,.grid-3{grid-template-columns:1fr;gap:16px}
-  .card,.feature,.quote{padding:14px}
-  .q-text{font-size:15px}
-}
-@media (max-width: 680px){
-  .cta-box{flex-direction:column;align-items:flex-start}
-  .logos-row{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
-}
-`
-
 /* ===== HELPERS ===== */
-function Chip({children}:{children:React.ReactNode}){return <span className="chip">{children}</span>}
+function Chip({children}:{children:React.ReactNode}){return <span className={styles.chip}>{children}</span>}

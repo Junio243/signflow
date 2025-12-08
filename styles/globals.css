@@ -2,8 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --paper: #fff;
+  --border: #e5e7eb;
+  --muted: #475569;
+  --txt: #0f172a;
+  --primary: #005BAA;
+  --primary-dark: #003366;
+  --ring: #dbeafe;
+  --bg: #f7f9fc;
+}
+
 html, body, :root { height: 100%; }
-body { @apply bg-slate-50 text-slate-800; }
+body { 
+  @apply bg-slate-50 text-slate-800;
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
 .btn { @apply px-4 py-2 rounded-xl bg-brand-600 text-white text-sm hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed; }
 .card { @apply bg-white rounded-2xl shadow p-4; }
 .input { @apply w-full rounded-lg border border-slate-300 p-2 text-sm; }
