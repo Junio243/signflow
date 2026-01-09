@@ -8,9 +8,9 @@ import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 export async function GET(req: NextRequest) {
   // Verificar se é uma chamada autorizada (ex: cron job)
   const authHeader = req.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
+  const cronSecret = process.env.CRON_SECRET?.trim();
 
-  if (!cronSecret || cronSecret.trim() === '' || authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
