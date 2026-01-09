@@ -252,34 +252,54 @@ export default function PdfEditor({
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <button className="btn" onClick={() => changePage(page - 1)} disabled={page <= 1}>◀</button>
-        <div>p. {page} / {totalPages}</div>
-        <button className="btn" onClick={() => changePage(page + 1)} disabled={page >= totalPages}>▶</button>
-        <div className="ml-auto flex items-center gap-2">
-          <label className="label m-0">Tamanho</label>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <button className="btn-secondary min-w-[44px] min-h-[44px] px-3 py-2" onClick={() => changePage(page - 1)} disabled={page <= 1}>◀</button>
+        <div className="text-sm whitespace-nowrap">p. {page} / {totalPages}</div>
+        <button className="btn-secondary min-w-[44px] min-h-[44px] px-3 py-2" onClick={() => changePage(page + 1)} disabled={page >= totalPages}>▶</button>
+        <div className="ml-auto hidden sm:flex items-center gap-2 text-xs sm:text-sm">
+          <label className="label m-0 whitespace-nowrap">Tamanho</label>
           <input type="range" min={0.5} max={3} step={0.1} value={currentPos?.scale || 1} onChange={e => {
             const v = Number(e.target.value);
             if (!currentPos) return; onPositions([...positions.filter(p => p.page !== page), { ...currentPos, scale: v }]);
-          }} />
-          <label className="label m-0">Rotação</label>
+          }} className="w-20" />
+          <label className="label m-0 whitespace-nowrap">Rotação</label>
           <input type="range" min={-45} max={45} step={1} value={currentPos?.rotation || 0} onChange={e => {
             const v = Number(e.target.value);
             if (!currentPos) return; onPositions([...positions.filter(p => p.page !== page), { ...currentPos, rotation: v }]);
-          }} />
+          }} className="w-20" />
         </div>
       </div>
-      <div className="relative">
+      {currentPos && (
+        <div className="flex sm:hidden flex-col gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <label className="label m-0 w-16">Tamanho</label>
+            <input type="range" min={0.5} max={3} step={0.1} value={currentPos?.scale || 1} onChange={e => {
+              const v = Number(e.target.value);
+              if (!currentPos) return; onPositions([...positions.filter(p => p.page !== page), { ...currentPos, scale: v }]);
+            }} className="flex-1" />
+            <span className="w-12 text-right">{(currentPos?.scale || 1).toFixed(1)}×</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="label m-0 w-16">Rotação</label>
+            <input type="range" min={-45} max={45} step={1} value={currentPos?.rotation || 0} onChange={e => {
+              const v = Number(e.target.value);
+              if (!currentPos) return; onPositions([...positions.filter(p => p.page !== page), { ...currentPos, rotation: v }]);
+            }} className="flex-1" />
+            <span className="w-12 text-right">{(currentPos?.rotation || 0).toFixed(0)}°</span>
+          </div>
+        </div>
+      )}
+      <div className="relative w-full overflow-auto">
         <canvas
           ref={canvasRef}
-          className="rounded-lg border bg-white max-w-full"
+          className="rounded-lg border bg-white mx-auto"
           onClick={onClick}
           onWheel={onWheel}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
-          style={{ display: 'block', maxWidth: '100%' }}
+          style={{ display: 'block', maxWidth: '100%', height: 'auto', touchAction: 'manipulation' }}
         />
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center rounded-lg border bg-white/80 text-sm text-slate-600">

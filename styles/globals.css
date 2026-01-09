@@ -14,11 +14,87 @@
 }
 
 html, body, :root { height: 100%; }
+
 body { 
   @apply bg-slate-50 text-slate-800;
   font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-tap-highlight-color: transparent;
 }
-.btn { @apply px-4 py-2 rounded-xl bg-brand-600 text-white text-sm hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed; }
-.card { @apply bg-white rounded-2xl shadow p-4; }
-.input { @apply w-full rounded-lg border border-slate-300 p-2 text-sm; }
-.label { @apply block text-sm font-medium mb-1; }
+
+/* Componentes base responsivos */
+.btn { 
+  @apply px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-medium
+         hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed
+         min-h-[44px] touch-manipulation transition-colors;
+}
+
+.btn-secondary {
+  @apply px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-medium
+         hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed
+         min-h-[44px] touch-manipulation transition-colors;
+}
+
+.card { 
+  @apply bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6; 
+}
+
+.input { 
+  @apply w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm
+         min-h-[44px] touch-manipulation
+         focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none
+         transition-colors;
+}
+
+.label { 
+  @apply block text-sm font-medium text-slate-700 mb-1.5; 
+}
+
+/* Container responsivo */
+.container-responsive {
+  @apply w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* Grid responsivo para editor */
+.editor-grid {
+  @apply grid gap-6;
+  grid-template-columns: 1fr;
+}
+
+@screen lg {
+  .editor-grid {
+    grid-template-columns: 1.5fr 1fr;
+  }
+}
+
+@screen xl {
+  .editor-grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+/* Overlay para menus mobile */
+.mobile-overlay {
+  @apply fixed inset-0 bg-black/50 z-40 backdrop-blur-sm;
+}
+
+/* Touch-friendly spacing */
+@layer utilities {
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Melhorar scroll em mobile */
+@supports (-webkit-overflow-scrolling: touch) {
+  .scroll-touch {
+    -webkit-overflow-scrolling: touch;
+  }
+}

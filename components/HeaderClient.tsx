@@ -210,47 +210,57 @@ export default function HeaderClient() {
       </div>
 
       {mobileOpen && (
-        <nav className="border-t border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 md:hidden" aria-label="Menu móvel">
-          <ul className="flex flex-col gap-2">
-            {navLinks.map(link => {
-              const isActive =
-                !link.href.includes('#') && (pathname === link.href || pathname.startsWith(`${link.href}/`))
-              return (
-                <li key={link.href}>
+        <>
+          <div 
+            className="mobile-overlay md:hidden" 
+            onClick={() => setMobileOpen(false)}
+            aria-hidden="true"
+          />
+          <nav 
+            className="fixed right-0 top-[65px] z-50 h-[calc(100vh-65px)] w-[280px] overflow-y-auto border-l border-slate-200 bg-white px-4 py-6 text-sm font-medium text-slate-700 shadow-2xl transition-transform duration-300 ease-in-out md:hidden"
+            aria-label="Menu móvel"
+          >
+            <ul className="flex flex-col gap-1">
+              {navLinks.map(link => {
+                const isActive =
+                  !link.href.includes('#') && (pathname === link.href || pathname.startsWith(`${link.href}/`))
+                return (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className={classNames(
+                        'flex min-h-[44px] items-center rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
+                        isActive && 'bg-slate-100 text-slate-900 font-semibold'
+                      )}
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                )
+              })}
+              {!user && pathname === '/' && (
+                <li className="mt-4">
                   <Link
-                    href={link.href}
-                    className={classNames(
-                      'flex items-center justify-between rounded-lg px-3 py-2 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
-                      isActive && 'bg-slate-100 text-slate-900'
-                    )}
+                    href="/signup"
+                    className="flex min-h-[44px] w-full items-center justify-center rounded-lg bg-brand-600 px-4 py-3 text-white transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
                   >
-                    {link.label}
+                    Criar conta
                   </Link>
                 </li>
-              )
-            })}
-            {!user && pathname === '/' && (
-              <li>
-                <Link
-                  href="/signup"
-                  className="flex w-full items-center justify-between rounded-lg bg-brand-600 px-3 py-2 text-white transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+              )}
+              <li className="mt-2">
+                <button
+                  type="button"
+                  onClick={handleAuth}
+                  className="flex min-h-[44px] w-full items-center justify-between rounded-lg border border-slate-200 px-4 py-3 text-left text-slate-700 transition hover:border-brand-500 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
                 >
-                  Criar conta
-                </Link>
+                  {user ? 'Sair' : 'Entrar'}
+                  {user ? <LogOut className="h-4 w-4" aria-hidden /> : <LogIn className="h-4 w-4" aria-hidden />}
+                </button>
               </li>
-            )}
-            <li>
-              <button
-                type="button"
-                onClick={handleAuth}
-                className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-slate-700 transition hover:border-brand-500 hover:text-brand-600"
-              >
-                {user ? 'Sair' : 'Entrar'}
-                {user ? <LogOut className="h-4 w-4" aria-hidden /> : <LogIn className="h-4 w-4" aria-hidden />}
-              </button>
-            </li>
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        </>
       )}
     </header>
   )
