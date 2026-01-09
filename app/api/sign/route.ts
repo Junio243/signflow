@@ -65,11 +65,17 @@ function extractSignersFromMetadata(metadata: Metadata): SignerMetadata[] {
     return sanitized;
   }
 
+  type MetadataWithTheme = Metadata & {
+    validation_theme_snapshot?: Record<string, unknown>;
+    theme?: Record<string, unknown>;
+  };
+
+  const metadataTyped = metadata as MetadataWithTheme;
   const theme =
-    (metadata && typeof (metadata as any).validation_theme_snapshot === 'object'
-      ? (metadata as any).validation_theme_snapshot
+    (metadataTyped.validation_theme_snapshot && typeof metadataTyped.validation_theme_snapshot === 'object'
+      ? metadataTyped.validation_theme_snapshot
       : null) ||
-    (metadata && typeof (metadata as any).theme === 'object' ? (metadata as any).theme : null);
+    (metadataTyped.theme && typeof metadataTyped.theme === 'object' ? metadataTyped.theme : null);
 
   if (theme && typeof theme === 'object') {
     const issuer = typeof (theme as any).issuer === 'string' ? (theme as any).issuer.trim() : '';
@@ -332,19 +338,19 @@ export async function POST(req: NextRequest) {
 
     // URLs públicas
     const pubSigned = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/signed.pdf`);
-    if (pubSigned.error || !pubSigned.data?.publicUrl) {
-      console.error('Erro ao gerar URL pública do PDF assinado:', pubSigned.error);
+    if (!pubSigned.data?.publicUrl) {
+      console.error('Erro ao gerar URL pública do PDF assinado: URL não disponível');
       return NextResponse.json(
-        { error: pubSigned.error?.message || 'Falha ao gerar URL pública do PDF assinado.' },
+        { error: 'Falha ao gerar URL pública do PDF assinado.' },
         { status: 500 },
       );
     }
 
     const pubQr = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/qr.png`);
-    if (pubQr.error || !pubQr.data?.publicUrl) {
-      console.error('Erro ao gerar URL pública do QR code:', pubQr.error);
+    if (!pubQr.data?.publicUrl) {
+      console.error('Erro ao gerar URL pública do QR code: URL não disponível');
       return NextResponse.json(
-        { error: pubQr.error?.message || 'Falha ao gerar URL pública do QR code.' },
+        { error: 'Falha ao gerar URL pública do QR code.' },
         { status: 500 },
       );
     }
