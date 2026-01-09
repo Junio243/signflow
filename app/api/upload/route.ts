@@ -12,9 +12,18 @@ import {
 } from '@/lib/validation/documentSchemas';
 
 const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB
+const MAX_PDF_SIZE_MB = 20;
 const MAX_SIGNATURE_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_SIGNATURE_SIZE_MB = 5;
 const ALLOWED_PDF_TYPES = ['application/pdf'];
 const ALLOWED_SIGNATURE_TYPES = ['image/png', 'image/jpeg'];
+
+/**
+ * Convert bytes to megabytes with 2 decimal places
+ */
+function bytesToMB(bytes: number): string {
+  return (bytes / (1024 * 1024)).toFixed(2);
+}
 
 /**
  * Helper: retorna SHA256 hex do input
@@ -120,8 +129,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (pdf.size > MAX_PDF_BYTES) {
+      const sizeMB = bytesToMB(pdf.size);
       structuredLog('warn', { ...baseCtx, event: 'validation_failed', reason: 'pdf_too_large', pdfSize: pdf.size });
-      return NextResponse.json({ error: 'PDF inválido: tamanho máximo de 20MB.' }, { status: 400 });
+      return NextResponse.json({ 
+        error: `PDF muito grande! Tamanho máximo: ${MAX_PDF_SIZE_MB}MB. Seu arquivo: ${sizeMB}MB.` 
+      }, { status: 413 });
     }
 
     // Validações da assinatura (opcional)
@@ -145,8 +157,11 @@ export async function POST(req: NextRequest) {
       }
 
       if (signature.size > MAX_SIGNATURE_BYTES) {
+        const sizeMB = bytesToMB(signature.size);
         structuredLog('warn', { ...baseCtx, event: 'validation_failed', reason: 'signature_too_large', signatureSize: signature.size });
-        return NextResponse.json({ error: 'Assinatura inválida: tamanho máximo de 5MB.' }, { status: 400 });
+        return NextResponse.json({ 
+          error: `Assinatura muito grande! Tamanho máximo: ${MAX_SIGNATURE_SIZE_MB}MB. Seu arquivo: ${sizeMB}MB.` 
+        }, { status: 413 });
       }
     }
 
