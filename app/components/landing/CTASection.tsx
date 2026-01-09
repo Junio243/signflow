@@ -5,7 +5,7 @@ import { Zap, Play } from 'lucide-react'
 
 export default function CTASection() {
   return (
-    <section className="py-16 sm:py-20 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800">
+    <section id="precos" className="py-16 sm:py-20 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div>
           <div className="text-center">

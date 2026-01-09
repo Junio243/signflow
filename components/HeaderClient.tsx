@@ -29,6 +29,7 @@ const LANDING_LINKS = [
   { href: '/#seguranca', label: 'Segurança' },
   { href: '/#precos', label: 'Preços' },
   { href: '/#suporte', label: 'Suporte/Ajuda' },
+  { href: '/contato', label: 'Contato' },
 ]
 
 export default function HeaderClient() {
@@ -100,6 +101,20 @@ export default function HeaderClient() {
     router.push(`/login?next=${next}`)
   }, [router, supabase, user])
 
+  const handleAnchorClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    // Só intercepta se já estiver na landing page e o link for uma âncora
+    if (pathname === '/' && href.startsWith('/#')) {
+      e.preventDefault()
+      const id = href.replace('/#', '')
+      const element = document.getElementById(id)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        // Fecha o menu mobile se estiver aberto
+        setMobileOpen(false)
+      }
+    }
+  }, [pathname])
+
   const navLinks = useMemo(() => {
     const filteredNavLinks = user ? NAV_LINKS : NAV_LINKS.filter(link => !link.requiresAuth)
 
@@ -136,6 +151,7 @@ export default function HeaderClient() {
               <Link
                 key={link.href}
                 href={link.href}
+                onClick={(e) => handleAnchorClick(e, link.href)}
                 className={classNames(
                   'rounded-lg px-3 py-2 transition hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2',
                   isActive && 'bg-slate-100 text-slate-900'
@@ -227,6 +243,7 @@ export default function HeaderClient() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
+                      onClick={(e) => handleAnchorClick(e, link.href)}
                       className={classNames(
                         'flex min-h-[44px] items-center rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
                         isActive && 'bg-slate-100 text-slate-900 font-semibold'
