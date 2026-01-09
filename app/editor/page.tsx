@@ -10,6 +10,7 @@ import type {
 import Link from 'next/link'
 import PdfEditor from '@/components/PdfEditor'
 import { supabase } from '@/lib/supabaseClient'
+import type { QrPosition, QrPage } from '@/lib/validation/documentSchemas'
 
 // -- tipos e constantes (mantidos) --
 type ProfileType = 'medico' | 'faculdade' | 'generico'
@@ -178,6 +179,9 @@ export default function EditorPage() {
   const [status, setStatus] = useState<StatusMessage | null>(null)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<UploadResult | null>(null)
+
+  const [qrPosition, setQrPosition] = useState<QrPosition>('bottom-left')
+  const [qrPage, setQrPage] = useState<QrPage>('last')
 
   const setInfo = (text: string) => setStatus({ tone: 'neutral', text })
   const setError = (text: string) => setStatus({ tone: 'error', text })
@@ -820,6 +824,9 @@ export default function EditorPage() {
         form.append('validation_profile_id', selectedProfile.id)
         form.append('validation_theme_snapshot', JSON.stringify(selectedProfile.theme || null))
       }
+
+      form.append('qr_position', qrPosition)
+      form.append('qr_page', qrPage)
 
       if (signatureBlob instanceof File) {
         form.append('signature', signatureBlob, signatureBlob.name)
@@ -1473,6 +1480,117 @@ export default function EditorPage() {
               <p className="mt-4 text-xs text-slate-500">
                 Os signatários cadastrados serão salvos nos metadados do documento e aparecerão automaticamente na página de validação.
               </p>
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Configurações do QR Code</h2>
+                <p className="text-sm text-slate-500">
+                  Escolha onde o QR Code de validação será posicionado no documento assinado.
+                </p>
+              </div>
+
+              <div className="mt-6 space-y-4">
+                <div className="grid gap-2">
+                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Posição do QR Code</label>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:border-slate-300 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="qr-position"
+                        checked={qrPosition === 'bottom-left'}
+                        onChange={() => setQrPosition('bottom-left')}
+                        disabled={busy}
+                      />
+                      Inferior Esquerdo
+                    </label>
+                    <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:border-slate-300 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="qr-position"
+                        checked={qrPosition === 'bottom-right'}
+                        onChange={() => setQrPosition('bottom-right')}
+                        disabled={busy}
+                      />
+                      Inferior Direito
+                    </label>
+                    <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:border-slate-300 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="qr-position"
+                        checked={qrPosition === 'top-left'}
+                        onChange={() => setQrPosition('top-left')}
+                        disabled={busy}
+                      />
+                      Superior Esquerdo
+                    </label>
+                    <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:border-slate-300 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="qr-position"
+                        checked={qrPosition === 'top-right'}
+                        onChange={() => setQrPosition('top-right')}
+                        disabled={busy}
+                      />
+                      Superior Direito
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Página(s) com QR Code</label>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:border-slate-300 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="qr-page"
+                        checked={qrPage === 'last'}
+                        onChange={() => setQrPage('last')}
+                        disabled={busy}
+                      />
+                      Última página
+                    </label>
+                    <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:border-slate-300 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="qr-page"
+                        checked={qrPage === 'first'}
+                        onChange={() => setQrPage('first')}
+                        disabled={busy}
+                      />
+                      Primeira página
+                    </label>
+                    <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:border-slate-300 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="qr-page"
+                        checked={qrPage === 'all'}
+                        onChange={() => setQrPage('all')}
+                        disabled={busy}
+                      />
+                      Todas as páginas
+                    </label>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs text-slate-600">
+                    <strong>Preview:</strong> O QR Code será posicionado no canto{' '}
+                    <strong>
+                      {qrPosition === 'bottom-left' && 'inferior esquerdo'}
+                      {qrPosition === 'bottom-right' && 'inferior direito'}
+                      {qrPosition === 'top-left' && 'superior esquerdo'}
+                      {qrPosition === 'top-right' && 'superior direito'}
+                    </strong>
+                    {' '}da{' '}
+                    <strong>
+                      {qrPage === 'last' && 'última página'}
+                      {qrPage === 'first' && 'primeira página'}
+                      {qrPage === 'all' && 'todas as páginas'}
+                    </strong>.
+                  </p>
+                </div>
+              </div>
             </section>
 
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

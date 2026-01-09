@@ -17,6 +17,10 @@ import {
   Position,
   documentIdSchema,
   storedMetadataSchema,
+  qrPositionSchema,
+  qrPageSchema,
+  QrPosition,
+  QrPage,
 } from '@/lib/validation/documentSchemas';
 
 type SignerMetadata = {
@@ -252,15 +256,56 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // gera QR e insere na última página
+    // gera QR e insere nas páginas configuradas
     const base = process.env.NEXT_PUBLIC_BASE_URL || req.nextUrl.origin;
     const validateUrl = `${base}/validate/${id}`;
     const qrPng = await QRCode.toBuffer(validateUrl, { width: 256 });
     const qrImage = await pdfDoc.embedPng(qrPng);
-    const last = pages[pages.length - 1];
+    
+    // Extract QR position settings from metadata with proper validation
+    const qrPositionRaw = (normalizedMetadata as any).qr_position || 'bottom-left';
+    const qrPageRaw = (normalizedMetadata as any).qr_page || 'last';
+    
+    const qrPositionResult = qrPositionSchema.safeParse(qrPositionRaw);
+    const qrPosition: QrPosition = qrPositionResult.success ? qrPositionResult.data : 'bottom-left';
+    
+    const qrPageResult = qrPageSchema.safeParse(qrPageRaw);
+    const qrPage: QrPage = qrPageResult.success ? qrPageResult.data : 'last';
+    
     const margin = 30;
     const qrSize = 80;
-    last.drawImage(qrImage, { x: margin, y: margin, width: qrSize, height: qrSize });
+    
+    // Function to calculate QR coordinates based on position
+    function getQrCoordinates(pageWidth: number, pageHeight: number, position: QrPosition) {
+      switch (position) {
+        case 'bottom-right':
+          return { x: pageWidth - margin - qrSize, y: margin };
+        case 'top-left':
+          return { x: margin, y: pageHeight - margin - qrSize };
+        case 'top-right':
+          return { x: pageWidth - margin - qrSize, y: pageHeight - margin - qrSize };
+        default: // bottom-left
+          return { x: margin, y: margin };
+      }
+    }
+    
+    // Determine which pages receive the QR code
+    let targetPages: any[] = [];
+    if (qrPage === 'first') {
+      targetPages = [pages[0]];
+    } else if (qrPage === 'all') {
+      targetPages = pages;
+    } else { // last
+      targetPages = [pages[pages.length - 1]];
+    }
+    
+    // Insert QR code in selected pages
+    for (const page of targetPages) {
+      const pageWidth = page.getWidth();
+      const pageHeight = page.getHeight();
+      const coords = getQrCoordinates(pageWidth, pageHeight, qrPosition);
+      page.drawImage(qrImage, { x: coords.x, y: coords.y, width: qrSize, height: qrSize });
+    }
 
     const signedBytes = await pdfDoc.save();
 

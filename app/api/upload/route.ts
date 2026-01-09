@@ -9,6 +9,8 @@ import {
   metadataSchema,
   positionSchema,
   signerSchema,
+  qrPositionSchema,
+  qrPageSchema,
 } from '@/lib/validation/documentSchemas';
 
 const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB
@@ -94,6 +96,8 @@ export async function POST(req: NextRequest) {
     const validationProfileId = form.get('validation_profile_id')?.toString() || null;
     const userId = form.get('user_id')?.toString() || null;
     const signersRaw = form.get('signers')?.toString() || '[]';
+    const qrPositionRaw = form.get('qr_position')?.toString() || 'bottom-left';
+    const qrPageRaw = form.get('qr_page')?.toString() || 'last';
 
     structuredLog('info', {
       ...baseCtx,
@@ -247,12 +251,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Validate QR position and page
+    const qrPositionResult = qrPositionSchema.safeParse(qrPositionRaw);
+    if (!qrPositionResult.success) {
+      return NextResponse.json(
+        { error: 'qr_position inválido', details: qrPositionResult.error.format() },
+        { status: 400 }
+      );
+    }
+    const qrPosition = qrPositionResult.data;
+
+    const qrPageResult = qrPageSchema.safeParse(qrPageRaw);
+    if (!qrPageResult.success) {
+      return NextResponse.json(
+        { error: 'qr_page inválido', details: qrPageResult.error.format() },
+        { status: 400 }
+      );
+    }
+    const qrPage = qrPageResult.data;
+
     const metadataResult = metadataSchema.safeParse({
       positions: parsedPositions.data,
       signature_meta: parsedSignatureMeta.data,
       validation_theme_snapshot: parsedValidationTheme.data,
       validation_profile_id: validationProfileId,
       signers: parsedSigners.data,
+      qr_position: qrPosition,
+      qr_page: qrPage,
     });
 
     if (!metadataResult.success) {
@@ -287,6 +312,8 @@ export async function POST(req: NextRequest) {
     if (validationTheme) metadata.validation_theme_snapshot = validationTheme;
     if (validationProfileIdSanitized) metadata.validation_profile_id = validationProfileIdSanitized;
     if (sanitizedSigners.length) metadata.signers = sanitizedSigners;
+    if (qrPosition) metadata.qr_position = qrPosition;
+    if (qrPage) metadata.qr_page = qrPage;
 
     const basePayload: Record<string, any> = {
       id,
