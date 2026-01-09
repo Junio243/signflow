@@ -1,6 +1,5 @@
 'use client'
 
-import AnimatedSection from '../ui/AnimatedSection'
 import { MessageCircle, Scale, FolderKanban, FileText, ShieldCheck, Code } from 'lucide-react'
 
 export default function FeaturesGrid() {
@@ -40,7 +39,7 @@ export default function FeaturesGrid() {
   return (
     <section className="py-16 sm:py-20 bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <AnimatedSection>
+        <div>
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               Funcionalidades inteligentes
@@ -49,11 +48,11 @@ export default function FeaturesGrid() {
               Tudo que você precisa para assinar documentos com segurança e praticidade
             </p>
           </div>
-        </AnimatedSection>
+        </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, i) => (
-            <AnimatedSection key={i} delay={i * 0.08}>
+            <div key={i}>
               <div className="group bg-white rounded-xl p-6 border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 h-full">
                 {/* Icon */}
                 <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center mb-4 group-hover:bg-blue-600 group-hover:scale-110 transition-all duration-300">
@@ -68,7 +67,7 @@ export default function FeaturesGrid() {
                   {feature.description}
                 </p>
               </div>
-            </AnimatedSection>
+            </div>
           ))}
         </div>
       </div>

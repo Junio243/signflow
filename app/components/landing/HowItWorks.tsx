@@ -1,7 +1,6 @@
 'use client'
 
-import AnimatedSection from '../ui/AnimatedSection'
-import { Upload, Users, Download, ArrowRight } from 'lucide-react'
+import { Upload, Users, Download } from 'lucide-react'
 
 export default function HowItWorks() {
   const steps = [
@@ -49,7 +48,7 @@ export default function HowItWorks() {
   return (
     <section className="py-16 sm:py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <AnimatedSection>
+        <div>
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               Como funciona
@@ -58,7 +57,7 @@ export default function HowItWorks() {
               Assine documentos em 3 passos simples
             </p>
           </div>
-        </AnimatedSection>
+        </div>
 
         <div className="grid md:grid-cols-3 gap-8 relative">
           {/* Connecting lines */}
@@ -70,7 +69,7 @@ export default function HowItWorks() {
             const colors = colorClasses[step.color as keyof typeof colorClasses]
             
             return (
-              <AnimatedSection key={i} delay={i * 0.15}>
+              <div key={i}>
                 <div className="relative">
                   <div className="bg-white rounded-2xl border-2 border-gray-200 p-8 hover:border-blue-300 hover:shadow-xl transition-all duration-300 h-full">
                     {/* Step number */}
@@ -91,15 +90,8 @@ export default function HowItWorks() {
                       {step.description}
                     </p>
                   </div>
-
-                  {/* Arrow connector (mobile only) */}
-                  {i < steps.length - 1 && (
-                    <div className="md:hidden flex justify-center my-4">
-                      <ArrowRight className="w-6 h-6 text-gray-300" />
-                    </div>
-                  )}
                 </div>
-              </AnimatedSection>
+              </div>
             )
           })}
         </div>
