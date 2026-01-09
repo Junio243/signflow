@@ -711,10 +711,22 @@
 }
 
 /* Responsive */
-@media (max-width: 1080px) {
+@media (max-width: 1024px) {
   .heroGrid {
     grid-template-columns: 1fr;
+    text-align: center;
   }
+  
+  .heroCopy {
+    order: 1;
+  }
+  
+  .heroImage {
+    order: 2;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+  
   .grid4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -743,14 +755,41 @@
   .qText {
     font-size: 15px;
   }
+  .price {
+    padding: 18px;
+  }
 }
 
-@media (max-width: 680px) {
+@media (max-width: 640px) {
+  .wrap {
+    padding: 0 16px;
+  }
+  
+  .ctaRow {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .landingBtn {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+  
   .ctaBox {
     flex-direction: column;
     align-items: flex-start;
   }
+  
   .logosRow {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+  
+  .sealCard {
+    min-height: 90px;
+  }
+  
+  .heroGrid {
+    padding: 60px 0 32px;
   }
 }
