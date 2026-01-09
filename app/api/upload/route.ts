@@ -94,6 +94,8 @@ export async function POST(req: NextRequest) {
     const validationProfileId = form.get('validation_profile_id')?.toString() || null;
     const userId = form.get('user_id')?.toString() || null;
     const signersRaw = form.get('signers')?.toString() || '[]';
+    const qrPosition = form.get('qr_position')?.toString() || 'bottom-left';
+    const qrPage = form.get('qr_page')?.toString() || 'last';
 
     structuredLog('info', {
       ...baseCtx,
@@ -253,6 +255,8 @@ export async function POST(req: NextRequest) {
       validation_theme_snapshot: parsedValidationTheme.data,
       validation_profile_id: validationProfileId,
       signers: parsedSigners.data,
+      qr_position: qrPosition,
+      qr_page: qrPage,
     });
 
     if (!metadataResult.success) {
@@ -287,6 +291,8 @@ export async function POST(req: NextRequest) {
     if (validationTheme) metadata.validation_theme_snapshot = validationTheme;
     if (validationProfileIdSanitized) metadata.validation_profile_id = validationProfileIdSanitized;
     if (sanitizedSigners.length) metadata.signers = sanitizedSigners;
+    if (qrPosition) metadata.qr_position = qrPosition;
+    if (qrPage) metadata.qr_page = qrPage;
 
     const basePayload: Record<string, any> = {
       id,

@@ -52,6 +52,9 @@ export default function PdfEditor({
   // throttle refs
   const rafRef = useRef(false);
   const latestPosRef = useRef<{ nx: number; ny: number } | null>(null);
+  
+  // ref to track first load to avoid resetting page on re-renders
+  const isFirstLoadRef = useRef(true);
 
   // Log quando 'file' muda
   useEffect(() => {
@@ -62,6 +65,9 @@ export default function PdfEditor({
     let cancelled = false;
     let task: any;
     let blobUrl: string | null = null;
+
+    // Reset first load flag when file changes
+    isFirstLoadRef.current = true;
 
     (async () => {
       if (!file) {
@@ -87,9 +93,14 @@ export default function PdfEditor({
           if (cancelled) { await doc?.destroy?.(); return; }
           console.log('PdfEditor: pdf carregado via Uint8Array, páginas=', doc.numPages);
           setPdf(doc);
-          if (controlledPage === undefined) setPage(1);
-          onDocumentLoaded?.({ pages: doc.numPages || 1 });
-          onPageChange?.(1);
+          
+          // Only reset page and call onPageChange on first load
+          if (isFirstLoadRef.current) {
+            isFirstLoadRef.current = false;
+            if (controlledPage === undefined) setPage(1);
+            onDocumentLoaded?.({ pages: doc.numPages || 1 });
+            onPageChange?.(1);
+          }
           return;
         } catch (firstErr) {
           console.warn('PdfEditor: getDocument usando Uint8Array falhou — tentando blob URL. Erro:', firstErr);
@@ -104,9 +115,14 @@ export default function PdfEditor({
           if (cancelled) { await doc?.destroy?.(); return; }
           console.log('PdfEditor: pdf carregado via blob URL, páginas=', doc.numPages);
           setPdf(doc);
-          if (controlledPage === undefined) setPage(1);
-          onDocumentLoaded?.({ pages: doc.numPages || 1 });
-          onPageChange?.(1);
+          
+          // Only reset page and call onPageChange on first load
+          if (isFirstLoadRef.current) {
+            isFirstLoadRef.current = false;
+            if (controlledPage === undefined) setPage(1);
+            onDocumentLoaded?.({ pages: doc.numPages || 1 });
+            onPageChange?.(1);
+          }
           return;
         } catch (secondErr) {
           console.warn('PdfEditor: getDocument via blob URL também falhou:', secondErr);
@@ -138,7 +154,7 @@ export default function PdfEditor({
         }
       }
     };
-  }, [file, controlledPage, onDocumentLoaded, onPageChange]);
+  }, [file]);
 
   useEffect(() => { setSigDataUrl(signatureUrl); }, [signatureUrl]);
   useEffect(() => { if (controlledPage !== undefined) setPage(controlledPage); }, [controlledPage]);

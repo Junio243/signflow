@@ -55,6 +55,9 @@ export const signerSchema = signerBaseSchema.transform(signer => ({
   email: signer.email ?? null,
 }));
 
+export const qrPositionSchema = z.enum(['bottom-left', 'bottom-right', 'top-left', 'top-right']).default('bottom-left');
+export const qrPageSchema = z.enum(['last', 'first', 'all']).default('last');
+
 export const metadataSchema = z
   .object({
     positions: z.array(positionSchema).default([]),
@@ -62,6 +65,8 @@ export const metadataSchema = z
     validation_theme_snapshot: z.record(z.any()).nullable().optional(),
     validation_profile_id: optionalTrimmedString,
     signers: z.array(signerSchema).optional(),
+    qr_position: qrPositionSchema.optional(),
+    qr_page: qrPageSchema.optional(),
   })
   .passthrough();
 
@@ -75,3 +80,5 @@ export const storedMetadataSchema = z.union([
 export type Position = z.infer<typeof positionSchema>;
 export type Signer = z.infer<typeof signerSchema>;
 export type Metadata = z.infer<typeof metadataSchema>;
+export type QrPosition = z.infer<typeof qrPositionSchema>;
+export type QrPage = z.infer<typeof qrPageSchema>;
