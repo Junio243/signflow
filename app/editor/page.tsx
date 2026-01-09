@@ -741,6 +741,15 @@ export default function EditorPage() {
       return
     }
 
+    // Validate PDF size BEFORE upload
+    const maxPdfSizeMB = 20
+    const maxPdfBytes = maxPdfSizeMB * 1024 * 1024
+    if (pdfFile.size > maxPdfBytes) {
+      const fileSizeMB = (pdfFile.size / (1024 * 1024)).toFixed(2)
+      setError(`PDF muito grande! Tamanho máximo: ${maxPdfSizeMB}MB. Seu arquivo: ${fileSizeMB}MB.`)
+      return
+    }
+
     if (!sigPreviewUrl) {
       setError('Desenhe ou envie uma assinatura para continuar.')
       return
@@ -760,6 +769,15 @@ export default function EditorPage() {
     const signatureBlob = await ensureSignatureBlob()
     if (!signatureBlob) {
       setError('Não foi possível preparar a assinatura.')
+      return
+    }
+
+    // Validate signature size BEFORE upload
+    const maxSignatureSizeMB = 5
+    const maxSignatureBytes = maxSignatureSizeMB * 1024 * 1024
+    if (signatureBlob.size > maxSignatureBytes) {
+      const sigSizeMB = (signatureBlob.size / (1024 * 1024)).toFixed(2)
+      setError(`Assinatura muito grande! Tamanho máximo: ${maxSignatureSizeMB}MB. Seu arquivo: ${sigSizeMB}MB.`)
       return
     }
 
@@ -801,6 +819,14 @@ export default function EditorPage() {
       }
 
       const uploadRes = await fetch('/api/upload', { method: 'POST', body: form })
+      
+      // Check if response is JSON before parsing
+      const contentType = uploadRes.headers.get('content-type')
+      if (!contentType?.includes('application/json')) {
+        const text = await uploadRes.text()
+        throw new Error(`Erro do servidor (${uploadRes.status}): ${text}`)
+      }
+
       const uploadJson = await uploadRes.json()
       if (!uploadRes.ok) {
         throw new Error(uploadJson?.error || 'Falha ao enviar PDF')
@@ -812,6 +838,14 @@ export default function EditorPage() {
       const signForm = new FormData()
       signForm.append('id', id)
       const signRes = await fetch('/api/sign', { method: 'POST', body: signForm })
+      
+      // Check if response is JSON before parsing
+      const signContentType = signRes.headers.get('content-type')
+      if (!signContentType?.includes('application/json')) {
+        const text = await signRes.text()
+        throw new Error(`Erro do servidor (${signRes.status}): ${text}`)
+      }
+
       const signJson = await signRes.json()
       if (!signRes.ok) {
         throw new Error(signJson?.error || 'Falha ao assinar documento')
@@ -902,6 +936,9 @@ export default function EditorPage() {
                     <span>Páginas detectadas: {pdfPageCount}</span>
                     <span>Assinaturas posicionadas: {positions.length}</span>
                   </div>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Tamanho: {(pdfFile.size / (1024 * 1024)).toFixed(2)} MB / 20 MB
+                  </p>
                 </div>
               ) : (
                 <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
