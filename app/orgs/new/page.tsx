@@ -29,7 +29,7 @@ export default function NewOrgPage() {
   useEffect(() => {
     (async () => {
       if (!supabaseClient) {
-        setInfo('Serviço indisponível.');
+        setInfo('Serviço de organizações indisponível.');
         setLoading(false);
         return;
       }
@@ -174,9 +174,6 @@ export default function NewOrgPage() {
         return;
       }
 
-      setInfo('Organização criada com sucesso!');
-      setIsSuccess(true);
-      
       // Redirecionar para configurações
       router.push(`/orgs/${org.id}/settings`);
 
@@ -191,7 +188,7 @@ export default function NewOrgPage() {
   // Renderização
   if (!supabaseClient) {
     return (
-      <div style={{ maxWidth: 900, margin: '20px auto', padding: 16 }}>
+      <div style={{ maxWidth: 980, margin: '20px auto', padding: 16 }}>
         <h1>Criar organização</h1>
         <p>Serviço indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.</p>
       </div>
