@@ -17,6 +17,13 @@ const ALLOWED_PDF_TYPES = ['application/pdf'];
 const ALLOWED_SIGNATURE_TYPES = ['image/png', 'image/jpeg'];
 
 /**
+ * Convert bytes to megabytes with 2 decimal places
+ */
+function bytesToMB(bytes: number): string {
+  return (bytes / (1024 * 1024)).toFixed(2);
+}
+
+/**
  * Helper: retorna SHA256 hex do input
  */
 async function sha256Hex(input: string) {
@@ -120,7 +127,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (pdf.size > MAX_PDF_BYTES) {
-      const sizeMB = (pdf.size / (1024 * 1024)).toFixed(2);
+      const sizeMB = bytesToMB(pdf.size);
       structuredLog('warn', { ...baseCtx, event: 'validation_failed', reason: 'pdf_too_large', pdfSize: pdf.size });
       return NextResponse.json({ 
         error: `PDF muito grande! Tamanho máximo: 20MB. Seu arquivo: ${sizeMB}MB.` 
@@ -148,7 +155,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (signature.size > MAX_SIGNATURE_BYTES) {
-        const sizeMB = (signature.size / (1024 * 1024)).toFixed(2);
+        const sizeMB = bytesToMB(signature.size);
         structuredLog('warn', { ...baseCtx, event: 'validation_failed', reason: 'signature_too_large', signatureSize: signature.size });
         return NextResponse.json({ 
           error: `Assinatura muito grande! Tamanho máximo: 5MB. Seu arquivo: ${sizeMB}MB.` 

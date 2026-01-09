@@ -74,6 +74,17 @@ const DEFAULT_THEME_ISSUER = 'Instituição/Profissional'
 const DEFAULT_THEME_REG = 'Registro (CRM/CRP/OAB/CNPJ)'
 const DEFAULT_THEME_FOOTER = 'Documento assinado digitalmente via SignFlow.'
 
+// File size limits (must match API limits in app/api/upload/route.ts)
+const MAX_PDF_SIZE_MB = 20
+const MAX_SIGNATURE_SIZE_MB = 5
+
+/**
+ * Convert bytes to megabytes with 2 decimal places
+ */
+const bytesToMB = (bytes: number): string => {
+  return (bytes / (1024 * 1024)).toFixed(2)
+}
+
 const createEmptySigner = (): Signer => ({
   name: '',
   reg: '',
@@ -742,11 +753,10 @@ export default function EditorPage() {
     }
 
     // Validate PDF size BEFORE upload
-    const maxPdfSizeMB = 20
-    const maxPdfBytes = maxPdfSizeMB * 1024 * 1024
+    const maxPdfBytes = MAX_PDF_SIZE_MB * 1024 * 1024
     if (pdfFile.size > maxPdfBytes) {
-      const fileSizeMB = (pdfFile.size / (1024 * 1024)).toFixed(2)
-      setError(`PDF muito grande! Tamanho máximo: ${maxPdfSizeMB}MB. Seu arquivo: ${fileSizeMB}MB.`)
+      const fileSizeMB = bytesToMB(pdfFile.size)
+      setError(`PDF muito grande! Tamanho máximo: ${MAX_PDF_SIZE_MB}MB. Seu arquivo: ${fileSizeMB}MB.`)
       return
     }
 
@@ -773,11 +783,10 @@ export default function EditorPage() {
     }
 
     // Validate signature size BEFORE upload
-    const maxSignatureSizeMB = 5
-    const maxSignatureBytes = maxSignatureSizeMB * 1024 * 1024
+    const maxSignatureBytes = MAX_SIGNATURE_SIZE_MB * 1024 * 1024
     if (signatureBlob.size > maxSignatureBytes) {
-      const sigSizeMB = (signatureBlob.size / (1024 * 1024)).toFixed(2)
-      setError(`Assinatura muito grande! Tamanho máximo: ${maxSignatureSizeMB}MB. Seu arquivo: ${sigSizeMB}MB.`)
+      const sigSizeMB = bytesToMB(signatureBlob.size)
+      setError(`Assinatura muito grande! Tamanho máximo: ${MAX_SIGNATURE_SIZE_MB}MB. Seu arquivo: ${sigSizeMB}MB.`)
       return
     }
 
@@ -937,7 +946,7 @@ export default function EditorPage() {
                     <span>Assinaturas posicionadas: {positions.length}</span>
                   </div>
                   <p className="mt-2 text-sm text-gray-500">
-                    Tamanho: {(pdfFile.size / (1024 * 1024)).toFixed(2)} MB / 20 MB
+                    Tamanho: {bytesToMB(pdfFile.size)} MB / {MAX_PDF_SIZE_MB} MB
                   </p>
                 </div>
               ) : (
