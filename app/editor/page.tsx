@@ -225,18 +225,20 @@ export default function EditorPage() {
       return
     }
 
+    // Usar selectId se fornecido e válido
     if (selectId && list.some(p => p.id === selectId)) {
       setProfileId(selectId)
       return
     }
 
-    if (profileId && list.some(p => p.id === profileId)) {
-      setProfileId(profileId)
-      return
-    }
-
-    setProfileId(list[0].id)
-  }, [profileId])
+    // Manter o atual se ainda existir, senão usar o primeiro
+    setProfileId(currentId => {
+      if (currentId && list.some(p => p.id === currentId)) {
+        return currentId
+      }
+      return list[0].id
+    })
+  }, [supabaseClient])
 
   const selectedProfile = useMemo(
     () => profiles.find(p => p.id === profileId) ?? null,
@@ -273,8 +275,8 @@ export default function EditorPage() {
     return () => {
       try {
         URL.revokeObjectURL(objectUrl)
-      } catch {
-        /* noop */
+      } catch (err) {
+        console.warn('[Editor] Falha ao revogar blob URL do logo do perfil:', err)
       }
     }
   }, [profileLogoFile, profileLogoExistingUrl])
@@ -351,12 +353,15 @@ export default function EditorPage() {
     }
   }, [pdfFile])
 
-  useEffect(() => () => {
-    if (sigPreviewUrl?.startsWith('blob:')) {
-      try {
-        URL.revokeObjectURL(sigPreviewUrl)
-      } catch {
-        /* noop */
+  useEffect(() => {
+    // Retorna cleanup function
+    return () => {
+      if (sigPreviewUrl?.startsWith('blob:')) {
+        try {
+          URL.revokeObjectURL(sigPreviewUrl)
+        } catch (err) {
+          console.warn('[Editor] Falha ao revogar blob URL da assinatura:', err)
+        }
       }
     }
   }, [sigPreviewUrl])

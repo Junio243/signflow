@@ -136,29 +136,43 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let active = true
-    setLoading(true)
 
-    if (!supabaseClient) {
-      setLoading(false)
-      return
+    const init = async () => {
+      if (!supabaseClient) {
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+
+      try {
+        await fetchSession()
+        if (!active) return
+
+        await fetchDocs()
+      } catch (err) {
+        if (active) {
+          setErrorMsg(err instanceof Error ? err.message : String(err))
+        }
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
     }
 
-    fetchSession().then(() =>
-      fetchDocs()
-        .catch(err => setErrorMsg(err instanceof Error ? err.message : String(err)))
-        .finally(() => {
-          if (active) setLoading(false)
-        }),
-    )
+    init()
 
     const channel = supabaseClient
-      .channel('realtime-docs')
+      ?.channel('realtime-docs')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => fetchDocs())
       .subscribe()
 
     return () => {
       active = false
-      supabaseClient.removeChannel(channel)
+      if (channel && supabaseClient) {
+        supabaseClient.removeChannel(channel)
+      }
     }
   }, [fetchDocs, fetchSession, supabaseClient])
 

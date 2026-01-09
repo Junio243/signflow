@@ -53,7 +53,7 @@ export default function HeaderClient() {
 
     if (!supabase) return () => {}
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return
       setUser(session?.user ?? null)
     })
@@ -69,9 +69,8 @@ export default function HeaderClient() {
     return () => {
       isMounted = false
       window.removeEventListener('click', handleClickOutside)
-      const maybeSubscription: any = subscription
-      maybeSubscription?.subscription?.unsubscribe?.()
-      maybeSubscription?.unsubscribe?.()
+      // Supabase v2 uses authListener.subscription.unsubscribe()
+      authListener?.subscription?.unsubscribe()
     }
   }, [fetchSession, supabase])
 

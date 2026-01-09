@@ -56,11 +56,6 @@ export default function PdfEditor({
   // ref to track first load to avoid resetting page on re-renders
   const isFirstLoadRef = useRef(true);
 
-  // Log quando 'file' muda
-  useEffect(() => {
-    console.log('PdfEditor: prop file mudou ->', file ? { name: file.name, size: file.size } : null);
-  }, [file]);
-
   useEffect(() => {
     let cancelled = false;
     let task: any;
@@ -71,7 +66,6 @@ export default function PdfEditor({
 
     (async () => {
       if (!file) {
-        console.log('PdfEditor: sem arquivo, limpando estado.');
         setPdf(null);
         setError(null);
         return;
@@ -80,18 +74,15 @@ export default function PdfEditor({
       try {
         setLoading(true);
         setError(null);
-        console.log('PdfEditor: iniciando load do arquivo:', { name: file.name, size: file.size });
 
         // 1) tenta com Uint8Array (recomendado)
         try {
           const ab = await file.arrayBuffer();
-          console.log('PdfEditor: arrayBuffer lido, byteLength=', ab.byteLength);
           const uint8 = new Uint8Array(ab);
 
           task = (pdfjsLib as any).getDocument({ data: uint8 });
           const doc = await task.promise;
           if (cancelled) { await doc?.destroy?.(); return; }
-          console.log('PdfEditor: pdf carregado via Uint8Array, páginas=', doc.numPages);
           setPdf(doc);
           
           // Only reset page and call onPageChange on first load
@@ -103,17 +94,17 @@ export default function PdfEditor({
           }
           return;
         } catch (firstErr) {
-          console.warn('PdfEditor: getDocument usando Uint8Array falhou — tentando blob URL. Erro:', firstErr);
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('PdfEditor: getDocument usando Uint8Array falhou — tentando blob URL. Erro:', firstErr);
+          }
         }
 
         // 2) fallback: blob URL
         try {
           blobUrl = URL.createObjectURL(file);
-          console.log('PdfEditor: tentando getDocument via blob URL:', blobUrl);
           task = (pdfjsLib as any).getDocument({ url: blobUrl });
           const doc = await task.promise;
           if (cancelled) { await doc?.destroy?.(); return; }
-          console.log('PdfEditor: pdf carregado via blob URL, páginas=', doc.numPages);
           setPdf(doc);
           
           // Only reset page and call onPageChange on first load
@@ -125,7 +116,9 @@ export default function PdfEditor({
           }
           return;
         } catch (secondErr) {
-          console.warn('PdfEditor: getDocument via blob URL também falhou:', secondErr);
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('PdfEditor: getDocument via blob URL também falhou:', secondErr);
+          }
           throw secondErr;
         }
       } catch (err: any) {
@@ -159,46 +152,64 @@ export default function PdfEditor({
   useEffect(() => { setSigDataUrl(signatureUrl); }, [signatureUrl]);
   useEffect(() => { if (controlledPage !== undefined) setPage(controlledPage); }, [controlledPage]);
 
-  useEffect(() => { renderPage(); }, [pdf, page, scale, positions, sigDataUrl, signatureSize]);
+  useEffect(() => {
+    let cancelled = false;
+    
+    async function renderPage() {
+      const canvas = canvasRef.current;
+      if (!canvas || !pdf || cancelled) return;
 
-  async function renderPage() {
-    const canvas = canvasRef.current;
-    if (!canvas) { console.log('PdfEditor.renderPage: canvas não encontrado'); return; }
-    if (!pdf) { console.log('PdfEditor.renderPage: pdf não definido'); return; }
+      try {
+        const p = await pdf.getPage(page);
+        if (cancelled) return;
+        
+        const viewport = p.getViewport({ scale });
+        canvas.width = viewport.width; 
+        canvas.height = viewport.height;
+        // também atualiza estilo CSS para evitar que canvas fique com 0x0 visualmente
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
+        const ctx = canvas.getContext('2d')!;
+        
+        await p.render({ canvasContext: ctx, viewport }).promise;
+        if (cancelled) return;
 
-    try {
-      console.log('PdfEditor.renderPage: renderizando página', page);
-      const p = await pdf.getPage(page);
-      const viewport = p.getViewport({ scale });
-      canvas.width = viewport.width; canvas.height = viewport.height;
-      // também atualiza estilo CSS para evitar que canvas fique com 0x0 visualmente
-      canvas.style.width = `${viewport.width}px`;
-      canvas.style.height = `${viewport.height}px`;
-      const ctx = canvas.getContext('2d')!;
-      await p.render({ canvasContext: ctx, viewport }).promise;
-      console.log('PdfEditor.renderPage: render concluído para página', page);
-
-      const pos = positions.find(ps => ps.page === page);
-      if (pos && sigDataUrl) {
-        const img = new Image(); img.src = sigDataUrl; await img.decode();
-        const baseW = signatureSize?.width || img.naturalWidth || 240;
-        const baseH = signatureSize?.height || img.naturalHeight || baseW * 0.35;
-        const w = baseW * (pos.scale || 1);
-        const h = baseH * (pos.scale || 1);
-        const cw = canvas.width, ch = canvas.height;
-        const x = (pos.nx || 0.5) * cw; const y = (pos.ny || 0.5) * ch;
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate((pos.rotation || 0) * Math.PI / 180);
-        ctx.drawImage(img, -w / 2, -h / 2, w, h);
-        ctx.restore();
+        const pos = positions.find(ps => ps.page === page);
+        if (pos && sigDataUrl) {
+          const img = new Image(); 
+          img.src = sigDataUrl; 
+          await img.decode();
+          if (cancelled) return;
+          
+          const baseW = signatureSize?.width || img.naturalWidth || 240;
+          const baseH = signatureSize?.height || img.naturalHeight || baseW * 0.35;
+          const w = baseW * (pos.scale || 1);
+          const h = baseH * (pos.scale || 1);
+          const cw = canvas.width, ch = canvas.height;
+          const x = (pos.nx || 0.5) * cw; const y = (pos.ny || 0.5) * ch;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate((pos.rotation || 0) * Math.PI / 180);
+          ctx.drawImage(img, -w / 2, -h / 2, w, h);
+          ctx.restore();
+        }
+        if (!cancelled) {
+          setError(null);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          console.error('Falha ao renderizar página do PDF:', err?.name, err?.message, err);
+          setError('Não foi possível renderizar esta página do PDF.');
+        }
       }
-      setError(null);
-    } catch (err: any) {
-      console.error('Falha ao renderizar página do PDF:', err?.name, err?.message, err);
-      setError('Não foi possível renderizar esta página do PDF.');
     }
-  }
+    
+    renderPage();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [pdf, page, scale, positions, sigDataUrl, signatureSize]);
 
   function onClick(e: React.MouseEvent) {
     const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();

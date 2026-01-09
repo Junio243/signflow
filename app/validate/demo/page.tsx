@@ -11,7 +11,12 @@ export default function ValidateDemoPage() {
     const url = typeof window !== 'undefined'
       ? window.location.origin + '/validate/demo'
       : 'https://seusite.com/validate/demo'
-    QRCode.toDataURL(url, { width: 180, margin: 1 }).then(setQr).catch(() => setQr(null))
+    QRCode.toDataURL(url, { width: 180, margin: 1 })
+      .then(setQr)
+      .catch((err) => {
+        console.warn('[ValidateDemo] Falha ao gerar QR Code:', err)
+        setQr(null)
+      })
   }, [])
 
   const color = '#2563eb'

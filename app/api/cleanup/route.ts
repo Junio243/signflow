@@ -2,10 +2,18 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Verificar se é uma chamada autorizada (ex: cron job)
+  const authHeader = req.headers.get('authorization');
+  const cronSecret = process.env.CRON_SECRET?.trim();
+
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const supabaseAdmin = getSupabaseAdmin();
 
   const now = new Date().toISOString();

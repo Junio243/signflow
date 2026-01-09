@@ -65,11 +65,17 @@ function extractSignersFromMetadata(metadata: Metadata): SignerMetadata[] {
     return sanitized;
   }
 
+  type MetadataWithTheme = Metadata & {
+    validation_theme_snapshot?: Record<string, unknown>;
+    theme?: Record<string, unknown>;
+  };
+
+  const metadataTyped = metadata as MetadataWithTheme;
   const theme =
-    (metadata && typeof (metadata as any).validation_theme_snapshot === 'object'
-      ? (metadata as any).validation_theme_snapshot
+    (metadataTyped.validation_theme_snapshot && typeof metadataTyped.validation_theme_snapshot === 'object'
+      ? metadataTyped.validation_theme_snapshot
       : null) ||
-    (metadata && typeof (metadata as any).theme === 'object' ? (metadata as any).theme : null);
+    (metadataTyped.theme && typeof metadataTyped.theme === 'object' ? metadataTyped.theme : null);
 
   if (theme && typeof theme === 'object') {
     const issuer = typeof (theme as any).issuer === 'string' ? (theme as any).issuer.trim() : '';
@@ -117,6 +123,20 @@ function extractSignersFromMetadata(metadata: Metadata): SignerMetadata[] {
       metadata: null,
     },
   ];
+}
+
+// Function to calculate QR coordinates based on position
+function getQrCoordinates(pageWidth: number, pageHeight: number, position: QrPosition, margin: number, qrSize: number) {
+  switch (position) {
+    case 'bottom-right':
+      return { x: pageWidth - margin - qrSize, y: margin };
+    case 'top-left':
+      return { x: margin, y: pageHeight - margin - qrSize };
+    case 'top-right':
+      return { x: pageWidth - margin - qrSize, y: pageHeight - margin - qrSize };
+    default: // bottom-left
+      return { x: margin, y: margin };
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -275,20 +295,6 @@ export async function POST(req: NextRequest) {
     const margin = 30;
     const qrSize = 80;
     
-    // Function to calculate QR coordinates based on position
-    function getQrCoordinates(pageWidth: number, pageHeight: number, position: QrPosition) {
-      switch (position) {
-        case 'bottom-right':
-          return { x: pageWidth - margin - qrSize, y: margin };
-        case 'top-left':
-          return { x: margin, y: pageHeight - margin - qrSize };
-        case 'top-right':
-          return { x: pageWidth - margin - qrSize, y: pageHeight - margin - qrSize };
-        default: // bottom-left
-          return { x: margin, y: margin };
-      }
-    }
-    
     // Determine which pages receive the QR code
     let targetPages: any[] = [];
     if (qrPage === 'first') {
@@ -303,7 +309,7 @@ export async function POST(req: NextRequest) {
     for (const page of targetPages) {
       const pageWidth = page.getWidth();
       const pageHeight = page.getHeight();
-      const coords = getQrCoordinates(pageWidth, pageHeight, qrPosition);
+      const coords = getQrCoordinates(pageWidth, pageHeight, qrPosition, margin, qrSize);
       page.drawImage(qrImage, { x: coords.x, y: coords.y, width: qrSize, height: qrSize });
     }
 
@@ -332,19 +338,19 @@ export async function POST(req: NextRequest) {
 
     // URLs públicas
     const pubSigned = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/signed.pdf`);
-    if (pubSigned.error || !pubSigned.data?.publicUrl) {
-      console.error('Erro ao gerar URL pública do PDF assinado:', pubSigned.error);
+    if (!pubSigned.data?.publicUrl) {
+      console.error('Erro ao gerar URL pública do PDF assinado: URL não disponível');
       return NextResponse.json(
-        { error: pubSigned.error?.message || 'Falha ao gerar URL pública do PDF assinado.' },
+        { error: 'Falha ao gerar URL pública do PDF assinado.' },
         { status: 500 },
       );
     }
 
     const pubQr = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/qr.png`);
-    if (pubQr.error || !pubQr.data?.publicUrl) {
-      console.error('Erro ao gerar URL pública do QR code:', pubQr.error);
+    if (!pubQr.data?.publicUrl) {
+      console.error('Erro ao gerar URL pública do QR code: URL não disponível');
       return NextResponse.json(
-        { error: pubQr.error?.message || 'Falha ao gerar URL pública do QR code.' },
+        { error: 'Falha ao gerar URL pública do QR code.' },
         { status: 500 },
       );
     }
