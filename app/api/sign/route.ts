@@ -125,6 +125,20 @@ function extractSignersFromMetadata(metadata: Metadata): SignerMetadata[] {
   ];
 }
 
+// Function to calculate QR coordinates based on position
+function getQrCoordinates(pageWidth: number, pageHeight: number, position: QrPosition, margin: number, qrSize: number) {
+  switch (position) {
+    case 'bottom-right':
+      return { x: pageWidth - margin - qrSize, y: margin };
+    case 'top-left':
+      return { x: margin, y: pageHeight - margin - qrSize };
+    case 'top-right':
+      return { x: pageWidth - margin - qrSize, y: pageHeight - margin - qrSize };
+    default: // bottom-left
+      return { x: margin, y: margin };
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabaseAdmin = getSupabaseAdmin(); // ← client dentro do handler
@@ -281,20 +295,6 @@ export async function POST(req: NextRequest) {
     const margin = 30;
     const qrSize = 80;
     
-    // Function to calculate QR coordinates based on position
-    function getQrCoordinates(pageWidth: number, pageHeight: number, position: QrPosition) {
-      switch (position) {
-        case 'bottom-right':
-          return { x: pageWidth - margin - qrSize, y: margin };
-        case 'top-left':
-          return { x: margin, y: pageHeight - margin - qrSize };
-        case 'top-right':
-          return { x: pageWidth - margin - qrSize, y: pageHeight - margin - qrSize };
-        default: // bottom-left
-          return { x: margin, y: margin };
-      }
-    }
-    
     // Determine which pages receive the QR code
     let targetPages: any[] = [];
     if (qrPage === 'first') {
@@ -309,7 +309,7 @@ export async function POST(req: NextRequest) {
     for (const page of targetPages) {
       const pageWidth = page.getWidth();
       const pageHeight = page.getHeight();
-      const coords = getQrCoordinates(pageWidth, pageHeight, qrPosition);
+      const coords = getQrCoordinates(pageWidth, pageHeight, qrPosition, margin, qrSize);
       page.drawImage(qrImage, { x: coords.x, y: coords.y, width: qrSize, height: qrSize });
     }
 
