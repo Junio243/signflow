@@ -10,6 +10,7 @@ import type {
 import Link from 'next/link'
 import PdfEditor from '@/components/PdfEditor'
 import { supabase } from '@/lib/supabaseClient'
+import type { QrPosition, QrPage } from '@/lib/validation/documentSchemas'
 
 // -- tipos e constantes (mantidos) --
 type ProfileType = 'medico' | 'faculdade' | 'generico'
@@ -179,8 +180,8 @@ export default function EditorPage() {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<UploadResult | null>(null)
 
-  const [qrPosition, setQrPosition] = useState<'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'>('bottom-left')
-  const [qrPage, setQrPage] = useState<'last' | 'first' | 'all'>('last')
+  const [qrPosition, setQrPosition] = useState<QrPosition>('bottom-left')
+  const [qrPage, setQrPage] = useState<QrPage>('last')
 
   const setInfo = (text: string) => setStatus({ tone: 'neutral', text })
   const setError = (text: string) => setStatus({ tone: 'error', text })

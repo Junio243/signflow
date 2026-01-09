@@ -17,6 +17,10 @@ import {
   Position,
   documentIdSchema,
   storedMetadataSchema,
+  qrPositionSchema,
+  qrPageSchema,
+  QrPosition,
+  QrPage,
 } from '@/lib/validation/documentSchemas';
 
 type SignerMetadata = {
@@ -258,15 +262,21 @@ export async function POST(req: NextRequest) {
     const qrPng = await QRCode.toBuffer(validateUrl, { width: 256 });
     const qrImage = await pdfDoc.embedPng(qrPng);
     
-    // Extract QR position settings from metadata
-    const qrPosition = (normalizedMetadata as any).qr_position || 'bottom-left';
-    const qrPage = (normalizedMetadata as any).qr_page || 'last';
+    // Extract QR position settings from metadata with proper validation
+    const qrPositionRaw = (normalizedMetadata as any).qr_position || 'bottom-left';
+    const qrPageRaw = (normalizedMetadata as any).qr_page || 'last';
+    
+    const qrPositionResult = qrPositionSchema.safeParse(qrPositionRaw);
+    const qrPosition: QrPosition = qrPositionResult.success ? qrPositionResult.data : 'bottom-left';
+    
+    const qrPageResult = qrPageSchema.safeParse(qrPageRaw);
+    const qrPage: QrPage = qrPageResult.success ? qrPageResult.data : 'last';
     
     const margin = 30;
     const qrSize = 80;
     
     // Function to calculate QR coordinates based on position
-    function getQrCoordinates(pageWidth: number, pageHeight: number, position: string) {
+    function getQrCoordinates(pageWidth: number, pageHeight: number, position: QrPosition) {
       switch (position) {
         case 'bottom-right':
           return { x: pageWidth - margin - qrSize, y: margin };
