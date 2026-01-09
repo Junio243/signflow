@@ -11,6 +11,7 @@ export default function NewOrgPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
 
   // Campos do formulário
@@ -90,16 +91,19 @@ export default function NewOrgPage() {
     // Validações
     if (!name.trim() || name.trim().length < 3) {
       setInfo('O nome deve ter pelo menos 3 caracteres.');
+      setIsSuccess(false);
       return;
     }
 
     if (!slug.trim()) {
       setInfo('O slug é obrigatório.');
+      setIsSuccess(false);
       return;
     }
 
     setBusy(true);
     setInfo(null);
+    setIsSuccess(false);
 
     try {
       // Verificar se slug já existe
@@ -111,6 +115,7 @@ export default function NewOrgPage() {
 
       if (existing) {
         setInfo('Este slug já está em uso. Escolha outro.');
+        setIsSuccess(false);
         setBusy(false);
         return;
       }
@@ -122,6 +127,7 @@ export default function NewOrgPage() {
         logoUrl = await uploadLogo(logoFile);
         if (!logoUrl) {
           setInfo('Erro ao fazer upload do logo. Tente novamente.');
+          setIsSuccess(false);
           setBusy(false);
           return;
         }
@@ -146,6 +152,7 @@ export default function NewOrgPage() {
       if (orgErr) {
         console.error('Erro ao criar organização:', orgErr);
         setInfo('Erro ao criar organização: ' + orgErr.message);
+        setIsSuccess(false);
         setBusy(false);
         return;
       }
@@ -160,21 +167,23 @@ export default function NewOrgPage() {
         });
 
       if (memberErr) {
-        console.warn('Erro ao adicionar membro:', memberErr);
-        // Não bloqueia, organização já foi criada
+        console.error('Erro ao adicionar membro:', memberErr);
+        setInfo('Organização criada, mas houve erro ao adicionar você como admin: ' + memberErr.message);
+        setIsSuccess(false);
+        setBusy(false);
+        return;
       }
 
       setInfo('Organização criada com sucesso!');
+      setIsSuccess(true);
       
       // Redirecionar para configurações
-      setTimeout(() => {
-        router.push(`/orgs/${org.id}/settings`);
-      }, 1000);
+      router.push(`/orgs/${org.id}/settings`);
 
     } catch (err: any) {
       console.error('Erro inesperado:', err);
       setInfo('Erro inesperado: ' + (err?.message ?? 'desconhecido'));
-    } finally {
+      setIsSuccess(false);
       setBusy(false);
     }
   }
@@ -361,9 +370,9 @@ export default function NewOrgPage() {
             marginTop: 16,
             padding: 12,
             borderRadius: 8,
-            background: info.includes('sucesso') ? '#ecfdf5' : '#fef2f2',
-            color: info.includes('sucesso') ? '#065f46' : '#991b1b',
-            border: `1px solid ${info.includes('sucesso') ? '#a7f3d0' : '#fecaca'}`,
+            background: isSuccess ? '#ecfdf5' : '#fef2f2',
+            color: isSuccess ? '#065f46' : '#991b1b',
+            border: `1px solid ${isSuccess ? '#a7f3d0' : '#fecaca'}`,
           }}
         >
           {info}
