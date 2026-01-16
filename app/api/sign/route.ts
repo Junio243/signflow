@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import {
   PDFDocument,
+  PDFFont,
   rgb,
   pushGraphicsState,
   popGraphicsState,
@@ -141,7 +142,7 @@ function getQrCoordinates(pageWidth: number, pageHeight: number, position: QrPos
 }
 
 // Function to wrap text to fit within a given width
-function wrapText(text: string, font: any, fontSize: number, maxWidth: number): string[] {
+function wrapText(text: string, font: PDFFont, fontSize: number, maxWidth: number): string[] {
   const words = text.split(' ');
   const lines: string[] = [];
   let currentLine = '';
@@ -392,7 +393,7 @@ export async function POST(req: NextRequest) {
       // Position text to the right or left of QR based on position
       if (qrPosition === 'bottom-right' || qrPosition === 'top-right') {
         // Text on the left side of QR
-        textX = coords.x - textMaxWidth - textMargin;
+        textX = Math.max(margin, coords.x - textMaxWidth - textMargin);
       } else {
         // Text on the right side of QR
         textX = coords.x + qrSize + textMargin;
@@ -406,8 +407,11 @@ export async function POST(req: NextRequest) {
         const line = wrappedLines[i];
         const lineY = textY - (i * (fontSize + 2)); // 2px line spacing
         
-        // Only draw if within page bounds
-        if (lineY >= margin && textX >= margin && textX + textMaxWidth <= pageWidth - margin) {
+        // Only draw if within page bounds (check all boundaries)
+        if (lineY >= margin && 
+            lineY <= pageHeight - margin &&
+            textX >= margin && 
+            textX + textMaxWidth <= pageWidth - margin) {
           page.drawText(line, {
             x: textX,
             y: lineY,
