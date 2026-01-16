@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80" role="img" aria-labelledby="govbr-title">
+  <title id="govbr-title">Gov.br - Governo Federal do Brasil</title>
+  
+  <!-- Background -->
+  <rect width="200" height="80" fill="#FFFFFF"/>
+  
+  <!-- Gov.br logo -->
+  <g font-family="Rawline, Arial, sans-serif" font-weight="600">
+    <!-- "gov" in green -->
+    <text x="20" y="50" font-size="36" fill="#168821">gov</text>
+    <!-- ".br" in blue -->
+    <text x="88" y="50" font-size="36" fill="#1351B4">.br</text>
+  </g>
+  
+  <!-- Bandeira do Brasil (simplified) -->
+  <g transform="translate(165, 15)">
+    <rect width="25" height="18" fill="#009B3A"/>
+    <path d="M2,9 L12.5,2 L23,9 L12.5,16 Z" fill="#FEDD00"/>
+    <circle cx="12.5" cy="9" r="4" fill="#002776"/>
+    <circle cx="12.5" cy="9" r="0.5" fill="#FFFFFF"/>
+  </g>
+</svg>
