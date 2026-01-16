@@ -5,11 +5,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import {
   PDFDocument,
+  PDFFont,
   rgb,
   pushGraphicsState,
   popGraphicsState,
   rotateRadians,
-  translate
+  translate,
+  StandardFonts
 } from 'pdf-lib';
 import QRCode from 'qrcode';
 import {
@@ -137,6 +139,47 @@ function getQrCoordinates(pageWidth: number, pageHeight: number, position: QrPos
     default: // bottom-left
       return { x: margin, y: margin };
   }
+}
+
+// Function to wrap text to fit within a given width
+function wrapText(text: string, font: PDFFont, fontSize: number, maxWidth: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    const width = font.widthOfTextAtSize(testLine, fontSize);
+
+    if (width > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines;
+}
+
+// Function to generate validation text content
+function generateValidationText(
+  signerName: string,
+  signerReg: string | null,
+  certificateSerial: string | null,
+  signatureDate: string,
+  validateUrl: string,
+  documentId: string
+): string {
+  const regText = signerReg ? `, CPF ${signerReg}` : '';
+  const serialText = certificateSerial ? ` número de série ${certificateSerial}` : '';
+  const accessCode = documentId.substring(0, 8).toUpperCase();
+
+  return `Documento assinado digitalmente de acordo com a ICP-Brasil, MP 2.200-2/2001, no sistema SignFlow, por ${signerName}${regText}, certificado${serialText} em ${signatureDate} e pode ser validado em ${validateUrl}. Código de Acesso: ${accessCode}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -295,6 +338,14 @@ export async function POST(req: NextRequest) {
     const margin = 30;
     const qrSize = 80;
     
+    // Extract signer information early for both validation text and database insert
+    const signers = extractSignersFromMetadata(normalizedMetadata);
+    const firstSigner = signers[0] || {
+      name: 'Signatário',
+      reg: null,
+      certificate_type: null,
+    };
+    
     // Determine which pages receive the QR code
     let targetPages: any[] = [];
     if (qrPage === 'first') {
@@ -306,11 +357,83 @@ export async function POST(req: NextRequest) {
     }
     
     // Insert QR code in selected pages
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontSize = 7;
+    const textMaxWidth = 200; // Maximum width for text block
+    const textMargin = 10; // Space between QR and text
+    const lineSpacing = 2; // Spacing between lines in pixels
+    
+    // Format signature date
+    const signatureDate = new Date().toLocaleDateString('pt-BR');
+    
     for (const page of targetPages) {
       const pageWidth = page.getWidth();
       const pageHeight = page.getHeight();
       const coords = getQrCoordinates(pageWidth, pageHeight, qrPosition, margin, qrSize);
+      
+      // Draw QR code
       page.drawImage(qrImage, { x: coords.x, y: coords.y, width: qrSize, height: qrSize });
+      
+      // Generate validation text
+      const validationText = generateValidationText(
+        firstSigner.name,
+        firstSigner.reg,
+        firstSigner.certificate_type,
+        signatureDate,
+        validateUrl,
+        id
+      );
+      
+      // Wrap text to fit within maxWidth
+      const wrappedLines = wrapText(validationText, font, fontSize, textMaxWidth);
+      
+      // Calculate text position based on QR position
+      let textX = coords.x;
+      let textY = coords.y;
+      
+      // Position text to the right or left of QR based on position
+      if (qrPosition === 'bottom-right' || qrPosition === 'top-right') {
+        // Text on the left side of QR - ensure it doesn't overlap with QR
+        const desiredX = coords.x - textMaxWidth - textMargin;
+        textX = Math.max(margin, desiredX);
+        
+        // If there's not enough space on the left, skip text rendering for this position
+        if (textX + textMaxWidth + textMargin > coords.x) {
+          continue; // Skip rendering text if it would overlap with QR
+        }
+      } else {
+        // Text on the right side of QR
+        textX = coords.x + qrSize + textMargin;
+        
+        // If there's not enough space on the right, skip text rendering for this position
+        if (textX + textMaxWidth > pageWidth - margin) {
+          continue; // Skip rendering text if it would go beyond page bounds
+        }
+      }
+      
+      // Start text from top of QR code area
+      textY = coords.y + qrSize - fontSize;
+      
+      // Draw each line of text
+      for (let i = 0; i < wrappedLines.length; i++) {
+        const line = wrappedLines[i];
+        const lineY = textY - (i * (fontSize + lineSpacing));
+        const lineWidth = font.widthOfTextAtSize(line, fontSize);
+        
+        // Only draw if within page bounds (check all boundaries with actual line width)
+        if (lineY >= margin && 
+            lineY <= pageHeight - margin &&
+            textX >= margin && 
+            textX + lineWidth <= pageWidth - margin) {
+          page.drawText(line, {
+            x: textX,
+            y: lineY,
+            size: fontSize,
+            font: font,
+            color: rgb(0, 0, 0),
+          });
+        }
+      }
     }
 
     const signedBytes = await pdfDoc.save();
@@ -370,7 +493,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: upd.error.message }, { status: 500 });
     }
 
-    const signers = extractSignersFromMetadata(normalizedMetadata);
     const nowIso = new Date().toISOString();
     if (signers.length) {
       const payload = signers.map(signer => ({
