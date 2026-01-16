@@ -361,6 +361,7 @@ export async function POST(req: NextRequest) {
     const fontSize = 7;
     const textMaxWidth = 200; // Maximum width for text block
     const textMargin = 10; // Space between QR and text
+    const lineSpacing = 2; // Spacing between lines in pixels
     
     // Format signature date
     const signatureDate = new Date().toLocaleDateString('pt-BR');
@@ -392,11 +393,22 @@ export async function POST(req: NextRequest) {
       
       // Position text to the right or left of QR based on position
       if (qrPosition === 'bottom-right' || qrPosition === 'top-right') {
-        // Text on the left side of QR
-        textX = Math.max(margin, coords.x - textMaxWidth - textMargin);
+        // Text on the left side of QR - ensure it doesn't overlap with QR
+        const desiredX = coords.x - textMaxWidth - textMargin;
+        textX = Math.max(margin, desiredX);
+        
+        // If there's not enough space on the left, skip text rendering for this position
+        if (textX + textMaxWidth + textMargin > coords.x) {
+          continue; // Skip rendering text if it would overlap with QR
+        }
       } else {
         // Text on the right side of QR
         textX = coords.x + qrSize + textMargin;
+        
+        // If there's not enough space on the right, skip text rendering for this position
+        if (textX + textMaxWidth > pageWidth - margin) {
+          continue; // Skip rendering text if it would go beyond page bounds
+        }
       }
       
       // Start text from top of QR code area
@@ -405,13 +417,14 @@ export async function POST(req: NextRequest) {
       // Draw each line of text
       for (let i = 0; i < wrappedLines.length; i++) {
         const line = wrappedLines[i];
-        const lineY = textY - (i * (fontSize + 2)); // 2px line spacing
+        const lineY = textY - (i * (fontSize + lineSpacing));
+        const lineWidth = font.widthOfTextAtSize(line, fontSize);
         
-        // Only draw if within page bounds (check all boundaries)
+        // Only draw if within page bounds (check all boundaries with actual line width)
         if (lineY >= margin && 
             lineY <= pageHeight - margin &&
             textX >= margin && 
-            textX + textMaxWidth <= pageWidth - margin) {
+            textX + lineWidth <= pageWidth - margin) {
           page.drawText(line, {
             x: textX,
             y: lineY,
