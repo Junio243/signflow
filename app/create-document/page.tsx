@@ -37,6 +37,10 @@ interface DocumentData {
       logoUrl?: string
     }
     qrCode: { position: string; size: string }
+    validation: {
+      requireCode: boolean
+      validationCode?: string
+    }
   }
 }
 
@@ -45,6 +49,7 @@ export default function CreateDocumentPage() {
   const [userEmail, setUserEmail] = useState('')
   const [result, setResult] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const {
     currentStep,
@@ -85,21 +90,72 @@ export default function CreateDocumentPage() {
 
   const handleSubmit = async () => {
     setLoading(true)
+    setError('')
 
     try {
-      // Simulate document processing
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Create FormData
+      const formDataToSend = new FormData()
 
-      // Generate result
-      const documentId = `DOC-${new Date().getFullYear()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`
-      const hash = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')
-      const validationUrl = `${window.location.origin}/validate/${documentId}`
+      // Add PDF file
+      if (!formData.document?.file) {
+        throw new Error('Documento não encontrado')
+      }
+      formDataToSend.append('pdf', formData.document.file)
 
+      // Add signature
+      if (formData.signature) {
+        formDataToSend.append('signature', JSON.stringify(formData.signature))
+      }
+
+      // Add profile
+      if (formData.profile) {
+        formDataToSend.append('profile', JSON.stringify(formData.profile))
+      }
+
+      // Add signatories
+      if (formData.signatories) {
+        formDataToSend.append('signatories', JSON.stringify(formData.signatories.list))
+      }
+
+      // Add certificate
+      if (formData.qrConfig?.certificate) {
+        formDataToSend.append('certificate', JSON.stringify(formData.qrConfig.certificate))
+      }
+
+      // Add QR code config
+      if (formData.qrConfig?.qrCode) {
+        formDataToSend.append('qrCodeConfig', JSON.stringify(formData.qrConfig.qrCode))
+      }
+
+      // Add validation config
+      if (formData.qrConfig?.validation) {
+        formDataToSend.append('validation', JSON.stringify(formData.qrConfig.validation))
+      }
+
+      // Call API
+      const response = await fetch('/api/documents/sign', {
+        method: 'POST',
+        body: formDataToSend
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao processar documento')
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Erro desconhecido')
+      }
+
+      // Success!
       const resultData = {
-        documentId,
-        hash,
-        validationUrl,
-        fileName: formData.document?.file.name || 'documento.pdf'
+        documentId: data.document.id,
+        hash: data.document.hash,
+        validationUrl: data.document.validationUrl,
+        signedPdfUrl: data.document.signedPdfUrl,
+        qrCodeUrl: data.document.qrCodeUrl,
+        fileName: formData.document.file.name
       }
 
       setResult(resultData)
@@ -107,9 +163,11 @@ export default function CreateDocumentPage() {
 
       // Clear saved data after successful submission
       setTimeout(() => reset(), 100)
-    } catch (error) {
-      console.error('Error submitting document:', error)
-      alert('Erro ao processar documento. Tente novamente.')
+    } catch (err) {
+      console.error('Error submitting document:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido ao processar documento'
+      setError(errorMessage)
+      alert(`Erro: ${errorMessage}\n\nVerifique o console para mais detalhes.`)
     } finally {
       setLoading(false)
     }
@@ -120,8 +178,11 @@ export default function CreateDocumentPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-lg font-semibold text-gray-900">Processando documento...</p>
-          <p className="text-sm text-gray-600 mt-2">Gerando QR Code e certificado digital</p>
+          <p className="text-lg font-semibold text-gray-900">📝 Processando documento...</p>
+          <p className="text-sm text-gray-600 mt-2">🔐 Gerando hash SHA-256</p>
+          <p className="text-sm text-gray-600">📱 Criando QR Code</p>
+          <p className="text-sm text-gray-600">💾 Inserindo no PDF</p>
+          <p className="text-sm text-gray-600">☁️ Salvando no Supabase</p>
         </div>
       </div>
     )
@@ -135,6 +196,15 @@ export default function CreateDocumentPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Criar Documento</h1>
           <p className="text-gray-600">Siga as etapas para criar e assinar seu documento</p>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-900">
+              <span className="font-semibold">⚠️ Erro:</span> {error}
+            </p>
+          </div>
+        )}
 
         {/* Progress Bar */}
         {currentStep < 7 && (
