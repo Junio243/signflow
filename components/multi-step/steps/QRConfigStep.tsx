@@ -53,45 +53,81 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
   // Carregar PDF e renderizar preview
   useEffect(() => {
     const loadPdfPreview = async () => {
-      if (!pdfUrl || !canvasRef.current) {
-        setLoadingError('PDF não disponível')
+      console.log('🔍 [QRConfigStep] Iniciando carregamento do PDF')
+      console.log('📄 [QRConfigStep] pdfUrl:', pdfUrl)
+      console.log('🖼️ [QRConfigStep] canvasRef.current:', canvasRef.current)
+
+      if (!pdfUrl) {
+        console.error('❌ [QRConfigStep] pdfUrl está vazio ou undefined')
+        setLoadingError('PDF não disponível para preview')
+        return
+      }
+
+      if (!canvasRef.current) {
+        console.error('❌ [QRConfigStep] Canvas não está disponível')
+        setLoadingError('Canvas não disponível')
         return
       }
 
       try {
+        console.log('⏳ [QRConfigStep] Iniciando renderização...')
         setPdfLoaded(false)
         setLoadingError('')
 
-        // Carregar PDF
+        // Verificar se é blob URL válida
+        if (!pdfUrl.startsWith('blob:')) {
+          console.error('❌ [QRConfigStep] URL não é um blob válido:', pdfUrl)
+          setLoadingError('URL do PDF inválida')
+          return
+        }
+
+        console.log('📦 [QRConfigStep] Carregando documento PDF...')
         const loadingTask = pdfjsLib.getDocument(pdfUrl)
         const pdf = await loadingTask.promise
+        console.log('✅ [QRConfigStep] PDF carregado! Total de páginas:', pdf.numPages)
+
+        console.log('📄 [QRConfigStep] Carregando primeira página...')
         const page = await pdf.getPage(1)
+        console.log('✅ [QRConfigStep] Primeira página carregada')
 
         // Configurar canvas
         const canvas = canvasRef.current
         const context = canvas.getContext('2d')
-        if (!context) return
+        if (!context) {
+          console.error('❌ [QRConfigStep] Não foi possível obter contexto 2D do canvas')
+          setLoadingError('Erro ao obter contexto do canvas')
+          return
+        }
 
         const viewport = page.getViewport({ scale: 1 })
+        console.log('📐 [QRConfigStep] Viewport original:', viewport.width, 'x', viewport.height)
+
+        const parentWidth = canvas.parentElement?.clientWidth || 600
         const scale = Math.min(
-          canvas.parentElement!.clientWidth / viewport.width,
+          parentWidth / viewport.width,
           400 / viewport.height
         )
+        console.log('🔍 [QRConfigStep] Scale calculado:', scale)
+
         const scaledViewport = page.getViewport({ scale })
+        console.log('📐 [QRConfigStep] Viewport escalado:', scaledViewport.width, 'x', scaledViewport.height)
 
         canvas.width = scaledViewport.width
         canvas.height = scaledViewport.height
 
         // Renderizar PDF
+        console.log('🎨 [QRConfigStep] Renderizando PDF no canvas...')
         await page.render({
           canvasContext: context,
           viewport: scaledViewport
         }).promise
 
+        console.log('✅ [QRConfigStep] PDF renderizado com sucesso!')
         setPdfLoaded(true)
       } catch (error) {
-        console.error('Erro ao carregar preview:', error)
-        setLoadingError('Erro ao carregar preview do PDF')
+        console.error('❌ [QRConfigStep] Erro ao carregar preview:', error)
+        console.error('❌ [QRConfigStep] Stack trace:', error instanceof Error ? error.stack : 'N/A')
+        setLoadingError(`Erro: ${error instanceof Error ? error.message : 'Desconhecido'}`)
       }
     }
 
@@ -193,6 +229,18 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
     <div className="bg-white rounded-xl border border-gray-200 p-8">
       <h2 className="text-2xl font-bold text-gray-900 mb-2">Configurações do QR Code</h2>
       <p className="text-gray-600 mb-6">Configure o certificado e o QR Code de validação</p>
+
+      {/* DEBUG INFO */}
+      <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs">
+        <p className="font-mono text-yellow-900">
+          🐛 Debug: pdfUrl = {pdfUrl ? 'Presente ✅' : 'Ausente ❌'}
+        </p>
+        {pdfUrl && (
+          <p className="font-mono text-yellow-900 truncate">
+            URL: {pdfUrl.substring(0, 50)}...
+          </p>
+        )}
+      </div>
 
       {/* Certificate Section */}
       <div className="mb-8 p-6 bg-gray-50 border border-gray-200 rounded-lg">
@@ -482,7 +530,7 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
           <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
             🔍 Preview em Tempo Real
             {pdfLoaded && <span className="text-xs text-green-600 font-normal">• Carregado</span>}
-            {loadingError && <span className="text-xs text-red-600 font-normal">• {loadingError}</span>}
+            {loadingError && <span className="text-xs text-red-600 font-normal">• Erro</span>}
           </p>
           <p className="text-xs text-gray-600">Posição: {qrPosition.replace('-', ' ')} | Tamanho: {qrSize}</p>
         </div>
@@ -498,14 +546,17 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-3"></div>
                     <p className="text-gray-600">Carregando preview...</p>
+                    <p className="text-xs text-gray-500 mt-1">Abra o Console (F12) para ver logs</p>
                   </div>
                 </div>
               )}
               {loadingError && (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-                  <div className="text-center">
+                  <div className="text-center p-4">
                     <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
-                    <p className="text-red-600">{loadingError}</p>
+                    <p className="text-red-600 font-semibold">Erro ao carregar preview</p>
+                    <p className="text-sm text-red-500 mt-1">{loadingError}</p>
+                    <p className="text-xs text-gray-600 mt-2">Abra o Console (F12) para detalhes</p>
                   </div>
                 </div>
               )}
@@ -525,6 +576,7 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
             <div className="text-center py-12">
               <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
               <p className="text-gray-600">Nenhum PDF disponível para preview</p>
+              <p className="text-xs text-gray-500 mt-1">Volte e faça upload de um PDF</p>
             </div>
           )}
         </div>
