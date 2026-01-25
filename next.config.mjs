@@ -1,3 +1,4 @@
+import { withSentryConfig } from '@sentry/nextjs';
 import withPWA from 'next-pwa';
 
 /** @type {import('next').NextConfig} */
@@ -49,4 +50,19 @@ const pwaConfig = withPWA({
   ]
 });
 
-export default pwaConfig(nextConfig);
+const configWithPWA = pwaConfig(nextConfig);
+
+// Configuração do Sentry
+export default withSentryConfig(configWithPWA, {
+  // Configurações do Sentry Webpack Plugin
+  silent: true,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+}, {
+  // Upload de source maps (apenas em produção)
+  widenClientFileUpload: true,
+  transpileClientSDK: true,
+  tunnelRoute: '/monitoring',
+  hideSourceMaps: true,
+  disableLogger: true,
+});
