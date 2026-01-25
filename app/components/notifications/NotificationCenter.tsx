@@ -2,7 +2,7 @@
 
 import { X, Check, Trash2, Settings, ExternalLink } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabaseClient'
 import type { Notification } from '@/lib/notifications/types'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -19,14 +19,15 @@ export default function NotificationCenter({ isOpen, onClose, userId }: Props) {
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && supabase) {
       loadNotifications()
     }
   }, [isOpen, filter])
 
   const loadNotifications = async () => {
+    if (!supabase) return
+    
     setLoading(true)
-    const supabase = createClient()
     
     let query = supabase
       .from('notifications')
@@ -45,7 +46,8 @@ export default function NotificationCenter({ isOpen, onClose, userId }: Props) {
   }
 
   const markAsRead = async (id: string) => {
-    const supabase = createClient()
+    if (!supabase) return
+    
     await supabase
       .from('notifications')
       .update({ read_at: new Date().toISOString() })
@@ -55,7 +57,8 @@ export default function NotificationCenter({ isOpen, onClose, userId }: Props) {
   }
 
   const markAllAsRead = async () => {
-    const supabase = createClient()
+    if (!supabase) return
+    
     await supabase
       .from('notifications')
       .update({ read_at: new Date().toISOString() })
@@ -66,7 +69,8 @@ export default function NotificationCenter({ isOpen, onClose, userId }: Props) {
   }
 
   const deleteNotification = async (id: string) => {
-    const supabase = createClient()
+    if (!supabase) return
+    
     await supabase
       .from('notifications')
       .delete()
