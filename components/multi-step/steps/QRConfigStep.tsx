@@ -4,13 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import { Calendar, Image as ImageIcon, AlertCircle, Lock, Key } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 
-// Configurar worker do PDF.js usando worker bundled
+// Configurar worker do PDF.js usando unpkg CDN (mais confiável)
 if (typeof window !== 'undefined') {
-  // Usar worker do pacote npm ao invés do CDN
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.mjs',
-    import.meta.url
-  ).toString()
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
 }
 
 interface QRConfigStepProps {
