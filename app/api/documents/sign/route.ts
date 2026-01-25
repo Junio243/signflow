@@ -157,14 +157,14 @@ export async function POST(request: NextRequest) {
     console.log('✅ [SIGN API] Document record created with ID:', docData.id)
     const documentId = docData.id
 
-    // 5. URL de validação
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const validationUrl = `${baseUrl}/validate/${documentId}`
+    // 5. URL de validação (sempre usa o host atual)
+    const origin = new URL(request.url).origin
+    const validationUrl = `${origin}/validate/${documentId}`
     console.log('🔗 [SIGN API] Validation URL:', validationUrl)
 
     // 6. Gerar QR Code
     console.log('📱 [SIGN API] Generating QR code...')
-    const qrResponse = await fetch(`${baseUrl}/api/documents/generate-qr`, {
+    const qrResponse = await fetch(`${origin}/api/documents/generate-qr`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
