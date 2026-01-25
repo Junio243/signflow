@@ -147,18 +147,18 @@ export default function ValidateDemoPage() {
             }}
           >
             <div style={{ fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase', fontWeight: 600 }}>
-              Selos oficiais
+              Certificação Oficial
             </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <img
                 src="/seals/icp-brasil.svg"
                 alt="Selo ICP-Brasil"
-                style={{ height: 42, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#fff' }}
+                style={{ height: 48, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#fff', padding: 4 }}
               />
               <img
-                src="/seals/dataprev.svg"
-                alt="Selo Dataprev / gov.br"
-                style={{ height: 42, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#fff' }}
+                src="/seals/iti.svg"
+                alt="Selo ITI - Instituto Nacional de Tecnologia da Informação"
+                style={{ height: 48, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#fff', padding: 4 }}
               />
             </div>
           </div>
