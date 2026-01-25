@@ -2,13 +2,46 @@
 import './globals.css';
 import Link from 'next/link';
 import HeaderClient from '@/components/HeaderClient';
+import type { Metadata, Viewport } from 'next';
+
+export const metadata: Metadata = {
+  title: {
+    default: 'SignFlow - Assinatura Digital de PDFs',
+    template: '%s | SignFlow'
+  },
+  description: 'Assinatura eletrônica de PDFs com QR Code e validação pública auditável. Simples, rápido e seguro.',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'SignFlow'
+  },
+  formatDetection: {
+    telephone: false
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'SignFlow',
+    title: 'SignFlow - Assinatura Digital de PDFs',
+    description: 'Assinatura eletrônica de PDFs com QR Code e validação pública auditável'
+  },
+  twitter: {
+    card: 'summary',
+    title: 'SignFlow - Assinatura Digital de PDFs',
+    description: 'Assinatura eletrônica de PDFs com QR Code e validação pública auditável'
+  }
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#0066ff'
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-      </head>
       <body className="min-h-screen bg-gradient-to-b from-slate-50 to-white text-slate-900 antialiased">
         <a
           href="#conteudo-principal"
