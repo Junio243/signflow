@@ -28,9 +28,10 @@ interface QRConfigStepProps {
   }) => void
   onBack: () => void
   initialData?: any
+  pdfUrl?: string // URL do PDF do DocumentStep
 }
 
-export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigStepProps) {
+export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QRConfigStepProps) {
   const [issuer, setIssuer] = useState(initialData?.certificate?.issuer || 'SignFlow - Assinaturas Digitais')
   const [validityType, setValidityType] = useState<'1year' | '2years' | '5years' | 'permanent' | 'custom'>(
     initialData?.validityType || '1year'
@@ -47,17 +48,19 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
   const [validationCode, setValidationCode] = useState(initialData?.validation?.validationCode || '')
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [pdfLoaded, setPdfLoaded] = useState(false)
+  const [loadingError, setLoadingError] = useState('')
 
-  // Carregar PDF do localStorage e renderizar preview
+  // Carregar PDF e renderizar preview
   useEffect(() => {
     const loadPdfPreview = async () => {
-      try {
-        const savedData = localStorage.getItem('document-creation')
-        if (!savedData) return
+      if (!pdfUrl || !canvasRef.current) {
+        setLoadingError('PDF não disponível')
+        return
+      }
 
-        const data = JSON.parse(savedData)
-        const pdfUrl = data.document?.url
-        if (!pdfUrl || !canvasRef.current) return
+      try {
+        setPdfLoaded(false)
+        setLoadingError('')
 
         // Carregar PDF
         const loadingTask = pdfjsLib.getDocument(pdfUrl)
@@ -72,7 +75,7 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
         const viewport = page.getViewport({ scale: 1 })
         const scale = Math.min(
           canvas.parentElement!.clientWidth / viewport.width,
-          300 / viewport.height
+          400 / viewport.height
         )
         const scaledViewport = page.getViewport({ scale })
 
@@ -88,11 +91,12 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
         setPdfLoaded(true)
       } catch (error) {
         console.error('Erro ao carregar preview:', error)
+        setLoadingError('Erro ao carregar preview do PDF')
       }
     }
 
     loadPdfPreview()
-  }, [])
+  }, [pdfUrl])
 
   useEffect(() => {
     const from = new Date(validFrom)
@@ -477,32 +481,55 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
             🔍 Preview em Tempo Real
-            {pdfLoaded && <span className="text-xs text-green-600 font-normal">• Documento carregado</span>}
+            {pdfLoaded && <span className="text-xs text-green-600 font-normal">• Carregado</span>}
+            {loadingError && <span className="text-xs text-red-600 font-normal">• {loadingError}</span>}
           </p>
           <p className="text-xs text-gray-600">Posição: {qrPosition.replace('-', ' ')} | Tamanho: {qrSize}</p>
         </div>
-        <div className="relative w-full bg-white rounded-lg border-2 border-gray-300 shadow-lg overflow-hidden">
-          <canvas
-            ref={canvasRef}
-            className="w-full h-auto"
-          />
-          {!pdfLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-              <p className="text-gray-400">Carregando preview...</p>
+        <div className="relative w-full bg-white rounded-lg border-2 border-gray-300 shadow-lg overflow-hidden min-h-[300px] flex items-center justify-center">
+          {pdfUrl ? (
+            <>
+              <canvas
+                ref={canvasRef}
+                className={`w-full h-auto ${!pdfLoaded ? 'hidden' : ''}`}
+              />
+              {!pdfLoaded && !loadingError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                    <p className="text-gray-600">Carregando preview...</p>
+                  </div>
+                </div>
+              )}
+              {loadingError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+                  <div className="text-center">
+                    <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+                    <p className="text-red-600">{loadingError}</p>
+                  </div>
+                </div>
+              )}
+              {/* QR Code Overlay */}
+              {pdfLoaded && (
+                <div className={`absolute ${getQrPosition()}`}>
+                  <div className={`${getQrSizeClass()} bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs rounded shadow-lg relative animate-pulse`}>
+                    QR
+                    {requireValidationCode && (
+                      <Lock className="absolute -top-1 -right-1 h-3 w-3 text-yellow-400 drop-shadow" />
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600">Nenhum PDF disponível para preview</p>
             </div>
           )}
-          {/* QR Code Overlay */}
-          <div className={`absolute ${getQrPosition()}`}>
-            <div className={`${getQrSizeClass()} bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs rounded shadow-lg relative animate-pulse`}>
-              QR
-              {requireValidationCode && (
-                <Lock className="absolute -top-1 -right-1 h-3 w-3 text-yellow-400 drop-shadow" />
-              )}
-            </div>
-          </div>
         </div>
         <p className="text-xs text-gray-600 mt-2 text-center">
-          ✨ Este é o preview do seu documento com o QR Code na posição selecionada
+          ✨ Preview do seu documento com o QR Code na posição selecionada
         </p>
       </div>
 
