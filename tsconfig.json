@@ -21,6 +21,9 @@
       ],
       "@/components/*": [
         "components/*"
+      ],
+      "@/hooks/*": [
+        "hooks/*"
       ]
     },
     "incremental": true,
@@ -35,6 +38,7 @@
     "app",
     "components",
     "lib",
+    "hooks",
     "types",
     "supabase",
     "styles",
