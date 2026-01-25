@@ -110,8 +110,8 @@ export async function POST(request: NextRequest) {
             x,
             y,
             width: finalWidth,
-            height: finalHeight,
-            rotate: { angle: pos.rotation || 0 }
+            height: finalHeight
+            // rotation removed temporarily - pdf-lib doesn't support the { angle: value } format
           })
         }
         
