@@ -19,6 +19,8 @@ import {
   ShieldCheck,
   Timer,
   XCircle,
+  Zap,
+  Sparkles,
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -188,7 +190,7 @@ export default function DashboardPage() {
     setLoading(false)
   }
 
-  const handleNew = async () => {
+  const handleQuickCreate = async () => {
     if (!supabaseClient) {
       setErrorMsg('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
       return
@@ -199,6 +201,19 @@ export default function DashboardPage() {
       return
     }
     router.push('/editor')
+  }
+
+  const handleAdvancedCreate = async () => {
+    if (!supabaseClient) {
+      setErrorMsg('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+      return
+    }
+    const { data } = await supabaseClient.auth.getSession()
+    if (!data?.session) {
+      router.push(`/login?next=${encodeURIComponent('/create-document')}`)
+      return
+    }
+    router.push('/create-document')
   }
 
   const cancelDoc = async (doc: Doc) => {
@@ -295,14 +310,32 @@ export default function DashboardPage() {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {/* Quick Create Button */}
           <button
             type="button"
-            onClick={handleNew}
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+            onClick={handleQuickCreate}
+            className="group relative inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+            title="Criação rápida: ideal para documentos simples"
           >
-            <ShieldCheck className="h-4 w-4" aria-hidden />
-            Novo documento
+            <Zap className="h-4 w-4" aria-hidden />
+            Criação Rápida
           </button>
+
+          {/* Advanced Create Button with NEW badge */}
+          <button
+            type="button"
+            onClick={handleAdvancedCreate}
+            className="group relative inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-md hover:from-brand-700 hover:to-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+            title="Criação avançada: configure certificado, QR Code e múltiplos signatários"
+          >
+            <Sparkles className="h-4 w-4" aria-hidden />
+            Criação Avançada
+            <span className="absolute -right-1 -top-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 shadow-sm">
+              NOVO
+            </span>
+          </button>
+
+          {/* Refresh Button */}
           <button
             type="button"
             onClick={handleRefresh}
@@ -450,14 +483,24 @@ export default function DashboardPage() {
                   <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
                     <p className="font-medium">Nenhum documento encontrado com os filtros aplicados.</p>
                     <p className="mt-2 text-sm">Altere os filtros ou crie um novo documento.</p>
-                    <button
-                      type="button"
-                      onClick={handleNew}
-                      className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-brand-700"
-                    >
-                      <ShieldCheck className="h-4 w-4" aria-hidden />
-                      Criar documento
-                    </button>
+                    <div className="mt-4 flex justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleQuickCreate}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 shadow hover:bg-slate-50"
+                      >
+                        <Zap className="h-4 w-4" aria-hidden />
+                        Criação Rápida
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAdvancedCreate}
+                        className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-brand-700"
+                      >
+                        <Sparkles className="h-4 w-4" aria-hidden />
+                        Criação Avançada
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}
