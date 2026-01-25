@@ -98,6 +98,8 @@ export async function POST(req: NextRequest) {
     const signersRaw = form.get('signers')?.toString() || '[]';
     const qrPositionRaw = form.get('qr_position')?.toString() || 'bottom-left';
     const qrPageRaw = form.get('qr_page')?.toString() || 'last';
+    const validationRequiresCodeRaw = form.get('validation_requires_code')?.toString() || 'false';
+    const validationAccessCodeRaw = form.get('validation_access_code')?.toString() || null;
 
     structuredLog('info', {
       ...baseCtx,
@@ -270,11 +272,26 @@ export async function POST(req: NextRequest) {
     }
     const qrPage = qrPageResult.data;
 
+    const validationRequiresCode =
+      validationRequiresCodeRaw === 'true' ||
+      validationRequiresCodeRaw === '1' ||
+      validationRequiresCodeRaw === 'on';
+    const validationAccessCode =
+      typeof validationAccessCodeRaw === 'string' && validationAccessCodeRaw.trim()
+        ? validationAccessCodeRaw.trim().toUpperCase()
+        : null;
+
+    if (validationRequiresCode && !validationAccessCode) {
+      return NextResponse.json({ error: 'Código de validação é obrigatório.' }, { status: 400 });
+    }
+
     const metadataResult = metadataSchema.safeParse({
       positions: parsedPositions.data,
       signature_meta: parsedSignatureMeta.data,
       validation_theme_snapshot: parsedValidationTheme.data,
       validation_profile_id: validationProfileId,
+      validation_requires_code: validationRequiresCode,
+      validation_access_code: validationAccessCode,
       signers: parsedSigners.data,
       qr_position: qrPosition,
       qr_page: qrPage,
@@ -293,6 +310,8 @@ export async function POST(req: NextRequest) {
     const validationTheme = metadataResult.data.validation_theme_snapshot ?? null;
     const validationProfileIdSanitized = metadataResult.data.validation_profile_id ?? null;
     const sanitizedSigners = (metadataResult.data.signers || []).map((signer: unknown) => signerSchema.parse(signer));
+    const validationRequiresCodeSanitized = metadataResult.data.validation_requires_code ?? false;
+    const validationAccessCodeSanitized = metadataResult.data.validation_access_code ?? null;
 
     structuredLog('info', {
       ...baseCtx,
@@ -311,6 +330,8 @@ export async function POST(req: NextRequest) {
     if (signatureMeta) metadata.signature_meta = signatureMeta;
     if (validationTheme) metadata.validation_theme_snapshot = validationTheme;
     if (validationProfileIdSanitized) metadata.validation_profile_id = validationProfileIdSanitized;
+    if (validationRequiresCodeSanitized) metadata.validation_requires_code = validationRequiresCodeSanitized;
+    if (validationAccessCodeSanitized) metadata.validation_access_code = validationAccessCodeSanitized;
     if (sanitizedSigners.length) metadata.signers = sanitizedSigners;
     if (qrPosition) metadata.qr_position = qrPosition;
     if (qrPage) metadata.qr_page = qrPage;

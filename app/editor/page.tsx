@@ -74,6 +74,8 @@ const DEFAULT_THEME_COLOR = '#2563eb'
 const DEFAULT_THEME_ISSUER = 'Instituição/Profissional'
 const DEFAULT_THEME_REG = 'Registro (CRM/CRP/OAB/CNPJ)'
 const DEFAULT_THEME_FOOTER = 'Documento assinado digitalmente via SignFlow.'
+const ACCESS_CODE_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+const ACCESS_CODE_LENGTH = 8
 
 // File size limits (must match API limits in app/api/upload/route.ts)
 const MAX_PDF_SIZE_MB = 20
@@ -138,6 +140,22 @@ function profileBadge(type: ProfileType) {
   }
 }
 
+const generateAccessCode = (length = ACCESS_CODE_LENGTH) => {
+  const charset = ACCESS_CODE_CHARSET
+  const values = new Uint32Array(length)
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(values)
+  } else {
+    for (let i = 0; i < length; i += 1) {
+      values[i] = Math.floor(Math.random() * charset.length)
+    }
+  }
+
+  return Array.from(values)
+    .map(value => charset[value % charset.length])
+    .join('')
+}
+
 export default function EditorPage() {
   const supabaseClient = supabase
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -182,6 +200,8 @@ export default function EditorPage() {
 
   const [qrPosition, setQrPosition] = useState<QrPosition>('bottom-left')
   const [qrPage, setQrPage] = useState<QrPage>('last')
+  const [validationRequiresCode, setValidationRequiresCode] = useState(false)
+  const [validationAccessCode, setValidationAccessCode] = useState('')
 
   const setInfo = (text: string) => setStatus({ tone: 'neutral', text })
   const setError = (text: string) => setStatus({ tone: 'error', text })
@@ -805,6 +825,12 @@ export default function EditorPage() {
       return
     }
 
+    const normalizedAccessCode = validationAccessCode.trim().toUpperCase()
+    if (validationRequiresCode && !normalizedAccessCode) {
+      setError('Defina um código de validação antes de continuar.')
+      return
+    }
+
     setBusy(true)
     setInfo('Enviando arquivo…')
 
@@ -832,6 +858,10 @@ export default function EditorPage() {
 
       form.append('qr_position', qrPosition)
       form.append('qr_page', qrPage)
+      form.append('validation_requires_code', String(validationRequiresCode))
+      if (validationRequiresCode) {
+        form.append('validation_access_code', normalizedAccessCode)
+      }
 
       if (signatureBlob instanceof File) {
         form.append('signature', signatureBlob, signatureBlob.name)
@@ -1496,6 +1526,60 @@ export default function EditorPage() {
               </div>
 
               <div className="mt-6 space-y-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <input
+                      id="validation-requires-code"
+                      type="checkbox"
+                      checked={validationRequiresCode}
+                      onChange={event => {
+                        const checked = event.target.checked
+                        setValidationRequiresCode(checked)
+                        if (checked && !validationAccessCode.trim()) {
+                          setValidationAccessCode(generateAccessCode())
+                        }
+                      }}
+                      disabled={busy}
+                    />
+                    <div className="flex-1">
+                      <label
+                        htmlFor="validation-requires-code"
+                        className="text-sm font-medium text-slate-800"
+                      >
+                        Exigir código de validação
+                      </label>
+                      <p className="text-xs text-slate-500">
+                        Ao ativar, o link público pedirá um código antes de mostrar os detalhes do documento.
+                      </p>
+                    </div>
+                  </div>
+
+                  {validationRequiresCode && (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                      <div className="grid gap-2">
+                        <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                          Código de validação
+                        </label>
+                        <input
+                          value={validationAccessCode}
+                          onChange={event => setValidationAccessCode(event.target.value.toUpperCase())}
+                          placeholder="Ex.: 8H2K9M7Q"
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          disabled={busy}
+                        />
+                      </div>
+                      <SecondaryButton
+                        type="button"
+                        onClick={() => setValidationAccessCode(generateAccessCode())}
+                        disabled={busy}
+                        className="w-full sm:w-auto"
+                      >
+                        Gerar código
+                      </SecondaryButton>
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid gap-2">
                   <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Posição do QR Code</label>
                   <div className="grid gap-2 sm:grid-cols-2">

@@ -1,10 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
 import { useParams } from 'next/navigation'
 import { ShieldCheck, Download } from 'lucide-react'
-
-import { supabase } from '@/lib/supabaseClient'
 
 type Doc = {
   id: string
@@ -32,6 +31,12 @@ type SigningEvent = {
   metadata: any | null
 }
 
+type ValidateApiResponse = {
+  requires_code: boolean
+  document?: Doc
+  events?: SigningEvent[]
+}
+
 const isUuid = (s: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)
 
@@ -53,38 +58,42 @@ export default function ValidatePage() {
   const [events, setEvents] = useState<SigningEvent[]>([])
   const [eventsLoading, setEventsLoading] = useState(false)
   const [eventsError, setEventsError] = useState<string | null>(null)
+  const [requiresCode, setRequiresCode] = useState(false)
+  const [accessCode, setAccessCode] = useState('')
+  const [accessError, setAccessError] = useState<string | null>(null)
 
   useEffect(() => {
     (async () => {
       if (id === 'demo') { window.location.replace('/validate/demo'); return }
       if (!isUuid(id)) { setErrorMsg('ID inválido.'); return }
-      if (!supabase) { setErrorMsg('Serviço de validação indisponível no momento.'); return }
-      const client = supabase
-
-      const { data, error } = await client
-        .from('documents')
-        .select('id, status, created_at, signed_pdf_url, qr_code_url, original_pdf_name, validation_theme_snapshot, metadata, canceled_at')
-        .eq('id', id).maybeSingle()
-
-      if (error) { setErrorMsg(error.message); return }
-      setDoc(data as Doc)
-
+      setErrorMsg(null)
       setEventsError(null)
       setEvents([])
       setEventsLoading(true)
-      const { data: eventsData, error: eventsFetchError } = await client
-        .from('document_signing_events')
-        .select('id, document_id, signer_name, signer_reg, certificate_type, certificate_issuer, signer_email, signed_at, certificate_valid_until, logo_url, metadata')
-        .eq('document_id', id)
-        .order('signed_at', { ascending: true })
 
-      if (eventsFetchError) {
-        console.error('[Validate] Falha ao carregar histórico de assinaturas', eventsFetchError)
-        setEventsError(eventsFetchError.message)
-      } else {
-        setEvents((eventsData || []) as SigningEvent[])
+      try {
+        const response = await fetch(`/api/validate/${id}`)
+        const payload = (await response.json()) as ValidateApiResponse
+        if (!response.ok) {
+          setErrorMsg((payload as any)?.error || 'Erro ao carregar validação.')
+          return
+        }
+
+        if (payload.requires_code) {
+          setRequiresCode(true)
+          setEventsLoading(false)
+          return
+        }
+
+        setRequiresCode(false)
+        setDoc(payload.document ?? null)
+        setEvents(payload.events ?? [])
+      } catch (error) {
+        console.error('[Validate] Falha ao carregar validação', error)
+        setErrorMsg('Não foi possível carregar a validação.')
+      } finally {
+        setEventsLoading(false)
       }
-      setEventsLoading(false)
     })()
   }, [id])
 
@@ -217,7 +226,87 @@ export default function ValidatePage() {
   }, [doc?.created_at])
 
   if (errorMsg) return <p style={{ padding:16 }}>Erro: {errorMsg}</p>
-  if (!doc) return <p style={{ padding:16 }}>Carregando…</p>
+  if (eventsLoading) return <p style={{ padding:16 }}>Carregando…</p>
+
+  if (requiresCode && !doc) {
+    const handleValidateAccess = async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+      setAccessError(null)
+      setEventsLoading(true)
+
+      try {
+        const response = await fetch(`/api/validate/${id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: accessCode.trim() }),
+        })
+        const payload = (await response.json()) as ValidateApiResponse & { error?: string }
+        if (!response.ok) {
+          setAccessError(payload.error || 'Código inválido.')
+          return
+        }
+
+        setDoc(payload.document ?? null)
+        setEvents(payload.events ?? [])
+        setRequiresCode(false)
+      } catch (error) {
+        console.error('[Validate] Falha ao validar código', error)
+        setAccessError('Não foi possível validar o código.')
+      } finally {
+        setEventsLoading(false)
+      }
+    }
+
+    return (
+      <div style={{ maxWidth: 520, margin: '40px auto', padding: 16 }}>
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: 16, padding: 24 }}>
+          <h1 style={{ margin: 0, fontSize: 22 }}>Validação protegida</h1>
+          <p style={{ color: '#6b7280', marginTop: 8, fontSize: 14 }}>
+            Este documento exige um código de validação para exibir os detalhes.
+          </p>
+          <form onSubmit={handleValidateAccess} style={{ marginTop: 16, display: 'grid', gap: 12 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>
+              Código de validação
+            </label>
+            <input
+              value={accessCode}
+              onChange={event => setAccessCode(event.target.value.toUpperCase())}
+              placeholder="Informe o código"
+              style={{
+                border: '1px solid #e2e8f0',
+                borderRadius: 8,
+                padding: '10px 12px',
+                fontSize: 16,
+              }}
+            />
+            {accessError && (
+              <div style={{ color: '#b91c1c', fontSize: 13 }}>
+                {accessError}
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={eventsLoading}
+              style={{
+                backgroundColor: '#2563eb',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 9999,
+                padding: '10px 16px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                opacity: eventsLoading ? 0.7 : 1,
+              }}
+            >
+              {eventsLoading ? 'Validando…' : 'Validar código'}
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  if (!doc) return <p style={{ padding:16 }}>Documento não disponível.</p>
 
   const handleDownload = () => {
     if (!doc.signed_pdf_url) return
