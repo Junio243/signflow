@@ -18,6 +18,7 @@ import {
   RefreshCcw,
   ShieldCheck,
   Timer,
+  Trash2,
   XCircle,
   Zap,
   Sparkles,
@@ -243,6 +244,40 @@ export default function DashboardPage() {
         setFeedback('Documento cancelado com sucesso.')
         await fetchDocs()
       }
+    } finally {
+      setActionBusyId(null)
+    }
+  }
+
+  const deleteDoc = async (doc: Doc) => {
+    if (!isLogged) {
+      router.push(`/login?next=${encodeURIComponent('/dashboard')}`)
+      return
+    }
+
+    const confirmed = window.confirm(
+      '🗑️ Tem certeza que deseja DELETAR permanentemente este documento?\n\nEsta ação não pode ser desfeita!',
+    )
+    if (!confirmed) return
+
+    try {
+      setActionBusyId(doc.id)
+      
+      const response = await fetch(`/api/documents/delete?id=${doc.id}`, {
+        method: 'DELETE',
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        setFeedback(`Erro ao deletar: ${result.error || 'Erro desconhecido'}`)
+        return
+      }
+
+      setFeedback('✅ Documento deletado com sucesso!')
+      await fetchDocs()
+    } catch (error) {
+      setFeedback(`Erro ao deletar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
     } finally {
       setActionBusyId(null)
     }
@@ -510,6 +545,8 @@ export default function DashboardPage() {
                   const statusKey = (doc.status ?? 'default').toLowerCase() as StatusKey
                   const meta = STATUS_META[statusKey] ?? STATUS_META.default
                   const Icon = meta.icon
+                  const canDelete = ['draft', 'canceled', 'expired'].includes(statusKey)
+                  
                   return (
                     <tr key={doc.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3 font-mono text-xs text-slate-500">{doc.id.slice(0, 8)}…</td>
@@ -562,6 +599,18 @@ export default function DashboardPage() {
                             >
                               <Ban className="h-3.5 w-3.5" aria-hidden />
                               {actionBusyId === doc.id ? 'Cancelando…' : 'Cancelar'}
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => deleteDoc(doc)}
+                              disabled={actionBusyId === doc.id}
+                              className="inline-flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:border-red-400 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              title="Deletar documento permanentemente"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                              {actionBusyId === doc.id ? 'Deletando…' : 'Deletar'}
                             </button>
                           )}
                         </div>
