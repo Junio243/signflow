@@ -258,6 +258,7 @@ export default function CreateDocumentPage() {
               onNext={(data) => goToNextStep({ qrConfig: data })}
               onBack={goToPreviousStep}
               initialData={formData.qrConfig}
+              pdfUrl={formData.document?.url}
             />
           )}
 
