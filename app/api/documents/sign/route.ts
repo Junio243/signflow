@@ -43,8 +43,35 @@ export async function POST(request: NextRequest) {
     // 2. Gerar hash SHA-256 do PDF original
     const hash = crypto.createHash('sha256').update(Buffer.from(pdfBytes)).digest('hex')
 
-    // 3. Criar ID do documento
-    const documentId = `DOC-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+    // 3. Criar registro no banco PRIMEIRO para obter UUID
+    const { data: docData, error: dbError } = await supabase
+      .from('documents')
+      .insert({
+        original_pdf_name: pdfFile.name,
+        hash,
+        status: 'draft', // Começa como draft
+        signature_type: signature?.type || 'drawn',
+        profile_type: profile?.type || 'individual',
+        profile_data: profile,
+        signatories,
+        certificate_issuer: certificate?.issuer,
+        certificate_valid_from: certificate?.validFrom,
+        certificate_valid_until: certificate?.validUntil,
+        certificate_logo_url: certificate?.logoUrl,
+        qr_position: qrCodeConfig?.position,
+        qr_size: qrCodeConfig?.size,
+        require_validation_code: validation?.requireCode || false,
+        validation_code: validation?.validationCode
+      })
+      .select()
+      .single()
+
+    if (dbError) {
+      console.error('Database error:', dbError)
+      throw new Error(`Failed to create document record: ${dbError.message}`)
+    }
+
+    const documentId = docData.id
 
     // 4. URL de validação
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
@@ -103,7 +130,7 @@ export async function POST(request: NextRequest) {
       height: qrSize
     })
 
-    // 7. Adicionar texto de validação abaixo do QR Code (opcional)
+    // 7. Adicionar texto de validação abaixo do QR Code
     firstPage.drawText('Documento Assinado Digitalmente', {
       x: position.x,
       y: position.y - 15,
@@ -136,36 +163,20 @@ export async function POST(request: NextRequest) {
 
     const signedPdfUrl = urlData.publicUrl
 
-    // 11. Salvar metadados no banco
-    const { data: docData, error: dbError } = await supabase
+    // 11. Atualizar registro no banco com URLs e status signed
+    const { error: updateError } = await supabase
       .from('documents')
-      .insert({
-        id: documentId,
-        original_pdf_name: pdfFile.name,
+      .update({
         signed_pdf_url: signedPdfUrl,
         qr_code_url: qrResult.qrCode,
-        hash,
         status: 'signed',
-        signature_type: signature?.type || 'drawn',
-        profile_type: profile?.type || 'individual',
-        profile_data: profile,
-        signatories,
-        certificate_issuer: certificate?.issuer,
-        certificate_valid_from: certificate?.validFrom,
-        certificate_valid_until: certificate?.validUntil,
-        certificate_logo_url: certificate?.logoUrl,
-        qr_position: qrCodeConfig?.position,
-        qr_size: qrCodeConfig?.size,
-        require_validation_code: validation?.requireCode || false,
-        validation_code: validation?.validationCode,
         signed_at: new Date().toISOString()
       })
-      .select()
-      .single()
+      .eq('id', documentId)
 
-    if (dbError) {
-      console.error('Database error:', dbError)
-      throw new Error(`Failed to save document metadata: ${dbError.message}`)
+    if (updateError) {
+      console.error('Update error:', updateError)
+      throw new Error(`Failed to update document: ${updateError.message}`)
     }
 
     // 12. Retornar sucesso
