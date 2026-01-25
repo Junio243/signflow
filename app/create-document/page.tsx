@@ -41,6 +41,17 @@ interface DocumentData {
       requireCode: boolean
       validationCode?: string
     }
+    signaturePositions?: Array<{
+      page: number
+      nx: number
+      ny: number
+      x: number
+      y: number
+      scale: number
+      rotation: number
+      page_width: number
+      page_height: number
+    }>
   }
 }
 
@@ -130,6 +141,11 @@ export default function CreateDocumentPage() {
       // Add validation config
       if (formData.qrConfig?.validation) {
         formDataToSend.append('validation', JSON.stringify(formData.qrConfig.validation))
+      }
+
+      // Add signature positions
+      if (formData.qrConfig?.signaturePositions) {
+        formDataToSend.append('positions', JSON.stringify(formData.qrConfig.signaturePositions))
       }
 
       // Call API
@@ -259,6 +275,8 @@ export default function CreateDocumentPage() {
               onBack={goToPreviousStep}
               initialData={formData.qrConfig}
               pdfUrl={formData.document?.url}
+              pdfFile={formData.document?.file}
+              signatureData={formData.signature}
             />
           )}
 
