@@ -17,6 +17,7 @@ interface UseOnboardingOptions {
   steps: OnboardingStep[];
   autoStart?: boolean;
   onComplete?: () => void;
+  version?: number; // Nova versão do tour
 }
 
 export function useOnboarding({
@@ -24,14 +25,24 @@ export function useOnboarding({
   steps,
   autoStart = false,
   onComplete,
+  version = 1,
 }: UseOnboardingOptions) {
   const [hasSeenTour, setHasSeenTour] = useState(true);
+  const [isNewFeature, setIsNewFeature] = useState(false);
 
   useEffect(() => {
     // Verifica se o usuário já viu o tour
-    const seen = localStorage.getItem(`onboarding-${tourId}`);
-    setHasSeenTour(seen === 'true');
-  }, [tourId]);
+    const storageKey = `onboarding-${tourId}`;
+    const seenVersion = localStorage.getItem(storageKey);
+    
+    // Se nunca viu OU a versão mudou, considera como não visto
+    const hasSeenCurrentVersion = seenVersion === version.toString();
+    setHasSeenTour(hasSeenCurrentVersion);
+    
+    // Se já viu versão antiga mas não a nova, é nova feature
+    const isNew = seenVersion !== null && !hasSeenCurrentVersion;
+    setIsNewFeature(isNew);
+  }, [tourId, version]);
 
   const startTour = () => {
     const driverObj = driver({
@@ -41,15 +52,16 @@ export function useOnboarding({
         popover: {
           ...step.popover,
           showButtons: ['next', 'previous', 'close'],
-          nextBtnText: '➜ Próximo',
+          nextBtnText: '→ Próximo',
           prevBtnText: '← Anterior',
           doneBtnText: '✓ Concluir',
         },
       })),
       onDestroyed: () => {
-        // Marca como visto quando completa ou fecha
-        localStorage.setItem(`onboarding-${tourId}`, 'true');
+        // Salva a versão atual como vista
+        localStorage.setItem(`onboarding-${tourId}`, version.toString());
         setHasSeenTour(true);
+        setIsNewFeature(false);
         if (onComplete) onComplete();
       },
     });
@@ -60,6 +72,7 @@ export function useOnboarding({
   const resetTour = () => {
     localStorage.removeItem(`onboarding-${tourId}`);
     setHasSeenTour(false);
+    setIsNewFeature(false);
   };
 
   // Auto-start no primeiro acesso
@@ -77,5 +90,6 @@ export function useOnboarding({
     startTour,
     resetTour,
     hasSeenTour,
+    isNewFeature, // true se é atualização de tour
   };
 }
