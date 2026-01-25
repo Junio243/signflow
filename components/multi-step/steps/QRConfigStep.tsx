@@ -1,13 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { Calendar, Image as ImageIcon, AlertCircle, Lock, Key } from 'lucide-react'
-import * as pdfjsLib from 'pdfjs-dist'
-
-// Configurar worker do PDF.js usando unpkg CDN (mais confiável)
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
-}
+import { useState, useEffect } from 'react'
+import { Calendar, Image as ImageIcon, AlertCircle, Lock, Key, FileText } from 'lucide-react'
 
 interface QRConfigStepProps {
   onNext: (data: {
@@ -46,78 +40,6 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
   const [qrSize, setQrSize] = useState(initialData?.qrCode?.size || 'medium')
   const [requireValidationCode, setRequireValidationCode] = useState(initialData?.validation?.requireCode || false)
   const [validationCode, setValidationCode] = useState(initialData?.validation?.validationCode || '')
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [pdfLoaded, setPdfLoaded] = useState(false)
-  const [loadingError, setLoadingError] = useState('')
-
-  // Carregar PDF e renderizar preview
-  useEffect(() => {
-    const loadPdfPreview = async () => {
-      console.log('🔍 [QRConfigStep] Iniciando carregamento do PDF')
-      console.log('📄 [QRConfigStep] pdfUrl:', pdfUrl)
-
-      if (!pdfUrl) {
-        console.error('❌ [QRConfigStep] pdfUrl está vazio ou undefined')
-        setLoadingError('PDF não disponível para preview')
-        return
-      }
-
-      if (!canvasRef.current) {
-        console.error('❌ [QRConfigStep] Canvas não está disponível')
-        return
-      }
-
-      try {
-        console.log('⏳ [QRConfigStep] Iniciando renderização...')
-        setPdfLoaded(false)
-        setLoadingError('')
-
-        console.log('📦 [QRConfigStep] Carregando documento PDF...')
-        const loadingTask = pdfjsLib.getDocument(pdfUrl)
-        const pdf = await loadingTask.promise
-        console.log('✅ [QRConfigStep] PDF carregado! Total de páginas:', pdf.numPages)
-
-        console.log('📄 [QRConfigStep] Carregando primeira página...')
-        const page = await pdf.getPage(1)
-        console.log('✅ [QRConfigStep] Primeira página carregada')
-
-        const canvas = canvasRef.current
-        const context = canvas.getContext('2d')
-        if (!context) {
-          console.error('❌ [QRConfigStep] Não foi possível obter contexto 2D do canvas')
-          setLoadingError('Erro ao obter contexto do canvas')
-          return
-        }
-
-        const viewport = page.getViewport({ scale: 1 })
-        const parentWidth = canvas.parentElement?.clientWidth || 600
-        const scale = Math.min(
-          parentWidth / viewport.width,
-          400 / viewport.height
-        )
-        console.log('🔍 [QRConfigStep] Scale calculado:', scale)
-
-        const scaledViewport = page.getViewport({ scale })
-        canvas.width = scaledViewport.width
-        canvas.height = scaledViewport.height
-
-        console.log('🎨 [QRConfigStep] Renderizando PDF no canvas...')
-        await page.render({
-          canvasContext: context,
-          viewport: scaledViewport
-        }).promise
-
-        console.log('✅ [QRConfigStep] PDF renderizado com sucesso!')
-        setPdfLoaded(true)
-      } catch (error) {
-        console.error('❌ [QRConfigStep] Erro ao carregar preview:', error)
-        console.error('❌ [QRConfigStep] Stack trace:', error instanceof Error ? error.stack : 'N/A')
-        setLoadingError(`Erro: ${error instanceof Error ? error.message : 'Desconhecido'}`)
-      }
-    }
-
-    loadPdfPreview()
-  }, [pdfUrl])
 
   useEffect(() => {
     const from = new Date(validFrom)
@@ -190,23 +112,23 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
     onNext(data)
   }
 
-  const getQrPosition = () => {
-    const positions = {
-      'top-left': 'top-4 left-4',
-      'top-right': 'top-4 right-4',
-      'bottom-left': 'bottom-4 left-4',
-      'bottom-right': 'bottom-4 right-4'
+  const getQrPositionLabel = () => {
+    const labels = {
+      'top-left': 'Superior Esquerda',
+      'top-right': 'Superior Direita',
+      'bottom-left': 'Inferior Esquerda',
+      'bottom-right': 'Inferior Direita'
     }
-    return positions[qrPosition as keyof typeof positions] || positions['bottom-right']
+    return labels[qrPosition as keyof typeof labels] || labels['bottom-right']
   }
 
-  const getQrSizeClass = () => {
-    const sizes = {
-      small: 'w-12 h-12',
-      medium: 'w-16 h-16',
-      large: 'w-20 h-20'
+  const getQrSizeLabel = () => {
+    const labels = {
+      small: 'Pequeno',
+      medium: 'Médio',
+      large: 'Grande'
     }
-    return sizes[qrSize as keyof typeof sizes] || sizes.medium
+    return labels[qrSize as keyof typeof labels] || labels.medium
   }
 
   return (
@@ -231,6 +153,9 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Ex: SignFlow - Assinaturas Digitais"
           />
+          <p className="text-xs text-gray-500 mt-1">
+            💡 Nome da organização que está emitindo o certificado
+          </p>
         </div>
 
         <div className="mb-4">
@@ -279,6 +204,40 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
               />
             </div>
           </div>
+
+          {validityType === 'permanent' && (
+            <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700 flex items-center gap-2">
+              <AlertCircle size={14} />
+              Certificado sem data de expiração (permanente)
+            </div>
+          )}
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Logo do Certificado (URL opcional)
+          </label>
+          <input
+            type="url"
+            value={logoUrl}
+            onChange={(e) => setLogoUrl(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="https://exemplo.com/logo.png"
+          />
+          {logoPreview && (
+            <div className="mt-2">
+              <p className="text-xs text-gray-600 mb-1">Preview:</p>
+              <img
+                src={logoPreview}
+                alt="Logo preview"
+                className="w-24 h-24 object-contain border border-gray-300 rounded p-2"
+                onError={() => setLogoPreview('')}
+              />
+            </div>
+          )}
+          <p className="text-xs text-gray-500 mt-1">
+            💡 Formatos aceitos: PNG, JPG, SVG (máx 1MB). Deixe em branco para usar logo padrão.
+          </p>
         </div>
       </div>
 
@@ -340,6 +299,19 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
             ))}
           </div>
         </div>
+
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-900 font-medium mb-1">O QR Code incluirá automaticamente:</p>
+          <ul className="text-xs text-blue-700 space-y-1">
+            <li>✓ Nome do assinante</li>
+            <li>✓ CPF/CNPJ</li>
+            <li>✓ Emissor do certificado</li>
+            <li>✓ Validade</li>
+            <li>✓ Data e hora da assinatura</li>
+            <li>✓ Link de validação pública</li>
+            <li>✓ Hash SHA-256 do documento</li>
+          </ul>
+        </div>
       </div>
 
       {/* Validation Code Section */}
@@ -355,7 +327,7 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
           <button
             type="button"
             onClick={() => setRequireValidationCode(!requireValidationCode)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
               requireValidationCode ? 'bg-purple-600' : 'bg-gray-300'
             }`}
           >
@@ -370,7 +342,7 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
               Exigir código de validação (opcional)
             </label>
             <p className="text-xs text-gray-600">
-              Ao ativar, o link público pedirá um código antes de mostrar os detalhes do documento.
+              Ao ativar, o link público pedirá um código antes de mostrar os detalhes do documento. Ideal para documentos confidenciais.
             </p>
           </div>
         </div>
@@ -388,7 +360,7 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
                 type="text"
                 value={validationCode}
                 onChange={(e) => setValidationCode(e.target.value.toUpperCase())}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 font-mono text-lg font-bold tracking-wider"
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-lg font-bold tracking-wider"
                 placeholder="ABC12XYZ"
                 maxLength={10}
               />
@@ -400,60 +372,77 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
                 Gerar Novo
               </button>
             </div>
+            <p className="text-xs text-purple-700 mt-2 flex items-center gap-1">
+              <AlertCircle size={12} />
+              Guarde este código em local seguro. Será necessário para validar o documento.
+            </p>
           </div>
         )}
       </div>
 
-      {/* Preview */}
+      {/* Visual Preview - DIAGRAM ONLY */}
       <div className="mb-8 p-6 bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg">
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-            🔍 Preview em Tempo Real
-            {pdfLoaded && <span className="text-xs text-green-600 font-normal">• Carregado</span>}
+            📝 Visualização da Configuração
           </p>
         </div>
-        <div className="relative w-full bg-white rounded-lg border-2 border-gray-300 shadow-lg overflow-hidden min-h-[300px] flex items-center justify-center">
-          {pdfUrl ? (
-            <>
-              <canvas
-                ref={canvasRef}
-                className={`w-full h-auto ${!pdfLoaded ? 'hidden' : ''}`}
-              />
-              {!pdfLoaded && !loadingError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                    <p className="text-gray-600">Carregando preview...</p>
-                  </div>
-                </div>
-              )}
-              {loadingError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-                  <div className="text-center p-4">
-                    <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
-                    <p className="text-red-600 font-semibold">Erro ao carregar preview</p>
-                    <p className="text-sm text-red-500 mt-1">{loadingError}</p>
-                  </div>
-                </div>
-              )}
-              {pdfLoaded && (
-                <div className={`absolute ${getQrPosition()}`}>
-                  <div className={`${getQrSizeClass()} bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs rounded shadow-lg relative animate-pulse`}>
-                    QR
-                    {requireValidationCode && (
-                      <Lock className="absolute -top-1 -right-1 h-3 w-3 text-yellow-400 drop-shadow" />
-                    )}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-12">
-              <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-600">Volte e faça upload de um PDF</p>
+        
+        {/* Simplified Diagram */}
+        <div className="bg-white rounded-lg border-2 border-gray-300 p-8 shadow-lg">
+          <div className="relative">
+            {/* Document representation */}
+            <div className="border-2 border-dashed border-gray-400 rounded-lg p-6 bg-gray-50 min-h-[300px] flex items-center justify-center">
+              <div className="text-center">
+                <FileText className="h-16 w-16 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-600 font-medium">Seu Documento PDF</p>
+                <p className="text-sm text-gray-500 mt-1">O QR Code será inserido no documento final</p>
+              </div>
             </div>
-          )}
+            
+            {/* QR Code indicator in selected position */}
+            <div className={`absolute ${
+              qrPosition === 'top-left' ? 'top-10 left-10' :
+              qrPosition === 'top-right' ? 'top-10 right-10' :
+              qrPosition === 'bottom-left' ? 'bottom-10 left-10' :
+              'bottom-10 right-10'
+            }`}>
+              <div className={`${
+                qrSize === 'small' ? 'w-12 h-12' :
+                qrSize === 'medium' ? 'w-16 h-16' :
+                'w-20 h-20'
+              } bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs rounded shadow-lg relative animate-pulse`}>
+                QR
+                {requireValidationCode && (
+                  <Lock className="absolute -top-1 -right-1 h-3 w-3 text-yellow-400 drop-shadow" />
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {/* Configuration summary */}
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm font-semibold text-blue-900 mb-2">⚙️ Configuração Atual:</p>
+            <div className="grid grid-cols-2 gap-3 text-xs text-blue-800">
+              <div>
+                <span className="font-medium">Posição:</span> {getQrPositionLabel()}
+              </div>
+              <div>
+                <span className="font-medium">Tamanho:</span> {getQrSizeLabel()}
+              </div>
+              <div>
+                <span className="font-medium">Emissor:</span> {issuer.substring(0, 30)}{issuer.length > 30 ? '...' : ''}
+              </div>
+              <div>
+                <span className="font-medium">Segurança:</span> {requireValidationCode ? `Código ${validationCode}` : 'Pública'}
+              </div>
+            </div>
+          </div>
         </div>
+        
+        <p className="text-xs text-gray-600 mt-3 text-center">
+          ✨ O QR Code será inserido automaticamente no documento final após a assinatura
+        </p>
       </div>
 
       {/* Navigation */}
