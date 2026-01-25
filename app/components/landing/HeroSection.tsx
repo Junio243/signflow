@@ -10,8 +10,8 @@ export default function HeroSection() {
       {/* Background gradient */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-100 via-transparent to-transparent opacity-60" />
       
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-28">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Left: Copy */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -24,44 +24,44 @@ export default function HeroSection() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2, duration: 0.5 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-100 text-blue-700 text-sm font-medium mb-6"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-100 text-blue-700 text-xs sm:text-sm font-medium mb-4 sm:mb-6"
             >
-              <CheckCircle2 className="w-4 h-4" />
+              <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4" />
               Segurança LGPD • Validade Jurídica
             </motion.div>
 
             {/* Headline */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight">
               A assinatura digital mais{' '}
               <span className="text-blue-600">simples e segura</span>{' '}
               para seus documentos
             </h1>
 
             {/* Subheadline */}
-            <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-2xl mx-auto lg:mx-0">
+            <p className="text-base sm:text-lg text-gray-600 mb-6 sm:mb-8 max-w-2xl mx-auto lg:mx-0">
               Assine contratos em segundos pelo WhatsApp ou E-mail com validade jurídica (ICP-Brasil).
             </p>
 
             {/* CTAs */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center lg:justify-start mb-6 sm:mb-8">
               <Link
                 href="/editor"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold shadow-lg shadow-blue-500/50 hover:shadow-xl hover:shadow-blue-600/50 hover:scale-105 transition-all duration-200"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm sm:text-base font-semibold shadow-lg shadow-blue-500/50 hover:shadow-xl hover:shadow-blue-600/50 hover:scale-105 transition-all duration-200"
               >
-                <Zap className="w-5 h-5" />
+                <Zap className="w-4 h-4 sm:w-5 sm:h-5" />
                 Testar Grátis Agora
               </Link>
               <Link
                 href="/validate/demo"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-white text-gray-700 font-semibold border-2 border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white text-gray-700 text-sm sm:text-base font-semibold border-2 border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200"
               >
-                <Play className="w-5 h-5" />
+                <Play className="w-4 h-4 sm:w-5 sm:h-5" />
                 Ver Demonstração
               </Link>
             </div>
 
             {/* Benefits list */}
-            <ul className="space-y-3 text-left max-w-md mx-auto lg:mx-0">
+            <ul className="space-y-2 sm:space-y-3 text-left max-w-md mx-auto lg:mx-0">
               {[
                 'Assinatura manuscrita ou certificada com hash SHA-256',
                 'QR Code em todas as páginas do PDF',
@@ -72,10 +72,10 @@ export default function HeroSection() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.4 + i * 0.1, duration: 0.5 }}
-                  className="flex items-start gap-3"
+                  className="flex items-start gap-2 sm:gap-3"
                 >
-                  <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <span className="text-gray-700">{benefit}</span>
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span className="text-sm sm:text-base text-gray-700">{benefit}</span>
                 </motion.li>
               ))}
             </ul>
@@ -88,29 +88,29 @@ export default function HeroSection() {
             transition={{ delay: 0.3, duration: 0.7 }}
             className="relative"
           >
-            <div className="relative bg-white rounded-2xl shadow-2xl p-6 border border-gray-200">
+            <div className="relative bg-white rounded-2xl shadow-2xl p-4 sm:p-6 border border-gray-200">
               {/* Window chrome */}
-              <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-200">
-                <div className="flex gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500" />
-                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
+              <div className="flex items-center gap-2 mb-3 sm:mb-4 pb-3 sm:pb-4 border-b border-gray-200">
+                <div className="flex gap-1.5 sm:gap-2">
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500" />
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-yellow-500" />
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500" />
                 </div>
-                <div className="text-sm text-gray-500 ml-auto">Documento Assinado</div>
+                <div className="text-xs sm:text-sm text-gray-500 ml-auto">Documento Assinado</div>
               </div>
               
               {/* Document preview */}
-              <div className="space-y-3">
-                <div className="h-4 bg-gray-200 rounded w-3/4" />
-                <div className="h-4 bg-gray-200 rounded w-full" />
-                <div className="h-4 bg-gray-200 rounded w-5/6" />
+              <div className="space-y-2 sm:space-y-3">
+                <div className="h-3 sm:h-4 bg-gray-200 rounded w-3/4" />
+                <div className="h-3 sm:h-4 bg-gray-200 rounded w-full" />
+                <div className="h-3 sm:h-4 bg-gray-200 rounded w-5/6" />
                 
                 {/* Signature box */}
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
                   <div className="text-xs font-semibold text-blue-900 mb-2">
                     Assinatura Digital Verificada
                   </div>
-                  <div className="h-16 bg-gradient-to-r from-blue-600 to-blue-400 rounded-lg flex items-center justify-center text-white font-bold text-lg opacity-80">
+                  <div className="h-12 sm:h-16 bg-gradient-to-r from-blue-600 to-blue-400 rounded-lg flex items-center justify-center text-white font-bold text-base sm:text-lg opacity-80">
                     SignFlow ✓
                   </div>
                   <div className="mt-2 text-xs text-blue-700">
@@ -120,7 +120,7 @@ export default function HeroSection() {
 
                 {/* QR Code */}
                 <div className="flex justify-end">
-                  <div className="w-20 h-20 bg-gray-900 rounded-lg p-2">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-900 rounded-lg p-2">
                     <div className="w-full h-full bg-white rounded grid grid-cols-4 gap-0.5">
                       {[...Array(16)].map((_, i) => (
                         <div 
@@ -139,7 +139,7 @@ export default function HeroSection() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8, duration: 0.5 }}
-              className="absolute -top-4 -right-4 bg-green-500 text-white px-4 py-2 rounded-full shadow-lg font-semibold text-sm"
+              className="absolute -top-2 -right-2 sm:-top-4 sm:-right-4 bg-green-500 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-full shadow-lg font-semibold text-xs sm:text-sm"
             >
               ✓ Válido
             </motion.div>
