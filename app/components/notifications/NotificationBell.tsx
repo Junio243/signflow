@@ -2,7 +2,7 @@
 
 import { Bell } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabaseClient'
 import NotificationCenter from './NotificationCenter'
 
 export default function NotificationBell() {
@@ -15,12 +15,11 @@ export default function NotificationBell() {
   }, [])
 
   useEffect(() => {
-    if (!userId) return
+    if (!userId || !supabase) return
     
     loadUnreadCount()
     
     // Real-time: escutar novas notificações
-    const supabase = createClient()
     const channel = supabase
       .channel('notifications')
       .on(
@@ -43,15 +42,14 @@ export default function NotificationBell() {
   }, [userId])
 
   const loadUser = async () => {
-    const supabase = createClient()
+    if (!supabase) return
     const { data: { user } } = await supabase.auth.getUser()
     setUserId(user?.id || null)
   }
 
   const loadUnreadCount = async () => {
-    if (!userId) return
+    if (!userId || !supabase) return
     
-    const supabase = createClient()
     const { count } = await supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
@@ -61,7 +59,7 @@ export default function NotificationBell() {
     setUnreadCount(count || 0)
   }
 
-  if (!userId) return null
+  if (!userId || !supabase) return null
 
   return (
     <>
