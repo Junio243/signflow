@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import classNames from 'classnames'
 import { Building2, ChevronDown, LayoutDashboard, LogIn, LogOut, Menu, Settings, UserRound } from 'lucide-react'
+import NotificationBell from '@/app/components/notifications/NotificationBell'
 
 import { supabase } from '@/lib/supabaseClient'
 
@@ -177,6 +178,10 @@ export default function HeaderClient() {
               Autenticação indisponível
             </span>
           )}
+          
+          {/* Sino de Notificações - só aparece para usuários logados */}
+          {user && <NotificationBell />}
+          
           {user ? (
             <div className="relative" ref={dropdownRef}>
               <button
