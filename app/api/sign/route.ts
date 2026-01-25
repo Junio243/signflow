@@ -173,13 +173,14 @@ function generateValidationText(
   certificateSerial: string | null,
   signatureDate: string,
   validateUrl: string,
-  documentId: string
+  accessCode: string | null,
+  requiresAccessCode: boolean
 ): string {
   const regText = signerReg ? `, CPF ${signerReg}` : '';
   const serialText = certificateSerial ? ` número de série ${certificateSerial}` : '';
-  const accessCode = documentId.substring(0, 8).toUpperCase();
+  const accessText = requiresAccessCode && accessCode ? ` Código de Acesso: ${accessCode}.` : '';
 
-  return `Documento assinado digitalmente de acordo com a ICP-Brasil, MP 2.200-2/2001, no sistema SignFlow, por ${signerName}${regText}, certificado${serialText} em ${signatureDate} e pode ser validado em ${validateUrl}. Código de Acesso: ${accessCode}`;
+  return `Documento assinado digitalmente de acordo com a ICP-Brasil, MP 2.200-2/2001, no sistema SignFlow, por ${signerName}${regText}, certificado${serialText} em ${signatureDate} e pode ser validado em ${validateUrl}.${accessText}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -345,6 +346,12 @@ export async function POST(req: NextRequest) {
       reg: null,
       certificate_type: null,
     };
+    const requiresAccessCode = (normalizedMetadata as any).validation_requires_code === true;
+    const accessCodeRaw = (normalizedMetadata as any).validation_access_code;
+    const accessCode =
+      typeof accessCodeRaw === 'string' && accessCodeRaw.trim()
+        ? accessCodeRaw.trim()
+        : null;
     
     // Determine which pages receive the QR code
     let targetPages: any[] = [];
@@ -381,7 +388,8 @@ export async function POST(req: NextRequest) {
         firstSigner.certificate_type,
         signatureDate,
         validateUrl,
-        id
+        accessCode,
+        requiresAccessCode
       );
       
       // Wrap text to fit within maxWidth

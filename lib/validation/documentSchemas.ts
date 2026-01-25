@@ -64,6 +64,8 @@ export const metadataSchema = z
     signature_meta: signatureMetaSchema.nullable().optional(),
     validation_theme_snapshot: z.record(z.any()).nullable().optional(),
     validation_profile_id: optionalTrimmedString,
+    validation_requires_code: z.boolean().optional(),
+    validation_access_code: optionalTrimmedString,
     signers: z.array(signerSchema).optional(),
     qr_position: qrPositionSchema.optional(),
     qr_page: qrPageSchema.optional(),
