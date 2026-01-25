@@ -6,6 +6,18 @@ import { type ReactNode, useState } from 'react'
 
 import { supabase } from '@/lib/supabaseClient'
 
+// Mover Wrapper para fora do componente principal
+// Isso evita recriação a cada render (problema no iOS Safari)
+function Wrapper({ children }: { children: ReactNode }) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
+      <div className="w-full max-w-md">
+        <div className="rounded-2xl bg-white p-8 shadow-lg ring-1 ring-slate-950/5">{children}</div>
+      </div>
+    </main>
+  )
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const supabaseClient = supabase
@@ -14,14 +26,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
-
-  const Wrapper = ({ children }: { children: ReactNode }) => (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
-      <div className="w-full max-w-md">
-        <div className="rounded-2xl bg-white p-8 shadow-lg ring-1 ring-slate-950/5">{children}</div>
-      </div>
-    </main>
-  )
 
   const loginComSenha = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -103,9 +107,11 @@ export default function LoginPage() {
             </label>
             <input
               id="email"
+              name="email"
               type="email"
               required
               autoComplete="email"
+              inputMode="email"
               placeholder="seu@email.com"
               value={email}
               onChange={event => setEmail(event.target.value)}
@@ -119,6 +125,7 @@ export default function LoginPage() {
             </label>
             <input
               id="password"
+              name="password"
               type="password"
               required
               autoComplete="current-password"
