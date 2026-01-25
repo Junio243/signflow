@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Calendar, Image as ImageIcon, AlertCircle, Lock, Key, FileText } from 'lucide-react'
+import PdfEditor from '@/components/PdfEditor'
 
 interface QRConfigStepProps {
   onNext: (data: {
@@ -19,13 +20,38 @@ interface QRConfigStepProps {
       requireCode: boolean
       validationCode?: string
     }
+    signaturePositions?: Array<{
+      page: number
+      nx: number
+      ny: number
+      x: number
+      y: number
+      scale: number
+      rotation: number
+      page_width: number
+      page_height: number
+    }>
   }) => void
   onBack: () => void
   initialData?: any
   pdfUrl?: string
+  signatureData?: { data: string; type: 'draw' | 'text' | 'upload' }
+  pdfFile?: File
 }
 
-export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QRConfigStepProps) {
+type Pos = {
+  page: number
+  nx: number
+  ny: number
+  x?: number
+  y?: number
+  scale: number
+  rotation: number
+}
+
+type PageSize = { width: number; height: number }
+
+export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl, signatureData, pdfFile }: QRConfigStepProps) {
   const [issuer, setIssuer] = useState(initialData?.certificate?.issuer || 'SignFlow - Assinaturas Digitais')
   const [validityType, setValidityType] = useState<'1year' | '2years' | '5years' | 'permanent' | 'custom'>(
     initialData?.validityType || '1year'
@@ -40,6 +66,19 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
   const [qrSize, setQrSize] = useState(initialData?.qrCode?.size || 'medium')
   const [requireValidationCode, setRequireValidationCode] = useState(initialData?.validation?.requireCode || false)
   const [validationCode, setValidationCode] = useState(initialData?.validation?.validationCode || '')
+
+  // PDF Editor states
+  const [positions, setPositions] = useState<Pos[]>(initialData?.signaturePositions?.map((p: any) => ({
+    page: p.page,
+    nx: p.nx,
+    ny: p.ny,
+    scale: p.scale,
+    rotation: p.rotation
+  })) || [])
+  const [activePage, setActivePage] = useState(1)
+  const [pdfPageCount, setPdfPageCount] = useState(1)
+  const [pageSizes, setPageSizes] = useState<PageSize[]>([])
+  const [showPreview, setShowPreview] = useState(false)
 
   useEffect(() => {
     const from = new Date(validFrom)
@@ -76,9 +115,126 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
     }
   }, [requireValidationCode])
 
+  // Load PDF pages and dimensions
+  useEffect(() => {
+    if (!pdfFile) {
+      setPdfPageCount(1)
+      setPageSizes([])
+      return
+    }
+
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const ab = await pdfFile.arrayBuffer()
+        const pdfjs = await import('pdfjs-dist/legacy/build/pdf')
+
+        try {
+          (pdfjs as any).GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
+        } catch (e) {
+          console.warn('[QRConfigStep] Could not set PDF.js workerSrc', e)
+        }
+
+        const loadingTask = pdfjs.getDocument({ data: ab })
+        const pdf = await loadingTask.promise
+
+        if (cancelled) {
+          try {
+            pdf.destroy?.()
+          } catch (err) {
+            console.warn('[QRConfigStep] Failed to destroy cancelled PDF', err)
+          }
+          return
+        }
+
+        const sizes: PageSize[] = []
+        const pageCount = pdf.numPages || 1
+        for (let i = 1; i <= pageCount; i++) {
+          const page = await pdf.getPage(i)
+          const viewport = page.getViewport({ scale: 1 })
+          sizes.push({ width: viewport.width, height: viewport.height })
+          try {
+            page.cleanup?.()
+          } catch (err) {
+            console.warn('[QRConfigStep] Failed to cleanup page', err)
+          }
+        }
+
+        setPageSizes(sizes)
+        setPdfPageCount(sizes.length || 1)
+        setActivePage(1)
+
+        try {
+          pdf.destroy?.()
+        } catch (err) {
+          console.warn('[QRConfigStep] Failed to destroy PDF', err)
+        }
+      } catch (err) {
+        console.error('[QRConfigStep] Failed to read PDF', err)
+        setPageSizes([])
+        setPdfPageCount(1)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [pdfFile])
+
   const generateNewCode = () => {
     const code = Math.random().toString(36).substr(2, 8).toUpperCase()
     setValidationCode(code)
+  }
+
+  const handlePositionsChange = useCallback((next: Pos[]) => {
+    setPositions(next)
+  }, [])
+
+  const removePosition = (page: number) => {
+    setPositions(current => current.filter(pos => pos.page !== page))
+  }
+
+  const handleGoToPosition = (page: number) => {
+    setActivePage(Math.max(1, page))
+  }
+
+  const clearPositions = () => {
+    setPositions([])
+  }
+
+  const computePositionsForApi = () => {
+    if (!positions.length) return []
+
+    return positions.map(pos => {
+      const dims = pageSizes[pos.page - 1] ?? pageSizes[0] ?? { width: 595, height: 842 }
+      const cw = dims.width
+      const ch = dims.height
+      const nx =
+        typeof pos.nx === 'number' && Number.isFinite(pos.nx)
+          ? Math.max(0, Math.min(1, pos.nx))
+          : typeof pos.x === 'number' && Number.isFinite(pos.x)
+            ? Math.max(0, Math.min(1, pos.x / cw))
+            : 0.5
+      const ny =
+        typeof pos.ny === 'number' && Number.isFinite(pos.ny)
+          ? Math.max(0, Math.min(1, pos.ny))
+          : typeof pos.y === 'number' && Number.isFinite(pos.y)
+            ? Math.max(0, Math.min(1, pos.y / ch))
+            : 0.5
+
+      return {
+        page: pos.page,
+        nx,
+        ny,
+        x: nx * cw,
+        y: ny * ch,
+        scale: typeof pos.scale === 'number' ? pos.scale : 1,
+        rotation: typeof pos.rotation === 'number' ? pos.rotation : 0,
+        page_width: cw,
+        page_height: ch,
+      }
+    })
   }
 
   const handleNext = () => {
@@ -89,6 +245,11 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
 
     if (requireValidationCode && !validationCode) {
       alert('Código de validação é obrigatório quando a opção está ativada')
+      return
+    }
+
+    if (positions.length === 0) {
+      alert('❌ Posicione a assinatura em pelo menos uma página do documento!\n\nClique em "Posicionar Assinatura no PDF" e depois clique no documento para adicionar a assinatura.')
       return
     }
 
@@ -106,7 +267,8 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
       validation: {
         requireCode: requireValidationCode,
         validationCode: requireValidationCode ? validationCode : undefined
-      }
+      },
+      signaturePositions: computePositionsForApi()
     }
 
     onNext(data)
@@ -133,8 +295,8 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-8">
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Configurações do QR Code</h2>
-      <p className="text-gray-600 mb-6">Configure o certificado e o QR Code de validação</p>
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">Configurações Finais</h2>
+      <p className="text-gray-600 mb-6">Configure o certificado, QR Code e posicione a assinatura no documento</p>
 
       {/* Certificate Section */}
       <div className="mb-8 p-6 bg-gray-50 border border-gray-200 rounded-lg">
@@ -380,69 +542,101 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl }: QR
         )}
       </div>
 
-      {/* Visual Preview - DIAGRAM ONLY */}
-      <div className="mb-8 p-6 bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-            📝 Visualização da Configuração
-          </p>
-        </div>
-        
-        {/* Simplified Diagram */}
-        <div className="bg-white rounded-lg border-2 border-gray-300 p-8 shadow-lg">
-          <div className="relative">
-            {/* Document representation */}
-            <div className="border-2 border-dashed border-gray-400 rounded-lg p-6 bg-gray-50 min-h-[300px] flex items-center justify-center">
-              <div className="text-center">
-                <FileText className="h-16 w-16 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600 font-medium">Seu Documento PDF</p>
-                <p className="text-sm text-gray-500 mt-1">O QR Code será inserido no documento final</p>
-              </div>
-            </div>
-            
-            {/* QR Code indicator in selected position */}
-            <div className={`absolute ${
-              qrPosition === 'top-left' ? 'top-10 left-10' :
-              qrPosition === 'top-right' ? 'top-10 right-10' :
-              qrPosition === 'bottom-left' ? 'bottom-10 left-10' :
-              'bottom-10 right-10'
-            }`}>
-              <div className={`${
-                qrSize === 'small' ? 'w-12 h-12' :
-                qrSize === 'medium' ? 'w-16 h-16' :
-                'w-20 h-20'
-              } bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs rounded shadow-lg relative animate-pulse`}>
-                QR
-                {requireValidationCode && (
-                  <Lock className="absolute -top-1 -right-1 h-3 w-3 text-yellow-400 drop-shadow" />
-                )}
-              </div>
-            </div>
+      {/* PDF Preview Section - NEW! */}
+      <div className="mb-8 p-6 bg-gradient-to-br from-green-50 to-blue-50 border-2 border-green-300 rounded-lg">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              ✍️ Posicionar Assinatura no PDF *
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Clique no documento para adicionar a assinatura. Você pode posicionar em múltiplas páginas.
+            </p>
           </div>
-          
-          {/* Configuration summary */}
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm font-semibold text-blue-900 mb-2">⚙️ Configuração Atual:</p>
-            <div className="grid grid-cols-2 gap-3 text-xs text-blue-800">
-              <div>
-                <span className="font-medium">Posição:</span> {getQrPositionLabel()}
-              </div>
-              <div>
-                <span className="font-medium">Tamanho:</span> {getQrSizeLabel()}
-              </div>
-              <div>
-                <span className="font-medium">Emissor:</span> {issuer.substring(0, 30)}{issuer.length > 30 ? '...' : ''}
-              </div>
-              <div>
-                <span className="font-medium">Segurança:</span> {requireValidationCode ? `Código ${validationCode}` : 'Pública'}
-              </div>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowPreview(!showPreview)}
+            className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors text-sm"
+          >
+            {showPreview ? '🙈 Ocultar Preview' : '👁️ Mostrar Preview'}
+          </button>
         </div>
-        
-        <p className="text-xs text-gray-600 mt-3 text-center">
-          ✨ O QR Code será inserido automaticamente no documento final após a assinatura
-        </p>
+
+        {positions.length > 0 && (
+          <div className="mb-4 p-4 bg-green-100 border border-green-300 rounded-lg">
+            <p className="text-sm font-semibold text-green-900 mb-2">
+              ✅ Assinaturas posicionadas: {positions.length}
+            </p>
+            <ul className="space-y-2">
+              {positions
+                .slice()
+                .sort((a, b) => a.page - b.page)
+                .map(pos => (
+                  <li
+                    key={pos.page}
+                    className="flex items-center justify-between text-xs bg-white rounded px-3 py-2 border border-green-200"
+                  >
+                    <div>
+                      <span className="font-medium text-gray-900">Página {pos.page}</span>
+                      <span className="ml-2 text-gray-600">
+                        {(pos.nx * 100).toFixed(0)}% × {(pos.ny * 100).toFixed(0)}% · Escala {(pos.scale ?? 1).toFixed(1)}×
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleGoToPosition(pos.page)}
+                        className="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded text-xs"
+                      >
+                        Ir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removePosition(pos.page)}
+                        className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-xs"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  </li>
+                ))}
+            </ul>
+            <button
+              type="button"
+              onClick={clearPositions}
+              className="mt-3 text-xs text-red-600 hover:text-red-700 font-medium"
+            >
+              🗑️ Limpar todas as posições
+            </button>
+          </div>
+        )}
+
+        {showPreview && pdfFile && signatureData && (
+          <div className="mt-4">
+            <PdfEditor
+              file={pdfFile}
+              signatureUrl={signatureData.data}
+              signatureSize={{ width: 400, height: 180 }}
+              positions={positions}
+              onPositions={handlePositionsChange}
+              page={activePage}
+              onPageChange={setActivePage}
+              onDocumentLoaded={({ pages }) => setPdfPageCount(pages)}
+            />
+          </div>
+        )}
+
+        {!pdfFile && (
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+            ⚠️ PDF não encontrado. Volte para a etapa de documento.
+          </div>
+        )}
+
+        {!signatureData && (
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+            ⚠️ Assinatura não encontrada. Volte para a etapa de assinatura.
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
