@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     const certificateData = formData.get('certificate') as string
     const qrCodeConfigData = formData.get('qrCodeConfig') as string
     const validationData = formData.get('validation') as string
+    const positionsData = formData.get('positions') as string
 
     console.log('📄 [SIGN API] PDF File:', pdfFile ? `${pdfFile.name} (${pdfFile.size} bytes)` : 'MISSING')
 
@@ -42,7 +43,9 @@ export async function POST(request: NextRequest) {
     const certificate = certificateData ? JSON.parse(certificateData) : null
     const qrCodeConfig = qrCodeConfigData ? JSON.parse(qrCodeConfigData) : null
     const validation = validationData ? JSON.parse(validationData) : null
+    const positions = positionsData ? JSON.parse(positionsData) : []
     console.log('✅ [SIGN API] JSON data parsed successfully')
+    console.log('📍 [SIGN API] Signature positions:', positions.length)
 
     // 1. Ler o PDF original
     console.log('📝 [SIGN API] Loading PDF document...')
@@ -55,7 +58,73 @@ export async function POST(request: NextRequest) {
     const hash = crypto.createHash('sha256').update(Buffer.from(pdfBytes)).digest('hex')
     console.log('✅ [SIGN API] Hash generated:', hash.substring(0, 16) + '...')
 
-    // 3. Criar registro no banco PRIMEIRO para obter UUID
+    // 3. Processar assinatura se houver posições
+    if (positions.length > 0 && signature?.data) {
+      console.log('✍️ [SIGN API] Processing signature image...')
+      
+      try {
+        // Converter data URL da assinatura para bytes
+        const signatureBase64 = signature.data.split(',')[1]
+        const signatureBytes = Buffer.from(signatureBase64, 'base64')
+        console.log('📦 [SIGN API] Signature bytes:', signatureBytes.length)
+        
+        // Embed signature image
+        let signatureImage
+        if (signature.data.includes('image/png')) {
+          signatureImage = await pdfDoc.embedPng(signatureBytes)
+        } else if (signature.data.includes('image/jpeg') || signature.data.includes('image/jpg')) {
+          signatureImage = await pdfDoc.embedJpg(signatureBytes)
+        } else {
+          // Default to PNG
+          signatureImage = await pdfDoc.embedPng(signatureBytes)
+        }
+        console.log('✅ [SIGN API] Signature image embedded')
+
+        // Desenhar assinatura em cada posição
+        const pages = pdfDoc.getPages()
+        console.log('📋 [SIGN API] Drawing signature on', positions.length, 'positions')
+        
+        for (const pos of positions) {
+          const pageIndex = pos.page - 1
+          if (pageIndex < 0 || pageIndex >= pages.length) {
+            console.warn('⚠️ [SIGN API] Invalid page index:', pos.page)
+            continue
+          }
+
+          const page = pages[pageIndex]
+          const { width: pageWidth, height: pageHeight } = page.getSize()
+          
+          // Calcular posição absoluta
+          const x = pos.x || (pos.nx * pageWidth)
+          const y = pos.y || (pos.ny * pageHeight)
+          
+          // Tamanho base da assinatura (ajustado com scale)
+          const baseWidth = 200
+          const baseHeight = 100
+          const finalWidth = baseWidth * (pos.scale || 1)
+          const finalHeight = baseHeight * (pos.scale || 1)
+          
+          console.log(`📍 [SIGN API] Page ${pos.page}: x=${x.toFixed(1)}, y=${y.toFixed(1)}, w=${finalWidth.toFixed(1)}, h=${finalHeight.toFixed(1)}`)
+          
+          page.drawImage(signatureImage, {
+            x,
+            y,
+            width: finalWidth,
+            height: finalHeight,
+            rotate: { angle: pos.rotation || 0 }
+          })
+        }
+        
+        console.log('✅ [SIGN API] All signatures drawn successfully')
+      } catch (err) {
+        console.error('❌ [SIGN API] Error processing signature:', err)
+        // Continuar sem assinatura se houver erro
+      }
+    } else {
+      console.log('ℹ️ [SIGN API] No signature positions provided, skipping signature drawing')
+    }
+
+    // 4. Criar registro no banco PRIMEIRO para obter UUID
     console.log('💾 [SIGN API] Inserting document record into database...')
     const { data: docData, error: dbError } = await supabase
       .from('documents')
@@ -88,12 +157,12 @@ export async function POST(request: NextRequest) {
     console.log('✅ [SIGN API] Document record created with ID:', docData.id)
     const documentId = docData.id
 
-    // 4. URL de validação
+    // 5. URL de validação
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const validationUrl = `${baseUrl}/validate/${documentId}`
     console.log('🔗 [SIGN API] Validation URL:', validationUrl)
 
-    // 5. Gerar QR Code
+    // 6. Gerar QR Code
     console.log('📱 [SIGN API] Generating QR code...')
     const qrResponse = await fetch(`${baseUrl}/api/documents/generate-qr`, {
       method: 'POST',
@@ -120,7 +189,7 @@ export async function POST(request: NextRequest) {
     }
     console.log('✅ [SIGN API] QR code generated successfully')
 
-    // 6. Inserir QR Code no PDF
+    // 7. Inserir QR Code no PDF
     console.log('🖼️ [SIGN API] Embedding QR code into PDF...')
     
     // Converter data URL para bytes
@@ -138,7 +207,7 @@ export async function POST(request: NextRequest) {
     console.log('📐 [SIGN API] Page dimensions:', width, 'x', height)
 
     // Tamanhos do QR Code
-    const qrSizes = {
+    const qrSizes: Record<string, number> = {
       small: 80,
       medium: 120,
       large: 160
@@ -148,14 +217,14 @@ export async function POST(request: NextRequest) {
 
     // Posições
     const margin = 20
-    const positions = {
+    const qrPositions: Record<string, {x: number, y: number}> = {
       'top-left': { x: margin, y: height - qrSize - margin },
       'top-right': { x: width - qrSize - margin, y: height - qrSize - margin },
       'bottom-left': { x: margin, y: margin },
       'bottom-right': { x: width - qrSize - margin, y: margin }
     }
 
-    const position = positions[qrCodeConfig?.position || 'bottom-right'] || positions['bottom-right']
+    const position = qrPositions[qrCodeConfig?.position || 'bottom-right'] || qrPositions['bottom-right']
     console.log('📍 [SIGN API] QR position:', qrCodeConfig?.position, '=', position)
 
     // Desenhar QR Code
@@ -167,7 +236,7 @@ export async function POST(request: NextRequest) {
       height: qrSize
     })
 
-    // 7. Adicionar texto de validação abaixo do QR Code
+    // 8. Adicionar texto de validação abaixo do QR Code
     firstPage.drawText('Documento Assinado Digitalmente', {
       x: position.x,
       y: position.y - 15,
@@ -176,13 +245,13 @@ export async function POST(request: NextRequest) {
     })
     console.log('✅ [SIGN API] QR code drawn on PDF')
 
-    // 8. Salvar PDF modificado
+    // 9. Salvar PDF modificado
     console.log('💾 [SIGN API] Saving modified PDF...')
     const signedPdfBytes = await pdfDoc.save()
     const signedPdfBlob = new Blob([signedPdfBytes], { type: 'application/pdf' })
     console.log('✅ [SIGN API] PDF saved, size:', signedPdfBytes.length, 'bytes')
 
-    // 9. Upload para Supabase Storage
+    // 10. Upload para Supabase Storage
     console.log('☁️ [SIGN API] Uploading to Supabase Storage...')
     const fileName = `${documentId}.pdf`
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -199,7 +268,7 @@ export async function POST(request: NextRequest) {
     }
     console.log('✅ [SIGN API] PDF uploaded successfully:', fileName)
 
-    // 10. Obter URL pública do PDF
+    // 11. Obter URL pública do PDF
     const { data: urlData } = supabase.storage
       .from('signed-documents')
       .getPublicUrl(fileName)
@@ -207,7 +276,7 @@ export async function POST(request: NextRequest) {
     const signedPdfUrl = urlData.publicUrl
     console.log('🔗 [SIGN API] Public URL:', signedPdfUrl)
 
-    // 11. Atualizar registro no banco com URLs e status signed
+    // 12. Atualizar registro no banco com URLs e status signed
     console.log('🔄 [SIGN API] Updating document record...')
     const { error: updateError } = await supabase
       .from('documents')
@@ -226,7 +295,7 @@ export async function POST(request: NextRequest) {
     }
     console.log('✅ [SIGN API] Document record updated')
 
-    // 12. Retornar sucesso
+    // 13. Retornar sucesso
     console.log('✅✅✅ [SIGN API] Document signed successfully!')
     return NextResponse.json({
       success: true,
