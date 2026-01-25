@@ -151,14 +151,14 @@ export default function ValidateDemoPage() {
             </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <img
-                src="/seals/icp-brasil.svg"
+                src="/seals/icp-brasil.png"
                 alt="Selo ICP-Brasil"
-                style={{ height: 48, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#fff', padding: 4 }}
+                style={{ height: 48, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#fff', objectFit: 'contain', padding: 4 }}
               />
               <img
-                src="/seals/iti.svg"
+                src="/seals/iti.png"
                 alt="Selo ITI - Instituto Nacional de Tecnologia da Informação"
-                style={{ height: 48, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#fff', padding: 4 }}
+                style={{ height: 48, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#fff', objectFit: 'contain', padding: 4 }}
               />
             </div>
           </div>
