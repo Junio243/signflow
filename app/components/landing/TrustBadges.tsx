@@ -1,16 +1,9 @@
 'use client'
 
-import Image from 'next/image'
 import { Shield, Lock, Award, FileCheck } from 'lucide-react'
+import { BancoDoBrasilLogo, MagazineLuizaLogo, HospitalEinsteinLogo, GovBrLogo } from '../Logos'
 
 export default function TrustBadges() {
-  const companies = [
-    { name: 'Banco do Brasil', logo: '/logos/banco-do-brasil.png', width: 140, height: 40 },
-    { name: 'Magazine Luiza', logo: '/logos/magazine-luiza.png', width: 120, height: 40 },
-    { name: 'Hospital Einstein', logo: '/logos/hospital-einstein.png', width: 130, height: 40 },
-    { name: 'Gov.br', logo: '/logos/govbr.png', width: 100, height: 40 },
-  ]
-
   const badges = [
     { icon: Shield, label: 'LGPD', description: 'Conforme à legislação' },
     { icon: Award, label: 'ISO 27001', description: 'Certificação de segurança' },
@@ -27,24 +20,20 @@ export default function TrustBadges() {
               Mais de 1.000 empresas confiam
             </h2>
             
-            {/* Company logos - AGORA COM IMAGENS REAIS */}
+            {/* Company logos - USANDO COMPONENTES REUTILIZÁVEIS */}
             <div className="flex flex-wrap justify-center items-center gap-6 sm:gap-8 lg:gap-12 mb-8 sm:mb-12">
-              {companies.map((company, i) => (
-                <div 
-                  key={i}
-                  className="relative grayscale hover:grayscale-0 opacity-60 hover:opacity-100 transition-all duration-300"
-                  title={company.name}
-                >
-                  <Image
-                    src={company.logo}
-                    alt={`Logo ${company.name}`}
-                    width={company.width}
-                    height={company.height}
-                    className="object-contain"
-                    priority={i < 2} // Prioriza primeiras 2 logos
-                  />
-                </div>
-              ))}
+              <div className="grayscale hover:grayscale-0 opacity-60 hover:opacity-100 transition-all duration-300">
+                <BancoDoBrasilLogo priority />
+              </div>
+              <div className="grayscale hover:grayscale-0 opacity-60 hover:opacity-100 transition-all duration-300">
+                <MagazineLuizaLogo priority />
+              </div>
+              <div className="grayscale hover:grayscale-0 opacity-60 hover:opacity-100 transition-all duration-300">
+                <HospitalEinsteinLogo />
+              </div>
+              <div className="grayscale hover:grayscale-0 opacity-60 hover:opacity-100 transition-all duration-300">
+                <GovBrLogo />
+              </div>
             </div>
 
             {/* Security badges */}
