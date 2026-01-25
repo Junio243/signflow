@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Image as ImageIcon, AlertCircle } from 'lucide-react'
+import { Calendar, Image as ImageIcon, AlertCircle, Lock, Key } from 'lucide-react'
 
 interface QRConfigStepProps {
   onNext: (data: {
@@ -14,6 +14,10 @@ interface QRConfigStepProps {
     qrCode: {
       position: string
       size: string
+    }
+    validation: {
+      requireCode: boolean
+      validationCode?: string
     }
   }) => void
   onBack: () => void
@@ -33,6 +37,8 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
   const [logoPreview, setLogoPreview] = useState('')
   const [qrPosition, setQrPosition] = useState(initialData?.qrCode?.position || 'bottom-right')
   const [qrSize, setQrSize] = useState(initialData?.qrCode?.size || 'medium')
+  const [requireValidationCode, setRequireValidationCode] = useState(initialData?.validation?.requireCode || false)
+  const [validationCode, setValidationCode] = useState(initialData?.validation?.validationCode || '')
 
   useEffect(() => {
     const from = new Date(validFrom)
@@ -62,9 +68,27 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
     }
   }, [logoUrl])
 
+  // Gera código automático quando ativa a opção
+  useEffect(() => {
+    if (requireValidationCode && !validationCode) {
+      const code = Math.random().toString(36).substr(2, 8).toUpperCase()
+      setValidationCode(code)
+    }
+  }, [requireValidationCode])
+
+  const generateNewCode = () => {
+    const code = Math.random().toString(36).substr(2, 8).toUpperCase()
+    setValidationCode(code)
+  }
+
   const handleNext = () => {
     if (!issuer) {
       alert('Emissor do certificado é obrigatório')
+      return
+    }
+
+    if (requireValidationCode && !validationCode) {
+      alert('Código de validação é obrigatório quando a opção está ativada')
       return
     }
 
@@ -78,6 +102,10 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
       qrCode: {
         position: qrPosition,
         size: qrSize
+      },
+      validation: {
+        requireCode: requireValidationCode,
+        validationCode: requireValidationCode ? validationCode : undefined
       }
     }
 
@@ -299,6 +327,74 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
         </div>
       </div>
 
+      {/* Validation Code Section - NOVO! */}
+      <div className="mb-8 p-6 bg-purple-50 border-2 border-purple-200 rounded-lg">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Lock className="h-5 w-5 text-purple-600" />
+            <h3 className="font-semibold text-gray-900">Segurança Adicional</h3>
+          </div>
+        </div>
+
+        {/* Toggle */}
+        <div className="flex items-start gap-3 mb-4">
+          <button
+            type="button"
+            onClick={() => setRequireValidationCode(!requireValidationCode)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+              requireValidationCode ? 'bg-purple-600' : 'bg-gray-300'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                requireValidationCode ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
+              Exigir código de validação (opcional)
+            </label>
+            <p className="text-xs text-gray-600">
+              Ao ativar, o link público pedirá um código antes de mostrar os detalhes do documento. Ideal para documentos confidenciais.
+            </p>
+          </div>
+        </div>
+
+        {/* Validation Code Field - Aparece quando ativado */}
+        {requireValidationCode && (
+          <div className="mt-4 p-4 bg-white border border-purple-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Key className="h-4 w-4 text-purple-600" />
+              <label className="text-sm font-medium text-gray-900">
+                Código de Validação
+              </label>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={validationCode}
+                onChange={(e) => setValidationCode(e.target.value.toUpperCase())}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-lg font-bold tracking-wider"
+                placeholder="ABC12XYZ"
+                maxLength={10}
+              />
+              <button
+                type="button"
+                onClick={generateNewCode}
+                className="px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors text-sm"
+              >
+                Gerar Novo
+              </button>
+            </div>
+            <p className="text-xs text-purple-700 mt-2 flex items-center gap-1">
+              <AlertCircle size={12} />
+              Guarde este código em local seguro. Será necessário para validar o documento.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Preview Placeholder */}
       <div className="mb-8 p-6 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg text-center">
         <p className="text-sm text-gray-600 mb-2">Preview do Documento</p>
@@ -313,8 +409,11 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
               qrSize === 'small' ? 'w-12 h-12' :
               qrSize === 'medium' ? 'w-16 h-16' :
               'w-20 h-20'
-            } flex items-center justify-center text-xs text-gray-600`}>
+            } flex items-center justify-center text-xs text-gray-600 relative`}>
               QR
+              {requireValidationCode && (
+                <Lock className="absolute -top-1 -right-1 h-3 w-3 text-purple-600" />
+              )}
             </div>
           </div>
           <p className="text-gray-400">Seu documento com QR Code</p>
