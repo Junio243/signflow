@@ -10,7 +10,10 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🚀 [SIGN API] Starting document signing process...')
+    
     const formData = await request.formData()
+    console.log('✅ [SIGN API] FormData received')
     
     // Extrair dados do formData
     const pdfFile = formData.get('pdf') as File
@@ -21,7 +24,10 @@ export async function POST(request: NextRequest) {
     const qrCodeConfigData = formData.get('qrCodeConfig') as string
     const validationData = formData.get('validation') as string
 
+    console.log('📄 [SIGN API] PDF File:', pdfFile ? `${pdfFile.name} (${pdfFile.size} bytes)` : 'MISSING')
+
     if (!pdfFile) {
+      console.error('❌ [SIGN API] PDF file is missing!')
       return NextResponse.json(
         { error: 'PDF file is required' },
         { status: 400 }
@@ -29,27 +35,34 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse JSON data
+    console.log('📦 [SIGN API] Parsing JSON data...')
     const signature = signatureData ? JSON.parse(signatureData) : null
     const profile = profileData ? JSON.parse(profileData) : null
     const signatories = signatoryData ? JSON.parse(signatoryData) : []
     const certificate = certificateData ? JSON.parse(certificateData) : null
     const qrCodeConfig = qrCodeConfigData ? JSON.parse(qrCodeConfigData) : null
     const validation = validationData ? JSON.parse(validationData) : null
+    console.log('✅ [SIGN API] JSON data parsed successfully')
 
     // 1. Ler o PDF original
+    console.log('📝 [SIGN API] Loading PDF document...')
     const pdfBytes = await pdfFile.arrayBuffer()
     const pdfDoc = await PDFDocument.load(pdfBytes)
+    console.log('✅ [SIGN API] PDF loaded successfully')
 
     // 2. Gerar hash SHA-256 do PDF original
+    console.log('🔐 [SIGN API] Generating SHA-256 hash...')
     const hash = crypto.createHash('sha256').update(Buffer.from(pdfBytes)).digest('hex')
+    console.log('✅ [SIGN API] Hash generated:', hash.substring(0, 16) + '...')
 
     // 3. Criar registro no banco PRIMEIRO para obter UUID
+    console.log('💾 [SIGN API] Inserting document record into database...')
     const { data: docData, error: dbError } = await supabase
       .from('documents')
       .insert({
         original_pdf_name: pdfFile.name,
         hash,
-        status: 'draft', // Começa como draft
+        status: 'draft',
         signature_type: signature?.type || 'drawn',
         profile_type: profile?.type || 'individual',
         profile_data: profile,
@@ -67,17 +80,21 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (dbError) {
-      console.error('Database error:', dbError)
+      console.error('❌ [SIGN API] Database error:', dbError)
+      console.error('❌ [SIGN API] Error details:', JSON.stringify(dbError, null, 2))
       throw new Error(`Failed to create document record: ${dbError.message}`)
     }
 
+    console.log('✅ [SIGN API] Document record created with ID:', docData.id)
     const documentId = docData.id
 
     // 4. URL de validação
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const validationUrl = `${baseUrl}/validate/${documentId}`
+    console.log('🔗 [SIGN API] Validation URL:', validationUrl)
 
     // 5. Gerar QR Code
+    console.log('📱 [SIGN API] Generating QR code...')
     const qrResponse = await fetch(`${baseUrl}/api/documents/generate-qr`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -89,19 +106,36 @@ export async function POST(request: NextRequest) {
       })
     })
 
-    const qrResult = await qrResponse.json()
-    if (!qrResult.success) {
-      throw new Error('Failed to generate QR code')
+    if (!qrResponse.ok) {
+      console.error('❌ [SIGN API] QR generation failed with status:', qrResponse.status)
+      const errorText = await qrResponse.text()
+      console.error('❌ [SIGN API] QR error response:', errorText)
+      throw new Error(`QR generation failed: ${qrResponse.status}`)
     }
 
+    const qrResult = await qrResponse.json()
+    if (!qrResult.success) {
+      console.error('❌ [SIGN API] QR generation returned error:', qrResult)
+      throw new Error('Failed to generate QR code')
+    }
+    console.log('✅ [SIGN API] QR code generated successfully')
+
     // 6. Inserir QR Code no PDF
-    const qrImageBytes = await fetch(qrResult.qrCode).then(res => res.arrayBuffer())
+    console.log('🖼️ [SIGN API] Embedding QR code into PDF...')
+    
+    // Converter data URL para bytes
+    const base64Data = qrResult.qrCode.split(',')[1]
+    const qrImageBytes = Buffer.from(base64Data, 'base64')
+    console.log('📦 [SIGN API] QR image bytes:', qrImageBytes.length)
+    
     const qrImage = await pdfDoc.embedPng(qrImageBytes)
+    console.log('✅ [SIGN API] QR image embedded')
 
     // Determinar posição e tamanho
     const pages = pdfDoc.getPages()
     const firstPage = pages[0]
     const { width, height } = firstPage.getSize()
+    console.log('📐 [SIGN API] Page dimensions:', width, 'x', height)
 
     // Tamanhos do QR Code
     const qrSizes = {
@@ -110,6 +144,7 @@ export async function POST(request: NextRequest) {
       large: 160
     }
     const qrSize = qrSizes[qrCodeConfig?.size || 'medium'] || 120
+    console.log('📊 [SIGN API] QR size:', qrSize)
 
     // Posições
     const margin = 20
@@ -121,8 +156,10 @@ export async function POST(request: NextRequest) {
     }
 
     const position = positions[qrCodeConfig?.position || 'bottom-right'] || positions['bottom-right']
+    console.log('📍 [SIGN API] QR position:', qrCodeConfig?.position, '=', position)
 
     // Desenhar QR Code
+    console.log('🎨 [SIGN API] Drawing QR code on page...')
     firstPage.drawImage(qrImage, {
       x: position.x,
       y: position.y,
@@ -137,12 +174,16 @@ export async function POST(request: NextRequest) {
       size: 8,
       color: rgb(0, 0, 0)
     })
+    console.log('✅ [SIGN API] QR code drawn on PDF')
 
     // 8. Salvar PDF modificado
+    console.log('💾 [SIGN API] Saving modified PDF...')
     const signedPdfBytes = await pdfDoc.save()
     const signedPdfBlob = new Blob([signedPdfBytes], { type: 'application/pdf' })
+    console.log('✅ [SIGN API] PDF saved, size:', signedPdfBytes.length, 'bytes')
 
     // 9. Upload para Supabase Storage
+    console.log('☁️ [SIGN API] Uploading to Supabase Storage...')
     const fileName = `${documentId}.pdf`
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('signed-documents')
@@ -152,9 +193,11 @@ export async function POST(request: NextRequest) {
       })
 
     if (uploadError) {
-      console.error('Upload error:', uploadError)
+      console.error('❌ [SIGN API] Upload error:', uploadError)
+      console.error('❌ [SIGN API] Upload error details:', JSON.stringify(uploadError, null, 2))
       throw new Error(`Failed to upload PDF: ${uploadError.message}`)
     }
+    console.log('✅ [SIGN API] PDF uploaded successfully:', fileName)
 
     // 10. Obter URL pública do PDF
     const { data: urlData } = supabase.storage
@@ -162,8 +205,10 @@ export async function POST(request: NextRequest) {
       .getPublicUrl(fileName)
 
     const signedPdfUrl = urlData.publicUrl
+    console.log('🔗 [SIGN API] Public URL:', signedPdfUrl)
 
     // 11. Atualizar registro no banco com URLs e status signed
+    console.log('🔄 [SIGN API] Updating document record...')
     const { error: updateError } = await supabase
       .from('documents')
       .update({
@@ -175,11 +220,14 @@ export async function POST(request: NextRequest) {
       .eq('id', documentId)
 
     if (updateError) {
-      console.error('Update error:', updateError)
+      console.error('❌ [SIGN API] Update error:', updateError)
+      console.error('❌ [SIGN API] Update error details:', JSON.stringify(updateError, null, 2))
       throw new Error(`Failed to update document: ${updateError.message}`)
     }
+    console.log('✅ [SIGN API] Document record updated')
 
     // 12. Retornar sucesso
+    console.log('✅✅✅ [SIGN API] Document signed successfully!')
     return NextResponse.json({
       success: true,
       document: {
@@ -193,7 +241,8 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error signing document:', error)
+    console.error('❌❌❌ [SIGN API] FATAL ERROR:', error)
+    console.error('❌ [SIGN API] Error stack:', error instanceof Error ? error.stack : 'No stack trace')
     return NextResponse.json(
       { 
         error: 'Failed to sign document', 
