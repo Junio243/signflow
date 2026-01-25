@@ -1,0 +1,6 @@
+# Force Vercel rebuild to include new seal images
+Timestamp: 2026-01-25 15:42:00
+
+This file forces Vercel to rebuild and include the new PNG seal images:
+- /public/seals/icp-brasil.png
+- /public/seals/iti.png
