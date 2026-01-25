@@ -1,7 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Calendar, Image as ImageIcon, AlertCircle, Lock, Key } from 'lucide-react'
+import * as pdfjsLib from 'pdfjs-dist'
+
+// Configurar worker do PDF.js
+if (typeof window !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+}
 
 interface QRConfigStepProps {
   onNext: (data: {
@@ -39,6 +45,54 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
   const [qrSize, setQrSize] = useState(initialData?.qrCode?.size || 'medium')
   const [requireValidationCode, setRequireValidationCode] = useState(initialData?.validation?.requireCode || false)
   const [validationCode, setValidationCode] = useState(initialData?.validation?.validationCode || '')
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [pdfLoaded, setPdfLoaded] = useState(false)
+
+  // Carregar PDF do localStorage e renderizar preview
+  useEffect(() => {
+    const loadPdfPreview = async () => {
+      try {
+        const savedData = localStorage.getItem('document-creation')
+        if (!savedData) return
+
+        const data = JSON.parse(savedData)
+        const pdfUrl = data.document?.url
+        if (!pdfUrl || !canvasRef.current) return
+
+        // Carregar PDF
+        const loadingTask = pdfjsLib.getDocument(pdfUrl)
+        const pdf = await loadingTask.promise
+        const page = await pdf.getPage(1)
+
+        // Configurar canvas
+        const canvas = canvasRef.current
+        const context = canvas.getContext('2d')
+        if (!context) return
+
+        const viewport = page.getViewport({ scale: 1 })
+        const scale = Math.min(
+          canvas.parentElement!.clientWidth / viewport.width,
+          300 / viewport.height
+        )
+        const scaledViewport = page.getViewport({ scale })
+
+        canvas.width = scaledViewport.width
+        canvas.height = scaledViewport.height
+
+        // Renderizar PDF
+        await page.render({
+          canvasContext: context,
+          viewport: scaledViewport
+        }).promise
+
+        setPdfLoaded(true)
+      } catch (error) {
+        console.error('Erro ao carregar preview:', error)
+      }
+    }
+
+    loadPdfPreview()
+  }, [])
 
   useEffect(() => {
     const from = new Date(validFrom)
@@ -68,7 +122,6 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
     }
   }, [logoUrl])
 
-  // Gera código automático quando ativa a opção
   useEffect(() => {
     if (requireValidationCode && !validationCode) {
       const code = Math.random().toString(36).substr(2, 8).toUpperCase()
@@ -112,6 +165,26 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
     onNext(data)
   }
 
+  // Calcular posição do QR Code no preview
+  const getQrPosition = () => {
+    const positions = {
+      'top-left': 'top-4 left-4',
+      'top-right': 'top-4 right-4',
+      'bottom-left': 'bottom-4 left-4',
+      'bottom-right': 'bottom-4 right-4'
+    }
+    return positions[qrPosition as keyof typeof positions] || positions['bottom-right']
+  }
+
+  const getQrSizeClass = () => {
+    const sizes = {
+      small: 'w-12 h-12',
+      medium: 'w-16 h-16',
+      large: 'w-20 h-20'
+    }
+    return sizes[qrSize as keyof typeof sizes] || sizes.medium
+  }
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-8">
       <h2 className="text-2xl font-bold text-gray-900 mb-2">Configurações do QR Code</h2>
@@ -149,6 +222,7 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
           {/* Quick Options */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
             <button
+              type="button"
               onClick={() => setValidityType('1year')}
               className={`py-2 px-3 rounded-lg border-2 font-medium text-sm transition-all ${
                 validityType === '1year'
@@ -159,6 +233,7 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
               1 ano
             </button>
             <button
+              type="button"
               onClick={() => setValidityType('2years')}
               className={`py-2 px-3 rounded-lg border-2 font-medium text-sm transition-all ${
                 validityType === '2years'
@@ -169,6 +244,7 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
               2 anos
             </button>
             <button
+              type="button"
               onClick={() => setValidityType('5years')}
               className={`py-2 px-3 rounded-lg border-2 font-medium text-sm transition-all ${
                 validityType === '5years'
@@ -179,6 +255,7 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
               5 anos
             </button>
             <button
+              type="button"
               onClick={() => setValidityType('permanent')}
               className={`py-2 px-3 rounded-lg border-2 font-medium text-sm transition-all ${
                 validityType === 'permanent'
@@ -273,6 +350,7 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
             ].map((option) => (
               <button
                 key={option.value}
+                type="button"
                 onClick={() => setQrPosition(option.value)}
                 className={`py-3 px-4 rounded-lg border-2 font-medium text-sm transition-all ${
                   qrPosition === option.value
@@ -299,6 +377,7 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
             ].map((option) => (
               <button
                 key={option.value}
+                type="button"
                 onClick={() => setQrSize(option.value)}
                 className={`py-3 px-4 rounded-lg border-2 font-medium text-sm transition-all ${
                   qrSize === option.value
@@ -327,7 +406,7 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
         </div>
       </div>
 
-      {/* Validation Code Section - NOVO! */}
+      {/* Validation Code Section */}
       <div className="mb-8 p-6 bg-purple-50 border-2 border-purple-200 rounded-lg">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -336,7 +415,6 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
           </div>
         </div>
 
-        {/* Toggle */}
         <div className="flex items-start gap-3 mb-4">
           <button
             type="button"
@@ -361,7 +439,6 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
           </div>
         </div>
 
-        {/* Validation Code Field - Aparece quando ativado */}
         {requireValidationCode && (
           <div className="mt-4 p-4 bg-white border border-purple-200 rounded-lg">
             <div className="flex items-center gap-2 mb-2">
@@ -395,40 +472,51 @@ export default function QRConfigStep({ onNext, onBack, initialData }: QRConfigSt
         )}
       </div>
 
-      {/* Preview Placeholder */}
-      <div className="mb-8 p-6 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg text-center">
-        <p className="text-sm text-gray-600 mb-2">Preview do Documento</p>
-        <div className="relative w-full h-64 bg-white rounded border border-gray-300 flex items-center justify-center">
-          <div className={`absolute ${
-            qrPosition === 'top-left' ? 'top-4 left-4' :
-            qrPosition === 'top-right' ? 'top-4 right-4' :
-            qrPosition === 'bottom-left' ? 'bottom-4 left-4' :
-            'bottom-4 right-4'
-          }`}>
-            <div className={`bg-gray-300 ${
-              qrSize === 'small' ? 'w-12 h-12' :
-              qrSize === 'medium' ? 'w-16 h-16' :
-              'w-20 h-20'
-            } flex items-center justify-center text-xs text-gray-600 relative`}>
+      {/* Preview REAL DO PDF */}
+      <div className="mb-8 p-6 bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            🔍 Preview em Tempo Real
+            {pdfLoaded && <span className="text-xs text-green-600 font-normal">• Documento carregado</span>}
+          </p>
+          <p className="text-xs text-gray-600">Posição: {qrPosition.replace('-', ' ')} | Tamanho: {qrSize}</p>
+        </div>
+        <div className="relative w-full bg-white rounded-lg border-2 border-gray-300 shadow-lg overflow-hidden">
+          <canvas
+            ref={canvasRef}
+            className="w-full h-auto"
+          />
+          {!pdfLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+              <p className="text-gray-400">Carregando preview...</p>
+            </div>
+          )}
+          {/* QR Code Overlay */}
+          <div className={`absolute ${getQrPosition()}`}>
+            <div className={`${getQrSizeClass()} bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs rounded shadow-lg relative animate-pulse`}>
               QR
               {requireValidationCode && (
-                <Lock className="absolute -top-1 -right-1 h-3 w-3 text-purple-600" />
+                <Lock className="absolute -top-1 -right-1 h-3 w-3 text-yellow-400 drop-shadow" />
               )}
             </div>
           </div>
-          <p className="text-gray-400">Seu documento com QR Code</p>
         </div>
+        <p className="text-xs text-gray-600 mt-2 text-center">
+          ✨ Este é o preview do seu documento com o QR Code na posição selecionada
+        </p>
       </div>
 
       {/* Navigation */}
       <div className="flex justify-between mt-8">
         <button
+          type="button"
           onClick={onBack}
           className="px-8 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
         >
           ← Voltar
         </button>
         <button
+          type="button"
           onClick={handleNext}
           className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
         >
