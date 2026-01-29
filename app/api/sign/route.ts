@@ -3,9 +3,13 @@ export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { requireAuth } from '@/lib/auth/apiAuth';
+import { withRateLimit } from '@/lib/utils/rateLimit';
+import { logger } from '@/lib/utils/logger';
 import {
   PDFDocument,
   PDFFont,
+  PDFPage,
   rgb,
   pushGraphicsState,
   popGraphicsState,
@@ -101,7 +105,7 @@ function extractSignersFromMetadata(metadata: Metadata): SignerMetadata[] {
 
     return [
       {
-        name: issuer || 'Signatário',
+        name: issuer || 'Signатário',
         reg,
         certificate_type,
         certificate_valid_until,
@@ -125,6 +129,69 @@ function extractSignersFromMetadata(metadata: Metadata): SignerMetadata[] {
       metadata: null,
     },
   ];
+}
+
+interface TextPosition {
+  x: number;
+  y: number;
+  shouldRender: boolean;
+}
+
+/**
+ * Calcula posição do texto de validação evitando colisão com QR code
+ */
+function calculateTextPosition(
+  qrPosition: QrPosition,
+  qrCoords: { x: number; y: number },
+  qrSize: number,
+  textMaxWidth: number,
+  margin: number,
+  pageWidth: number,
+  pageHeight: number
+): TextPosition {
+  let textX = qrCoords.x;
+  let textY = qrCoords.y + qrSize;
+  let shouldRender = true;
+
+  // Tentar posicionar ao lado do QR code
+  if (qrPosition === 'bottom-right' || qrPosition === 'top-right') {
+    // QR à direita, texto à esquerda
+    const desiredX = qrCoords.x - textMaxWidth - margin;
+    if (desiredX >= margin) {
+      textX = desiredX;
+      textY = qrCoords.y + qrSize;
+    } else {
+      // Não há espaço à esquerda, tentar abaixo
+      textX = margin;
+      textY = qrCoords.y - margin;
+      if (textY < margin + 50) { // 50 = altura estimada do texto
+        // Não há espaço abaixo, tentar acima
+        textY = qrCoords.y + qrSize + margin;
+        if (textY + 50 > pageHeight - margin) {
+          shouldRender = false; // Sem espaço disponível
+        }
+      }
+    }
+  } else {
+    // QR à esquerda, texto à direita
+    textX = qrCoords.x + qrSize + margin;
+    textY = qrCoords.y + qrSize;
+    
+    if (textX + textMaxWidth > pageWidth - margin) {
+      // Não há espaço à direita, tentar abaixo
+      textX = margin;
+      textY = qrCoords.y - margin;
+      if (textY < margin + 50) {
+        // Tentar acima
+        textY = qrCoords.y + qrSize + margin;
+        if (textY + 50 > pageHeight - margin) {
+          shouldRender = false;
+        }
+      }
+    }
+  }
+
+  return { x: textX, y: textY, shouldRender };
 }
 
 // Function to calculate QR coordinates based on position
@@ -184,35 +251,58 @@ function generateValidationText(
 }
 
 export async function POST(req: NextRequest) {
+  // Rate limiting
+  const rateLimitResult = withRateLimit(20, 60000)(req);
+  if (rateLimitResult) return rateLimitResult;
+
+  // Authentication
+  const auth = await requireAuth(req);
+  if (auth.error) return auth.error;
+  const user = auth.user!;
+
   try {
-    const supabaseAdmin = getSupabaseAdmin(); // ← client dentro do handler
+    const supabaseAdmin = getSupabaseAdmin();
 
     const form = await req.formData();
     const idResult = documentIdSchema.safeParse(form.get('id')?.toString());
     if (!idResult.success) {
-      return NextResponse.json({ error: 'id é obrigatório e deve ser um UUID válido' }, { status: 400 });
+      return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
     }
     const id = idResult.data;
 
-    // busca doc
+    // Busca e valida status do documento (previne race condition)
     const docRes = await supabaseAdmin
       .from('documents')
-      .select('id, metadata, signed_pdf_url, qr_code_url, status')
+      .select('id, metadata, signed_pdf_url, qr_code_url, status, user_id')
       .eq('id', id)
       .maybeSingle();
 
     if (docRes.error) {
-      return NextResponse.json({ error: docRes.error.message }, { status: 500 });
+      logger.error('Document fetch failed', docRes.error, { documentId: id, userId: user.id });
+      return NextResponse.json({ error: 'Erro ao buscar documento' }, { status: 500 });
     }
-    const doc = (docRes.data || null) as any;
+    
+    const doc = docRes.data;
     if (!doc) {
       return NextResponse.json({ error: 'Documento não encontrado' }, { status: 404 });
+    }
+
+    // Verificar se usuário é o dono do documento
+    if (doc.user_id !== user.id) {
+      logger.warn('Unauthorized sign attempt', { documentId: id, userId: user.id, ownerId: doc.user_id });
+      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
+    }
+
+    // Prevenir assinatura de documento já assinado (race condition)
+    if (doc.status === 'signed') {
+      return NextResponse.json({ error: 'Documento já foi assinado' }, { status: 409 });
     }
 
     // baixa o original
     const orig = await supabaseAdmin.storage.from('signflow').download(`${id}/original.pdf`);
     if (orig.error || !orig.data) {
-      return NextResponse.json({ error: orig.error?.message || 'original.pdf não encontrado' }, { status: 500 });
+      logger.error('Original PDF download failed', orig.error, { documentId: id });
+      return NextResponse.json({ error: 'Arquivo original não encontrado' }, { status: 500 });
     }
     const originalBytes = new Uint8Array(await orig.data.arrayBuffer());
 
@@ -233,6 +323,7 @@ export async function POST(req: NextRequest) {
     const metadataParsed = storedMetadataSchema.safeParse(doc?.metadata);
 
     if (!metadataParsed.success) {
+      logger.error('Invalid metadata', metadataParsed.error, { documentId: id });
       return NextResponse.json({ error: 'Metadados inválidos' }, { status: 400 });
     }
 
@@ -321,12 +412,11 @@ export async function POST(req: NextRequest) {
     }
 
     // gera QR e insere nas páginas configuradas
-    const base = process.env.NEXT_PUBLIC_BASE_URL || req.nextUrl.origin;
+    const base = req.nextUrl.origin; // Usar origin da requisição
     const validateUrl = `${base}/validate/${id}`;
     const qrPng = await QRCode.toBuffer(validateUrl, { width: 256 });
     const qrImage = await pdfDoc.embedPng(qrPng);
     
-    // Extract QR position settings from metadata with proper validation
     const qrPositionRaw = (normalizedMetadata as any).qr_position || 'bottom-left';
     const qrPageRaw = (normalizedMetadata as any).qr_page || 'last';
     
@@ -339,7 +429,6 @@ export async function POST(req: NextRequest) {
     const margin = 30;
     const qrSize = 80;
     
-    // Extract signer information early for both validation text and database insert
     const signers = extractSignersFromMetadata(normalizedMetadata);
     const firstSigner = signers[0] || {
       name: 'Signatário',
@@ -353,24 +442,20 @@ export async function POST(req: NextRequest) {
         ? accessCodeRaw.trim()
         : null;
     
-    // Determine which pages receive the QR code
-    let targetPages: any[] = [];
+    let targetPages: PDFPage[] = [];
     if (qrPage === 'first') {
       targetPages = [pages[0]];
     } else if (qrPage === 'all') {
       targetPages = pages;
-    } else { // last
+    } else {
       targetPages = [pages[pages.length - 1]];
     }
     
-    // Insert QR code in selected pages
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontSize = 7;
-    const textMaxWidth = 200; // Maximum width for text block
-    const textMargin = 10; // Space between QR and text
-    const lineSpacing = 2; // Spacing between lines in pixels
+    const textMaxWidth = 200;
+    const lineSpacing = 2;
     
-    // Format signature date
     const signatureDate = new Date().toLocaleDateString('pt-BR');
     
     for (const page of targetPages) {
@@ -378,10 +463,8 @@ export async function POST(req: NextRequest) {
       const pageHeight = page.getHeight();
       const coords = getQrCoordinates(pageWidth, pageHeight, qrPosition, margin, qrSize);
       
-      // Draw QR code
       page.drawImage(qrImage, { x: coords.x, y: coords.y, width: qrSize, height: qrSize });
       
-      // Generate validation text
       const validationText = generateValidationText(
         firstSigner.name,
         firstSigner.reg,
@@ -392,49 +475,32 @@ export async function POST(req: NextRequest) {
         requiresAccessCode
       );
       
-      // Wrap text to fit within maxWidth
       const wrappedLines = wrapText(validationText, font, fontSize, textMaxWidth);
       
-      // Calculate text position based on QR position
-      let textX = coords.x;
-      let textY = coords.y;
+      // Usar nova função de posicionamento
+      const textPos = calculateTextPosition(
+        qrPosition,
+        coords,
+        qrSize,
+        textMaxWidth,
+        margin,
+        pageWidth,
+        pageHeight
+      );
       
-      // Position text to the right or left of QR based on position
-      if (qrPosition === 'bottom-right' || qrPosition === 'top-right') {
-        // Text on the left side of QR - ensure it doesn't overlap with QR
-        const desiredX = coords.x - textMaxWidth - textMargin;
-        textX = Math.max(margin, desiredX);
-        
-        // If there's not enough space on the left, skip text rendering for this position
-        if (textX + textMaxWidth + textMargin > coords.x) {
-          continue; // Skip rendering text if it would overlap with QR
-        }
-      } else {
-        // Text on the right side of QR
-        textX = coords.x + qrSize + textMargin;
-        
-        // If there's not enough space on the right, skip text rendering for this position
-        if (textX + textMaxWidth > pageWidth - margin) {
-          continue; // Skip rendering text if it would go beyond page bounds
-        }
+      if (!textPos.shouldRender) {
+        logger.warn('Text rendering skipped: insufficient space', { documentId: id, qrPosition });
+        continue;
       }
       
-      // Start text from top of QR code area
-      textY = coords.y + qrSize - fontSize;
-      
-      // Draw each line of text
+      let textY = textPos.y;
       for (let i = 0; i < wrappedLines.length; i++) {
         const line = wrappedLines[i];
         const lineY = textY - (i * (fontSize + lineSpacing));
-        const lineWidth = font.widthOfTextAtSize(line, fontSize);
         
-        // Only draw if within page bounds (check all boundaries with actual line width)
-        if (lineY >= margin && 
-            lineY <= pageHeight - margin &&
-            textX >= margin && 
-            textX + lineWidth <= pageWidth - margin) {
+        if (lineY >= margin && lineY <= pageHeight - margin) {
           page.drawText(line, {
-            x: textX,
+            x: textPos.x,
             y: lineY,
             size: fontSize,
             font: font,
@@ -454,7 +520,8 @@ export async function POST(req: NextRequest) {
         upsert: true,
       });
     if (upSigned.error) {
-      return NextResponse.json({ error: upSigned.error.message }, { status: 500 });
+      logger.error('Signed PDF upload failed', upSigned.error, { documentId: id });
+      return NextResponse.json({ error: 'Erro ao salvar documento assinado' }, { status: 500 });
     }
 
     const upQr = await supabaseAdmin.storage
@@ -464,30 +531,24 @@ export async function POST(req: NextRequest) {
         upsert: true,
       });
     if (upQr.error) {
-      return NextResponse.json({ error: upQr.error.message }, { status: 500 });
+      logger.error('QR code upload failed', upQr.error, { documentId: id });
+      return NextResponse.json({ error: 'Erro ao salvar QR code' }, { status: 500 });
     }
 
-    // URLs públicas
     const pubSigned = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/signed.pdf`);
     if (!pubSigned.data?.publicUrl) {
-      console.error('Erro ao gerar URL pública do PDF assinado: URL não disponível');
-      return NextResponse.json(
-        { error: 'Falha ao gerar URL pública do PDF assinado.' },
-        { status: 500 },
-      );
+      logger.error('Failed to generate signed PDF public URL', undefined, { documentId: id });
+      return NextResponse.json({ error: 'Erro ao gerar URL do documento' }, { status: 500 });
     }
 
     const pubQr = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/qr.png`);
     if (!pubQr.data?.publicUrl) {
-      console.error('Erro ao gerar URL pública do QR code: URL não disponível');
-      return NextResponse.json(
-        { error: 'Falha ao gerar URL pública do QR code.' },
-        { status: 500 },
-      );
+      logger.error('Failed to generate QR code public URL', undefined, { documentId: id });
+      return NextResponse.json({ error: 'Erro ao gerar URL do QR code' }, { status: 500 });
     }
 
     // atualiza registro
-    // @ts-ignore (evita never do types gerados no build)
+    // @ts-ignore
     const upd = await supabaseAdmin
       .from('documents')
       .update({
@@ -498,7 +559,8 @@ export async function POST(req: NextRequest) {
       .eq('id', id);
 
     if (upd.error) {
-      return NextResponse.json({ error: upd.error.message }, { status: 500 });
+      logger.error('Document status update failed', upd.error, { documentId: id });
+      return NextResponse.json({ error: 'Erro ao atualizar status do documento' }, { status: 500 });
     }
 
     const nowIso = new Date().toISOString();
@@ -516,15 +578,18 @@ export async function POST(req: NextRequest) {
         metadata: signer.metadata,
       }));
 
+      // @ts-ignore
       const insEvents = await supabaseAdmin
         .from('document_signing_events')
-        // @ts-ignore (tipagem gerada em tempo de build)
         .insert(payload);
 
       if (insEvents.error) {
-        return NextResponse.json({ error: insEvents.error.message }, { status: 500 });
+        logger.error('Signing event insert failed', insEvents.error, { documentId: id });
+        // Não retornar erro, já que o documento foi assinado com sucesso
       }
     }
+
+    logger.info('Document signed successfully', { documentId: id, userId: user.id });
 
     return NextResponse.json({
       ok: true,
@@ -534,6 +599,7 @@ export async function POST(req: NextRequest) {
       validate_url: validateUrl,
     });
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+    logger.error('Sign operation failed', e);
+    return NextResponse.json({ error: 'Erro ao processar assinatura' }, { status: 500 });
   }
 }
