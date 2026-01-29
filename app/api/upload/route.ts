@@ -4,6 +4,11 @@ export const runtime = 'nodejs';
 import { createHash, randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { requireAuth } from '@/lib/auth/apiAuth';
+import { checkRateLimit, addRateLimitHeaders } from '@/lib/rateLimit';
+import { validateUploadedFile } from '@/lib/validation/fileValidation';
+import { createErrorResponse, ErrorResponses, createSuccessResponse } from '@/lib/utils/errorResponses';
+import { createApiLogger } from '@/lib/logger';
 import {
   documentIdSchema,
   metadataSchema,
@@ -13,19 +18,10 @@ import {
   qrPageSchema,
 } from '@/lib/validation/documentSchemas';
 
-const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB
-const MAX_PDF_SIZE_MB = 20;
-const MAX_SIGNATURE_BYTES = 5 * 1024 * 1024; // 5 MB
-const MAX_SIGNATURE_SIZE_MB = 5;
-const ALLOWED_PDF_TYPES = ['application/pdf'];
-const ALLOWED_SIGNATURE_TYPES = ['image/png', 'image/jpeg'];
+const logger = createApiLogger('POST /api/upload');
 
-/**
- * Convert bytes to megabytes with 2 decimal places
- */
-function bytesToMB(bytes: number): string {
-  return (bytes / (1024 * 1024)).toFixed(2);
-}
+const MAX_SIGNATURE_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_SIGNATURE_TYPES = ['image/png', 'image/jpeg'];
 
 /**
  * Helper: retorna SHA256 hex do input
@@ -35,25 +31,6 @@ async function sha256Hex(input: string) {
     return createHash('sha256').update(input, 'utf8').digest('hex');
   } catch (error) {
     return Promise.reject(error);
-  }
-}
-
-/**
- * Logging estruturado em JSON.
- * Um log básico com reqId/time e payload.
- */
-function structuredLog(level: 'info' | 'warn' | 'error', ctx: Record<string, any>) {
-  const base = {
-    time: new Date().toISOString(),
-    ...ctx,
-  };
-  const str = JSON.stringify(base);
-  if (level === 'error') {
-    console.error(str);
-  } else if (level === 'warn') {
-    console.warn(str);
-  } else {
-    console.info(str);
   }
 }
 
@@ -71,21 +48,37 @@ const parseJsonField = (
 
 export async function POST(req: NextRequest) {
   const reqId = randomUUID();
-  const baseCtx = { reqId, route: 'POST /api/upload' };
+  logger.info('Request received', { reqId });
 
-  structuredLog('info', { ...baseCtx, event: 'request_received' });
+  // Check rate limit (10 uploads per minute per IP)
+  const rateLimit = checkRateLimit(req, { limit: 10, windowMs: 60000 });
+  if (!rateLimit.allowed) {
+    logger.warn('Rate limit exceeded', { reqId, retryAfter: rateLimit.retryAfter });
+    const response = ErrorResponses.tooManyRequests(rateLimit.retryAfter);
+    return addRateLimitHeaders(response, rateLimit);
+  }
+
+  // Require authentication
+  const auth = await requireAuth(req);
+  if (auth.error) {
+    logger.warn('Authentication failed', { reqId });
+    return auth.error;
+  }
+
+  const user = auth.user;
+  logger.info('User authenticated', { reqId, userId: user.id });
 
   try {
-    const supabaseAdmin = getSupabaseAdmin(); // ← client dentro do handler
+    const supabaseAdmin = getSupabaseAdmin();
 
-    // Extração robusta do IP (x-forwarded-for pode ser lista)
+    // Extract client IP
     const ipHeader =
       (req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || (req as any).ip) ?? '';
     const ip = ipHeader ? (ipHeader as string).split(',')[0].trim() : '0.0.0.0';
-    structuredLog('info', { ...baseCtx, event: 'client_ip', ip });
 
     const form = await req.formData();
 
+    // Extract form fields
     const pdf = form.get('pdf') as File | null;
     const signature = form.get('signature') as File | null;
     const original_pdf_name =
@@ -94,181 +87,153 @@ export async function POST(req: NextRequest) {
     const signatureMetaRaw = form.get('signature_meta')?.toString() || 'null';
     const validationThemeRaw = form.get('validation_theme_snapshot')?.toString() || 'null';
     const validationProfileId = form.get('validation_profile_id')?.toString() || null;
-    const userId = form.get('user_id')?.toString() || null;
     const signersRaw = form.get('signers')?.toString() || '[]';
     const qrPositionRaw = form.get('qr_position')?.toString() || 'bottom-left';
     const qrPageRaw = form.get('qr_page')?.toString() || 'last';
     const validationRequiresCodeRaw = form.get('validation_requires_code')?.toString() || 'false';
     const validationAccessCodeRaw = form.get('validation_access_code')?.toString() || null;
 
-    structuredLog('info', {
-      ...baseCtx,
-      event: 'form_received',
+    logger.info('Form data extracted', {
+      reqId,
       original_pdf_name,
       hasSignature: !!signature,
-      validationProfileId,
-      userId,
+      userId: user.id,
     });
 
-    // Validações do PDF
-    if (!pdf) {
-      structuredLog('warn', { ...baseCtx, event: 'validation_failed', reason: 'pdf_missing' });
-      return NextResponse.json({ error: 'PDF é obrigatório' }, { status: 400 });
+    // Validate PDF file using new utility
+    const pdfValidation = await validateUploadedFile(pdf);
+    if (!pdfValidation.valid) {
+      logger.warn('PDF validation failed', { reqId, error: pdfValidation.error });
+      return ErrorResponses.badRequest(pdfValidation.error);
     }
 
-    if (!(pdf instanceof File)) {
-      structuredLog('warn', { ...baseCtx, event: 'validation_failed', reason: 'pdf_not_file' });
-      return NextResponse.json({ error: 'PDF inválido: arquivo não reconhecido.' }, { status: 400 });
-    }
-
-    structuredLog('info', {
-      ...baseCtx,
-      event: 'pdf_info',
-      pdfName: pdf.name,
-      pdfType: pdf.type,
-      pdfSize: pdf.size,
-    });
-
-    if (!ALLOWED_PDF_TYPES.includes(pdf.type)) {
-      structuredLog('warn', { ...baseCtx, event: 'validation_failed', reason: 'pdf_bad_mime', pdfType: pdf.type });
-      return NextResponse.json({ error: 'PDF inválido: envie um arquivo application/pdf.' }, { status: 400 });
-    }
-
-    if (pdf.size > MAX_PDF_BYTES) {
-      const sizeMB = bytesToMB(pdf.size);
-      structuredLog('warn', { ...baseCtx, event: 'validation_failed', reason: 'pdf_too_large', pdfSize: pdf.size });
-      return NextResponse.json({ 
-        error: `PDF muito grande! Tamanho máximo: ${MAX_PDF_SIZE_MB}MB. Seu arquivo: ${sizeMB}MB.` 
-      }, { status: 413 });
-    }
-
-    // Validações da assinatura (opcional)
+    // Validate signature if provided
     if (signature) {
       if (!(signature instanceof File)) {
-        structuredLog('warn', { ...baseCtx, event: 'validation_failed', reason: 'signature_not_file' });
-        return NextResponse.json({ error: 'Assinatura inválida: arquivo não reconhecido.' }, { status: 400 });
+        return ErrorResponses.badRequest('Assinatura inválida: arquivo não reconhecido.');
       }
 
-      structuredLog('info', {
-        ...baseCtx,
-        event: 'signature_info',
-        signatureName: signature.name,
-        signatureType: signature.type,
-        signatureSize: signature.size,
-      });
-
       if (!ALLOWED_SIGNATURE_TYPES.includes(signature.type)) {
-        structuredLog('warn', { ...baseCtx, event: 'validation_failed', reason: 'signature_bad_mime', signatureType: signature.type });
-        return NextResponse.json({ error: 'Assinatura inválida: use imagem PNG ou JPG.' }, { status: 400 });
+        return ErrorResponses.badRequest('Assinatura inválida: use imagem PNG ou JPG.');
       }
 
       if (signature.size > MAX_SIGNATURE_BYTES) {
-        const sizeMB = bytesToMB(signature.size);
-        structuredLog('warn', { ...baseCtx, event: 'validation_failed', reason: 'signature_too_large', signatureSize: signature.size });
-        return NextResponse.json({ 
-          error: `Assinatura muito grande! Tamanho máximo: ${MAX_SIGNATURE_SIZE_MB}MB. Seu arquivo: ${sizeMB}MB.` 
-        }, { status: 413 });
+        const sizeMB = (signature.size / (1024 * 1024)).toFixed(2);
+        return ErrorResponses.badRequest(
+          `Assinatura muito grande! Tamanho máximo: 5MB. Seu arquivo: ${sizeMB}MB.`
+        );
       }
+
+      logger.info('Signature validated', {
+        reqId,
+        size: signature.size,
+        type: signature.type,
+      });
     }
 
-    // Gera ID do documento cedo para correlacionar logs de upload
+    // Generate document ID
     const id = documentIdSchema.parse(randomUUID());
 
-    // Gera hash do IP
+    // Generate IP hash
     let ip_hash = 'unknown';
     try {
       ip_hash = await sha256Hex(ip);
-    } catch (err: any) {
-      structuredLog('warn', { ...baseCtx, event: 'ip_hash_failed', error: String(err?.message || err) });
+    } catch (err) {
+      logger.warn('IP hash failed', { reqId, error: err });
       ip_hash = 'error';
     }
 
-    structuredLog('info', { ...baseCtx, event: 'upload_start', documentId: id, ip_hash });
+    logger.info('Starting upload', { reqId, documentId: id });
 
-    // uploads no Storage
+    // Upload PDF to storage
     try {
-      const pdfBytes = new Uint8Array(await pdf.arrayBuffer());
-      structuredLog('info', { ...baseCtx, event: 'storage_upload_pdf_start', documentId: id, size: pdfBytes.length });
+      const pdfBytes = new Uint8Array(await pdfValidation.file!.arrayBuffer());
       const up1 = await supabaseAdmin.storage
         .from('signflow')
         .upload(`${id}/original.pdf`, pdfBytes, {
           contentType: 'application/pdf',
           upsert: true,
         });
+
       if (up1.error) {
-        structuredLog('error', { ...baseCtx, event: 'storage_upload_pdf_failed', documentId: id, error: up1.error.message });
-        return NextResponse.json({ error: up1.error.message }, { status: 500 });
+        logger.error('PDF upload failed', up1.error, { reqId, documentId: id });
+        return createErrorResponse(
+          'Erro ao fazer upload do PDF.',
+          500,
+          up1.error,
+          { documentId: id }
+        );
       }
-      structuredLog('info', { ...baseCtx, event: 'storage_upload_pdf_success', documentId: id, key: `${id}/original.pdf` });
-    } catch (err: any) {
-      structuredLog('error', { ...baseCtx, event: 'storage_upload_pdf_exception', documentId: id, error: String(err?.message || err) });
-      return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
+
+      logger.info('PDF uploaded successfully', { reqId, documentId: id });
+    } catch (err) {
+      logger.error('PDF upload exception', err, { reqId, documentId: id });
+      return ErrorResponses.internalError(err, { documentId: id });
     }
 
+    // Upload signature if provided
     if (signature) {
       try {
         const sigBytes = new Uint8Array(await signature.arrayBuffer());
-        structuredLog('info', { ...baseCtx, event: 'storage_upload_signature_start', documentId: id, size: sigBytes.length });
         const up2 = await supabaseAdmin.storage
           .from('signflow')
           .upload(`${id}/signature`, sigBytes, {
             contentType: signature.type || 'image/png',
             upsert: true,
           });
+
         if (up2.error) {
-          structuredLog('error', { ...baseCtx, event: 'storage_upload_signature_failed', documentId: id, error: up2.error.message });
-          return NextResponse.json({ error: up2.error.message }, { status: 500 });
+          logger.error('Signature upload failed', up2.error, { reqId, documentId: id });
+          return createErrorResponse(
+            'Erro ao fazer upload da assinatura.',
+            500,
+            up2.error,
+            { documentId: id }
+          );
         }
-        structuredLog('info', { ...baseCtx, event: 'storage_upload_signature_success', documentId: id, key: `${id}/signature` });
-      } catch (err: any) {
-        structuredLog('error', { ...baseCtx, event: 'storage_upload_signature_exception', documentId: id, error: String(err?.message || err) });
-        return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
+
+        logger.info('Signature uploaded successfully', { reqId, documentId: id });
+      } catch (err) {
+        logger.error('Signature upload exception', err, { reqId, documentId: id });
+        return ErrorResponses.internalError(err, { documentId: id });
       }
     }
 
-    // --- validação de metadados via schemas ---
+    // Parse and validate metadata
     const parsedPositions = parseJsonField(positionsRaw || '[]', 'positions');
     if (!parsedPositions.success || !Array.isArray(parsedPositions.data)) {
-      return NextResponse.json(
-        { error: parsedPositions.success ? 'positions deve ser um array' : parsedPositions.error },
-        { status: 400 }
+      return ErrorResponses.badRequest(
+        parsedPositions.success ? 'positions deve ser um array' : parsedPositions.error
       );
     }
 
     const parsedSignatureMeta = parseJsonField(signatureMetaRaw || 'null', 'signature_meta');
     if (!parsedSignatureMeta.success) {
-      return NextResponse.json({ error: parsedSignatureMeta.error }, { status: 400 });
+      return ErrorResponses.badRequest(parsedSignatureMeta.error);
     }
 
     const parsedValidationTheme = parseJsonField(validationThemeRaw || 'null', 'validation_theme_snapshot');
     if (!parsedValidationTheme.success) {
-      return NextResponse.json({ error: parsedValidationTheme.error }, { status: 400 });
+      return ErrorResponses.badRequest(parsedValidationTheme.error);
     }
 
     const parsedSigners = parseJsonField(signersRaw || '[]', 'signers');
     if (!parsedSigners.success || !Array.isArray(parsedSigners.data)) {
-      return NextResponse.json(
-        { error: parsedSigners.success ? 'signers deve ser um array' : parsedSigners.error },
-        { status: 400 }
+      return ErrorResponses.badRequest(
+        parsedSigners.success ? 'signers deve ser um array' : parsedSigners.error
       );
     }
 
     // Validate QR position and page
     const qrPositionResult = qrPositionSchema.safeParse(qrPositionRaw);
     if (!qrPositionResult.success) {
-      return NextResponse.json(
-        { error: 'qr_position inválido', details: qrPositionResult.error.format() },
-        { status: 400 }
-      );
+      return ErrorResponses.badRequest('qr_position inválido');
     }
     const qrPosition = qrPositionResult.data;
 
     const qrPageResult = qrPageSchema.safeParse(qrPageRaw);
     if (!qrPageResult.success) {
-      return NextResponse.json(
-        { error: 'qr_page inválido', details: qrPageResult.error.format() },
-        { status: 400 }
-      );
+      return ErrorResponses.badRequest('qr_page inválido');
     }
     const qrPage = qrPageResult.data;
 
@@ -282,7 +247,7 @@ export async function POST(req: NextRequest) {
         : null;
 
     if (validationRequiresCode && !validationAccessCode) {
-      return NextResponse.json({ error: 'Código de validação é obrigatório.' }, { status: 400 });
+      return ErrorResponses.badRequest('Código de validação é obrigatório.');
     }
 
     const metadataResult = metadataSchema.safeParse({
@@ -298,13 +263,11 @@ export async function POST(req: NextRequest) {
     });
 
     if (!metadataResult.success) {
-      return NextResponse.json(
-        { error: 'Metadados inválidos', details: metadataResult.error.format() },
-        { status: 400 }
-      );
+      logger.warn('Metadata validation failed', { reqId, error: metadataResult.error });
+      return ErrorResponses.badRequest('Metadados inválidos');
     }
 
-    // extrai/valida posições e signers via schemas individuais
+    // Build metadata object
     const positions = metadataResult.data.positions.map((pos: unknown) => positionSchema.parse(pos));
     const signatureMeta = metadataResult.data.signature_meta ?? null;
     const validationTheme = metadataResult.data.validation_theme_snapshot ?? null;
@@ -312,16 +275,6 @@ export async function POST(req: NextRequest) {
     const sanitizedSigners = (metadataResult.data.signers || []).map((signer: unknown) => signerSchema.parse(signer));
     const validationRequiresCodeSanitized = metadataResult.data.validation_requires_code ?? false;
     const validationAccessCodeSanitized = metadataResult.data.validation_access_code ?? null;
-
-    structuredLog('info', {
-      ...baseCtx,
-      event: 'metadata_summary',
-      documentId: id,
-      positionsCount: positions.length,
-      signersCount: sanitizedSigners.length,
-      hasSignatureMeta: !!signatureMeta,
-      hasValidationTheme: !!validationTheme,
-    });
 
     const now = new Date();
     const expires = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -338,7 +291,7 @@ export async function POST(req: NextRequest) {
 
     const basePayload: Record<string, any> = {
       id,
-      user_id: userId,
+      user_id: user.id, // Use authenticated user ID
       original_pdf_name,
       metadata,
       status: 'draft',
@@ -356,7 +309,7 @@ export async function POST(req: NextRequest) {
       basePayload.validation_profile_id = validationProfileIdSanitized;
     }
 
-    structuredLog('info', { ...baseCtx, event: 'db_insert_start', documentId: id });
+    logger.info('Inserting document record', { reqId, documentId: id });
 
     let ins = await supabaseAdmin
       .from('documents')
@@ -368,7 +321,7 @@ export async function POST(req: NextRequest) {
     if (ins.error &&
       (ins.error.message?.includes('validation_theme_snapshot') || ins.error.message?.includes('validation_profile_id'))
     ) {
-      structuredLog('warn', { ...baseCtx, event: 'db_insert_fallback', documentId: id, error: ins.error.message });
+      logger.warn('Retrying insert without validation fields', { reqId, documentId: id });
       const fallbackPayload = { ...basePayload };
       delete (fallbackPayload as any).validation_theme_snapshot;
       delete (fallbackPayload as any).validation_profile_id;
@@ -381,15 +334,21 @@ export async function POST(req: NextRequest) {
     }
 
     if (ins.error) {
-      structuredLog('error', { ...baseCtx, event: 'db_insert_failed', documentId: id, error: ins.error.message });
-      return NextResponse.json({ error: ins.error.message }, { status: 500 });
+      logger.error('Database insert failed', ins.error, { reqId, documentId: id });
+      return createErrorResponse(
+        'Erro ao salvar documento.',
+        500,
+        ins.error,
+        { documentId: id }
+      );
     }
 
-    structuredLog('info', { ...baseCtx, event: 'db_insert_success', documentId: id });
+    logger.info('Upload completed successfully', { reqId, documentId: id });
 
-    return NextResponse.json({ ok: true, id });
+    const response = createSuccessResponse({ ok: true, id });
+    return addRateLimitHeaders(response, rateLimit);
   } catch (e: any) {
-    structuredLog('error', { reqId, route: 'POST /api/upload', event: 'unhandled_exception', error: String(e?.message || e), stack: e?.stack ? e.stack.split('\n').slice(0,5).join(' | ') : undefined });
-    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+    logger.error('Unhandled exception', e, { reqId });
+    return ErrorResponses.internalError(e, { reqId });
   }
 }
