@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
     // 9. Salvar PDF modificado
     console.log('💾 [SIGN API] Saving modified PDF...')
     const signedPdfBytes = await pdfDoc.save()
-    const signedPdfBlob = new Blob([signedPdfBytes], { type: 'application/pdf' })
+    const signedPdfBlob = new Blob([signedPdfBytes as any], { type: 'application/pdf' })
     console.log('✅ [SIGN API] PDF saved, size:', signedPdfBytes.length, 'bytes')
 
     // 10. Upload para Supabase Storage

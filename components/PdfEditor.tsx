@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 // usar a build legacy evita diversos problemas com bundlers/Next.js
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+import type { PDFDocumentProxy, PDFDocumentLoadingTask } from 'pdfjs-dist';
 import 'pdfjs-dist/web/pdf_viewer.css';
 
 type Pos = { page: number; nx: number; ny: number; scale: number; rotation: number };
@@ -24,7 +25,7 @@ if (typeof window !== 'undefined') {
   try {
     // usamos a versão legacy do worker que está disponível em public/pdf.worker.min.mjs
     const workerSrc = '/pdf.worker.min.mjs';
-    (pdfjsLib as any).GlobalWorkerOptions.workerSrc = workerSrc;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
   } catch (e) {
     console.warn('Não foi possível configurar GlobalWorkerOptions.workerSrc automaticamente:', e);
   }
@@ -41,7 +42,7 @@ export default function PdfEditor({
   onDocumentLoaded
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [pdf, setPdf] = useState<any>(null);
+  const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [page, setPage] = useState(1);
   const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
@@ -58,7 +59,7 @@ export default function PdfEditor({
 
   useEffect(() => {
     let cancelled = false;
-    let task: any;
+    let task: PDFDocumentLoadingTask | undefined;
     let blobUrl: string | null = null;
 
     // Reset first load flag when file changes
@@ -80,8 +81,9 @@ export default function PdfEditor({
           const ab = await file.arrayBuffer();
           const uint8 = new Uint8Array(ab);
 
-          task = (pdfjsLib as any).getDocument({ data: uint8 });
-          const doc = await task.promise;
+          const loadingTask = pdfjsLib.getDocument({ data: uint8 });
+          task = loadingTask;
+          const doc = await loadingTask.promise;
           if (cancelled) { await doc?.destroy?.(); return; }
           setPdf(doc);
           
@@ -102,8 +104,9 @@ export default function PdfEditor({
         // 2) fallback: blob URL
         try {
           blobUrl = URL.createObjectURL(file);
-          task = (pdfjsLib as any).getDocument({ url: blobUrl });
-          const doc = await task.promise;
+          const loadingTask = pdfjsLib.getDocument({ url: blobUrl });
+          task = loadingTask;
+          const doc = await loadingTask.promise;
           if (cancelled) { await doc?.destroy?.(); return; }
           setPdf(doc);
           

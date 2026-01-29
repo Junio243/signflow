@@ -230,7 +230,7 @@ export class NotificationService {
       console.error('[NotificationService] Erro ao salvar:', error)
     }
 
-    return notification as Notification
+    return notification as unknown as Notification
   }
 
   private static async sendEmail(payload: NotificationPayload): Promise<{ success: boolean }> {
@@ -275,7 +275,7 @@ export class NotificationService {
     preferences: NotificationPreferences
   ): boolean {
     // Verifica se preferência específica está habilitada
-    return preferences[type] !== false
+    return (preferences as any)[type] !== false
   }
 
   private static getDefaultChannels(

@@ -63,9 +63,9 @@ export default function AppearancePage() {
       return { url: null, ok: false }
     }
 
-    const pub = await supabaseClient.storage.from('signflow').getPublicUrl(key)
-    if (pub.error || !pub.data?.publicUrl) {
-      console.error('Erro ao gerar URL pública do logo:', pub.error)
+    const pub = supabaseClient.storage.from('signflow').getPublicUrl(key)
+    if (!pub.data?.publicUrl) {
+      console.error('Erro ao gerar URL pública do logo')
       setInfo('Não consegui gerar a URL pública do logo. Tente novamente mais tarde.')
       return { url: null, ok: false }
     }

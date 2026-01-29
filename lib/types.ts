@@ -43,6 +43,10 @@ export interface Database {
           created_at: string;
           expires_at: string;
           ip_hash: string | null;
+          validation_theme_snapshot?: Json | null;
+          validation_profile_id?: string | null;
+          validation_requires_code?: boolean;
+          validation_access_code?: string | null;
         };
         Insert: {
           id?: string;
@@ -55,6 +59,10 @@ export interface Database {
           created_at?: string;
           expires_at: string;
           ip_hash?: string | null;
+          validation_theme_snapshot?: Json | null;
+          validation_profile_id?: string | null;
+          validation_requires_code?: boolean;
+          validation_access_code?: string | null;
         };
         Update: {
           id?: string;
@@ -67,6 +75,10 @@ export interface Database {
           created_at?: string;
           expires_at?: string;
           ip_hash?: string | null;
+          validation_theme_snapshot?: Json | null;
+          validation_profile_id?: string | null;
+          validation_requires_code?: boolean;
+          validation_access_code?: string | null;
         };
       };
 
