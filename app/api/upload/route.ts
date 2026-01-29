@@ -4,6 +4,7 @@ export const runtime = 'nodejs';
 import { createHash, randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { Database } from '@/lib/types';
 import {
   documentIdSchema,
   metadataSchema,
@@ -336,11 +337,11 @@ export async function POST(req: NextRequest) {
     if (qrPosition) metadata.qr_position = qrPosition;
     if (qrPage) metadata.qr_page = qrPage;
 
-    const basePayload: Record<string, any> = {
+    const basePayload: Database['public']['Tables']['documents']['Insert'] = {
       id,
       user_id: userId,
       original_pdf_name,
-      metadata,
+      metadata: metadata as any,
       status: 'draft',
       created_at: now.toISOString(),
       expires_at: expires.toISOString(),
@@ -350,7 +351,7 @@ export async function POST(req: NextRequest) {
     };
 
     if (validationTheme) {
-      basePayload.validation_theme_snapshot = validationTheme;
+      basePayload.validation_theme_snapshot = validationTheme as any;
     }
     if (validationProfileIdSanitized) {
       basePayload.validation_profile_id = validationProfileIdSanitized;
@@ -360,7 +361,6 @@ export async function POST(req: NextRequest) {
 
     let ins = await supabaseAdmin
       .from('documents')
-      // @ts-ignore (evita never do types gerados no build)
       .insert(basePayload)
       .select('id')
       .maybeSingle();
@@ -370,11 +370,10 @@ export async function POST(req: NextRequest) {
     ) {
       structuredLog('warn', { ...baseCtx, event: 'db_insert_fallback', documentId: id, error: ins.error.message });
       const fallbackPayload = { ...basePayload };
-      delete (fallbackPayload as any).validation_theme_snapshot;
-      delete (fallbackPayload as any).validation_profile_id;
+      delete fallbackPayload.validation_theme_snapshot;
+      delete fallbackPayload.validation_profile_id;
       ins = await supabaseAdmin
         .from('documents')
-        // @ts-ignore
         .insert(fallbackPayload)
         .select('id')
         .maybeSingle();

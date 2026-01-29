@@ -36,6 +36,8 @@ type Pos = {
   ny: number
   scale: number
   rotation: number
+  x?: number
+  y?: number
 }
 
 type SignatureSize = { width: number; height: number } | null

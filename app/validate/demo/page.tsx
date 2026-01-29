@@ -13,7 +13,7 @@ export default function ValidateDemoPage() {
       : 'https://seusite.com/validate/demo'
     QRCode.toDataURL(url, { width: 180, margin: 1 })
       .then(setQr)
-      .catch((err) => {
+      .catch((err: any) => {
         console.warn('[ValidateDemo] Falha ao gerar QR Code:', err)
         setQr(null)
       })
