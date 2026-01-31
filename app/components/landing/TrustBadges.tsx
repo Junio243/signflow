@@ -1,8 +1,9 @@
-import { Shield, Lock, Award, FileCheck } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import { Shield, Lock, Award, FileCheck, Circle } from 'lucide-react'
 import { BancoDoBrasilLogo, MagazineLuizaLogo, HospitalEinsteinLogo, GovBrLogo } from '../Logos'
 
 export default function TrustBadges() {
-  const badges = [
+  const badges: Array<{ icon?: LucideIcon; label: string; description: string }> = [
     { icon: Shield, label: 'LGPD', description: 'Conforme à legislação' },
     { icon: Award, label: 'ISO 27001', description: 'Certificação de segurança' },
     { icon: FileCheck, label: 'ICP-Brasil', description: 'Validade jurídica' },
@@ -36,19 +37,23 @@ export default function TrustBadges() {
 
             {/* Security badges */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 max-w-4xl mx-auto">
-              {badges.map((badge, i) => (
-                <div key={i}>
-                  <div className="bg-white p-3 sm:p-4 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200">
-                    <badge.icon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 mx-auto mb-2" />
-                    <div className="font-semibold text-gray-900 text-xs sm:text-sm">
-                      {badge.label}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1 hidden sm:block">
-                      {badge.description}
+              {badges.map((badge, i) => {
+                const Icon = badge.icon ?? Circle
+
+                return (
+                  <div key={i}>
+                    <div className="bg-white p-3 sm:p-4 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200">
+                      <Icon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 mx-auto mb-2" />
+                      <div className="font-semibold text-gray-900 text-xs sm:text-sm">
+                        {badge.label}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1 hidden sm:block">
+                        {badge.description}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>

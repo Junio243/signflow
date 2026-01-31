@@ -1,9 +1,15 @@
 'use client'
 
-import { Upload, Users, Download } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import { Upload, Users, Download, Circle } from 'lucide-react'
 
 export default function HowItWorks() {
-  const steps = [
+  const steps: Array<{
+    icon?: LucideIcon
+    title: string
+    description: string
+    color: 'blue' | 'green' | 'purple'
+  }> = [
     {
       icon: Upload,
       title: 'Carregue seu PDF',
@@ -67,6 +73,7 @@ export default function HowItWorks() {
 
           {steps.map((step, i) => {
             const colors = colorClasses[step.color as keyof typeof colorClasses]
+            const Icon = step.icon ?? Circle
             
             return (
               <div key={i}>
@@ -79,7 +86,7 @@ export default function HowItWorks() {
 
                     {/* Icon */}
                     <div className={`w-16 h-16 rounded-2xl ${colors.bg} border-2 ${colors.border} flex items-center justify-center mb-6`}>
-                      <step.icon className={`w-8 h-8 ${colors.icon}`} />
+                      <Icon className={`w-8 h-8 ${colors.icon}`} />
                     </div>
 
                     {/* Content */}
