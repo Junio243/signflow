@@ -12,6 +12,7 @@ import ProfileStep from '@/components/multi-step/steps/ProfileStep'
 import SignatoriesStep from '@/components/multi-step/steps/SignatoriesStep'
 import QRConfigStep from '@/components/multi-step/steps/QRConfigStep'
 import ReviewStep from '@/components/multi-step/steps/ReviewStep'
+import ConfirmationStep from '@/components/multi-step/steps/ConfirmationStep'
 import ResultStep from '@/components/multi-step/steps/ResultStep'
 
 const STEPS = [
@@ -21,6 +22,7 @@ const STEPS = [
   'Signatários',
   'QR Code',
   'Revisão',
+  'Confirmação',
   'Resultado'
 ]
 
@@ -70,7 +72,7 @@ export default function CreateDocumentPage() {
     goToPreviousStep,
     reset,
     hasSavedData
-  } = useMultiStep<DocumentData>(7, 'document-creation')
+  } = useMultiStep<DocumentData>(8, 'document-creation')
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -217,7 +219,7 @@ export default function CreateDocumentPage() {
         fileName: formData.document.file.name
       }
 
-      console.log('🎉 [FRONTEND] Setting result and moving to step 7')
+      console.log('🎉 [FRONTEND] Setting result and moving to step 8')
       setResult(resultData)
       goToNextStep({})
 
@@ -280,10 +282,10 @@ export default function CreateDocumentPage() {
         )}
 
         {/* Progress Bar */}
-        {currentStep < 7 && (
+        {currentStep < 8 && (
           <ProgressBar
             currentStep={currentStep}
-            totalSteps={7}
+            totalSteps={8}
             steps={STEPS}
           />
         )}
@@ -291,7 +293,7 @@ export default function CreateDocumentPage() {
         {/* Steps */}
         <MultiStepContainer
           currentStep={currentStep}
-          totalSteps={7}
+          totalSteps={8}
           direction={direction}
         >
           {currentStep === 1 && (
@@ -341,11 +343,19 @@ export default function CreateDocumentPage() {
             <ReviewStep
               data={formData as any}
               onBack={goToPreviousStep}
-              onSubmit={handleSubmit}
+              onSubmit={() => goToNextStep({})}
             />
           )}
 
-          {currentStep === 7 && result && (
+          {currentStep === 7 && (
+            <ConfirmationStep
+              onNext={handleSubmit}
+              onBack={goToPreviousStep}
+              documentName={formData.document?.file.name}
+            />
+          )}
+
+          {currentStep === 8 && result && (
             <ResultStep result={result} />
           )}
         </MultiStepContainer>
