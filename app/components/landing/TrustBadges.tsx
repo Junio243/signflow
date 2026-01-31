@@ -1,3 +1,5 @@
+'use client'
+
 import type { LucideIcon } from 'lucide-react'
 import { Shield, Lock, Award, FileCheck, Circle } from 'lucide-react'
 import { BancoDoBrasilLogo, MagazineLuizaLogo, HospitalEinsteinLogo, GovBrLogo } from '../Logos'
