@@ -6,8 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import classNames from 'classnames'
-import { Building2, ChevronDown, LayoutDashboard, LogIn, LogOut, Menu, Settings, UserRound } from 'lucide-react'
-import NotificationBell from '../app/components/notifications/NotificationBell'
+import { Building2, ChevronDown, LayoutDashboard, LogIn, LogOut, Menu, Settings, User } from 'lucide-react'
+// REMOVIDO: import NotificationBell from '../app/components/notifications/NotificationBell'
 
 import { supabase } from '@/lib/supabaseClient'
 
@@ -71,7 +71,6 @@ export default function HeaderClient() {
     return () => {
       isMounted = false
       window.removeEventListener('click', handleClickOutside)
-      // Supabase v2 uses authListener.subscription.unsubscribe()
       authListener?.subscription?.unsubscribe()
     }
   }, [fetchSession, supabase])
@@ -103,14 +102,12 @@ export default function HeaderClient() {
   }, [router, supabase, user])
 
   const handleAnchorClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    // Só intercepta se já estiver na landing page e o link for uma âncora
     if (pathname === '/' && href.startsWith('/#')) {
       e.preventDefault()
       const id = href.replace('/#', '')
       const element = document.getElementById(id)
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        // Fecha o menu mobile se estiver aberto
         setMobileOpen(false)
       }
     }
@@ -179,8 +176,8 @@ export default function HeaderClient() {
             </span>
           )}
           
-          {/* Sino de Notificações - só aparece para usuários logados */}
-          {user && <NotificationBell />}
+          {/* REMOVIDO TEMPORARIAMENTE - NotificationBell causando erro React #130 */}
+          {/* {user && <NotificationBell />} */}
           
           {user ? (
             <div className="relative" ref={dropdownRef}>
@@ -191,7 +188,7 @@ export default function HeaderClient() {
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
               >
-                <UserRound className="h-4 w-4" aria-hidden />
+                <User className="h-4 w-4" aria-hidden />
                 <span className="max-w-[150px] truncate text-left sm:max-w-[200px]">{displayName}</span>
                 <ChevronDown className="h-4 w-4" aria-hidden />
               </button>
