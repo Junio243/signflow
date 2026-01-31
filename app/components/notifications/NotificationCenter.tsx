@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import type { Notification } from '@/lib/notifications/types'
 import { formatDistanceToNow } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { ptBR } from 'date-fns/locale/pt-BR'
 
 interface Props {
   isOpen: boolean
