@@ -31,6 +31,42 @@ export interface Database {
         };
       };
 
+      user_profiles: {
+        Row: {
+          id: string;
+          full_name: string | null;
+          company_name: string | null;
+          cpf_cnpj: string | null;
+          phone: string | null;
+          avatar_url: string | null;
+          bio: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          full_name?: string | null;
+          company_name?: string | null;
+          cpf_cnpj?: string | null;
+          phone?: string | null;
+          avatar_url?: string | null;
+          bio?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          full_name?: string | null;
+          company_name?: string | null;
+          cpf_cnpj?: string | null;
+          phone?: string | null;
+          avatar_url?: string | null;
+          bio?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+
       documents: {
         Row: {
           id: string;
