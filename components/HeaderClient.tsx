@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import classNames from 'classnames'
 import { Building2, ChevronDown, LayoutDashboard, LogIn, LogOut, Menu, Settings, UserRound } from 'lucide-react'
-import NotificationBell from '../app/components/notifications/NotificationBell'
+import NotificationBell from '@/app/components/notifications/NotificationBell'
 
 import { supabase } from '@/lib/supabaseClient'
 
