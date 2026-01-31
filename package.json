@@ -10,7 +10,7 @@
     "generate-certificate": "bash scripts/generate-certificate.sh"
   },
   "dependencies": {
-    "@signpdf/placeholder-pdfkit010": "^3.2.5",
+    "@signpdf/placeholder-plain": "^3.3.0",
     "@signpdf/signer-p12": "^3.3.0",
     "@signpdf/signpdf": "^3.3.0",
     "@signpdf/utils": "^3.3.0",

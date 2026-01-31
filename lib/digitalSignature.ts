@@ -9,7 +9,7 @@
 
 import signpdf from '@signpdf/signpdf';
 import { P12Signer } from '@signpdf/signer-p12';
-import { plainAddPlaceholder } from '@signpdf/placeholder-pdfkit010';
+import { plainAddPlaceholder } from '@signpdf/placeholder-plain';
 import fs from 'fs';
 import path from 'path';
 
