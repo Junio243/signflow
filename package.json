@@ -10,10 +10,10 @@
     "generate-certificate": "bash scripts/generate-certificate.sh"
   },
   "dependencies": {
-    "@signpdf/placeholder-pdfkit010": "^4.0.2",
-    "@signpdf/signer-p12": "^4.0.2",
-    "@signpdf/signpdf": "^4.0.2",
-    "@signpdf/utils": "^4.0.2",
+    "@signpdf/placeholder-pdfkit010": "^3.2.5",
+    "@signpdf/signer-p12": "^3.3.0",
+    "@signpdf/signpdf": "^3.3.0",
+    "@signpdf/utils": "^3.3.0",
     "@supabase/supabase-js": "^2.39.1",
     "lucide-react": "^0.263.1",
     "next": "14.0.4",
