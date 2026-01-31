@@ -1,5 +1,3 @@
-'use client'
-
 import { Shield, Lock, Award, FileCheck } from 'lucide-react'
 import { BancoDoBrasilLogo, MagazineLuizaLogo, HospitalEinsteinLogo, GovBrLogo } from '../Logos'
 
