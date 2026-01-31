@@ -16,15 +16,16 @@ import {
   Loader2,
   LogIn,
   RefreshCcw,
-  ShieldCheck,
   Timer,
   Trash2,
+  User,
   XCircle,
   Zap,
   Sparkles,
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabaseClient'
+import { useUserProfile } from '@/hooks/useUserProfile'
 
 const STATUS_META = {
   signed: {
@@ -88,6 +89,9 @@ export default function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [feedback, setFeedback] = useState<string | null>(null)
+
+  // Hook do perfil do usuário
+  const { profile, loading: profileLoading } = useUserProfile()
 
   const fetchSession = useCallback(async () => {
     if (!supabaseClient) {
@@ -341,10 +345,35 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
           <p className="text-sm text-slate-500">Acompanhe documentos, status de assinatura e ações rápidas.</p>
           {isLogged && (
-            <p className="mt-2 text-xs text-slate-400">Logado como: {userEmail}</p>
+            <div className="mt-2 space-y-1">
+              {profileLoading ? (
+                <p className="text-xs text-slate-400">Carregando perfil...</p>
+              ) : profile ? (
+                <>
+                  <p className="text-sm font-medium text-slate-700">
+                    👋 Olá, {profile.full_name || 'Usuário'}!
+                  </p>
+                  <p className="text-xs text-slate-400">✉️ {userEmail}</p>
+                </>
+              ) : (
+                <p className="text-xs text-slate-400">✉️ {userEmail}</p>
+              )}
+            </div>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {/* Botão de Perfil */}
+          {isLogged && (
+            <Link
+              href="/profile"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+              title="Editar meu perfil"
+            >
+              <User className="h-4 w-4" aria-hidden />
+              Perfil
+            </Link>
+          )}
+
           {/* Quick Create Button */}
           <button
             type="button"
