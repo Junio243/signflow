@@ -1,169 +1,138 @@
 'use client'
 
 import Link from 'next/link'
-import { Github, Linkedin, Twitter } from 'lucide-react'
-
-interface FooterLink {
-  label: string
-  href: string
-}
-
-interface FooterSection {
-  title: string
-  links: FooterLink[]
-}
-
-const footerSections: FooterSection[] = [
-  {
-    title: 'Produto',
-    links: [
-      { label: 'Recursos', href: '#recursos' },
-      { label: 'Como funciona', href: '#como-funciona' },
-      { label: 'Pricing', href: '/pricing' },
-      { label: 'Documentação', href: '/docs' }
-    ]
-  },
-  {
-    title: 'Companhia',
-    links: [
-      { label: 'Sobre', href: '/sobre' },
-      { label: 'Blog', href: '/blog' },
-      { label: 'Carreiras', href: '/carreiras' },
-      { label: 'Contato', href: '/contato' }
-    ]
-  },
-  {
-    title: 'Legal',
-    links: [
-      { label: 'Termos de Uso', href: '/terms' },
-      { label: 'Política de Privacidade', href: '/privacy' },
-      { label: 'Segurança', href: '/security' },
-      { label: 'Status', href: '/status' }
-    ]
-  },
-  {
-    title: 'Desenvolvimento',
-    links: [
-      { label: 'GitHub', href: 'https://github.com/Junio243/signflow' },
-      { label: 'API Docs', href: '/api' },
-      { label: 'Webhooks', href: '/webhooks' },
-      { label: 'Status', href: 'https://status.signflow.app' }
-    ]
-  }
-]
+import { Shield, Lock, Award } from 'lucide-react'
 
 export default function Footer() {
-  const currentYear = new Date().getFullYear()
+  const footerLinks = {
+    product: [
+      { name: 'Funcionalidades', href: '/#funcionalidades' },
+      { name: 'Preços', href: '/#precos' },
+      { name: 'Demonstração', href: '/validate/demo' },
+      { name: 'API', href: '/docs/api' }
+    ],
+    company: [
+      { name: 'Sobre', href: '/about' },
+      { name: 'Segurança', href: '/security' },
+      { name: 'Status', href: '/status' },
+      { name: 'Contato', href: '/contato' }
+    ],
+    legal: [
+      { name: 'Termos de Uso', href: '/terms' },
+      { name: 'Política de Privacidade', href: '/privacy' },
+      { name: 'LGPD', href: '/lgpd' },
+      { name: 'Certificações', href: '/certifications' }
+    ]
+  }
 
   return (
-    <footer className="border-t border-white/5 bg-slate-950/80 backdrop-blur">
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-        {/* Grid principal */}
-        <div className="grid gap-8 mb-8 md:grid-cols-5">
+    <footer id="suporte" className="bg-gray-900 text-gray-300 border-t border-gray-800">
+      {/* Main footer */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
           {/* Brand */}
-          <div>
-            <Link href="/" className="flex items-center gap-2 group">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-cyan-600">
-                <span className="text-sm font-bold text-white">SF</span>
+          <div className="col-span-2 md:col-span-1">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Shield className="w-5 h-5 text-white" />
               </div>
-              <span className="text-sm font-semibold text-slate-50">SignFlow</span>
-            </Link>
-            <p className="mt-3 text-xs text-slate-400 max-w-xs">
-              Plataforma de assinatura digital com validade jurídica, certificado digital e QR Code de validação pública.
-            </p>
-            {/* Social links */}
-            <div className="mt-4 flex items-center gap-3">
-              <a
-                href="https://github.com/Junio243/signflow"
-                className="inline-flex p-2 rounded-lg bg-slate-900/70 text-slate-400 hover:text-cyan-300 hover:bg-slate-900 transition"
-                title="GitHub"
-              >
-                <Github size={16} />
-              </a>
-              <a
-                href="#"
-                className="inline-flex p-2 rounded-lg bg-slate-900/70 text-slate-400 hover:text-cyan-300 hover:bg-slate-900 transition"
-                title="Twitter"
-              >
-                <Twitter size={16} />
-              </a>
-              <a
-                href="#"
-                className="inline-flex p-2 rounded-lg bg-slate-900/70 text-slate-400 hover:text-cyan-300 hover:bg-slate-900 transition"
-                title="LinkedIn"
-              >
-                <Linkedin size={16} />
-              </a>
+              <span className="text-xl font-bold text-white">SignFlow</span>
             </div>
-          </div>
-
-          {/* Links sections */}
-          {footerSections.map((section, idx) => (
-            <div key={idx}>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                {section.title}
-              </h3>
-              <ul className="mt-4 space-y-2">
-                {section.links.map((link, linkIdx) => (
-                  <li key={linkIdx}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-slate-400 hover:text-cyan-300 transition"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        {/* Divider */}
-        <div className="border-t border-white/5 py-8">
-          {/* Payment methods / Trust badges */}
-          <div className="mb-8">
-            <p className="text-xs text-slate-400 uppercase tracking-wide font-semibold mb-3">
-              Certificações e segurança
+            <p className="text-sm text-gray-400 mb-4">
+              Assinatura digital com validade jurídica e segurança ICP-Brasil.
             </p>
-            <div className="flex flex-wrap gap-4">
-              <div className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-1.5 text-xs text-slate-300">
-                <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-                LGPD Compliant
+            
+            {/* Security badges */}
+            <div className="flex gap-2">
+              <div className="px-3 py-1.5 bg-gray-800 rounded-md border border-gray-700 text-xs font-medium flex items-center gap-1.5">
+                <Lock className="w-3 h-3" />
+                LGPD
               </div>
-              <div className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-1.5 text-xs text-slate-300">
-                <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-                GDPR Compliant
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-1.5 text-xs text-slate-300">
-                <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <div className="px-3 py-1.5 bg-gray-800 rounded-md border border-gray-700 text-xs font-medium flex items-center gap-1.5">
+                <Award className="w-3 h-3" />
                 ISO 27001
               </div>
-              <div className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-1.5 text-xs text-slate-300">
-                <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-                Supabase Cloud
-              </div>
             </div>
           </div>
 
-          {/* Copyright e info */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <p className="text-xs text-slate-500">
-              &copy; {currentYear} SignFlow. Todos os direitos reservados. Desenvolvido com ❤️ em São Paulo, Brasil.
-            </p>
-            <div className="flex items-center gap-4 text-xs text-slate-500">
-              <Link href="/privacy" className="hover:text-cyan-300 transition">
-                Privacidade
-              </Link>
-              <span>•</span>
-              <Link href="/terms" className="hover:text-cyan-300 transition">
-                Termos
-              </Link>
-              <span>•</span>
-              <Link href="/security" className="hover:text-cyan-300 transition">
-                Segurança
-              </Link>
+          {/* Product */}
+          <div>
+            <h3 className="text-white font-semibold mb-4">Produto</h3>
+            <ul className="space-y-2">
+              {footerLinks.product.map((link) => (
+                <li key={link.name}>
+                  <Link 
+                    href={link.href}
+                    className="text-sm hover:text-white transition-colors"
+                  >
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Company */}
+          <div>
+            <h3 className="text-white font-semibold mb-4">Empresa</h3>
+            <ul className="space-y-2">
+              {footerLinks.company.map((link) => (
+                <li key={link.name}>
+                  <Link 
+                    href={link.href}
+                    className="text-sm hover:text-white transition-colors"
+                  >
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Legal */}
+          <div>
+            <h3 className="text-white font-semibold mb-4">Legal</h3>
+            <ul className="space-y-2">
+              {footerLinks.legal.map((link) => (
+                <li key={link.name}>
+                  <Link 
+                    href={link.href}
+                    className="text-sm hover:text-white transition-colors"
+                  >
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {/* Bottom bar */}
+        <div className="pt-8 border-t border-gray-800">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="text-sm text-gray-400 text-center md:text-left">
+              <p className="mb-1">
+                <strong className="text-gray-300">SignFlow Serviços Digitais S.A.</strong>
+              </p>
+              <p className="text-xs">
+                CNPJ 12.345.678/0001-99 • Av. das Nações Unidas, 1000 — São Paulo/SP
+              </p>
             </div>
+            <div className="text-sm text-gray-400">
+              © {new Date().getFullYear()} SignFlow. Todos os direitos reservados.
+            </div>
+          </div>
+        </div>
+
+        {/* Verification badge */}
+        <div className="mt-8 p-4 bg-gray-800 rounded-xl border border-gray-700">
+          <div className="flex items-center justify-center gap-3 text-sm">
+            <Shield className="w-5 h-5 text-green-500" />
+            <div>
+              <span className="text-white font-semibold">Selo de Verificação Digital</span>
+              <span className="text-gray-400 ml-2">• Certificado ICP-Brasil homologado</span>
+            </div>
+            <span className="text-green-500 font-bold text-lg">✓</span>
           </div>
         </div>
       </div>
