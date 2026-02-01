@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { logAudit, extractIpFromRequest } from '@/lib/audit'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,6 +14,7 @@ export async function DELETE(request: NextRequest) {
     // Get document ID from query params
     const url = new URL(request.url)
     const documentId = url.searchParams.get('id')
+    const clientIp = extractIpFromRequest(request);
 
     if (!documentId) {
       console.error('❌ [DELETE API] Document ID missing')
@@ -34,6 +36,17 @@ export async function DELETE(request: NextRequest) {
 
     if (fetchError || !doc) {
       console.error('❌ [DELETE API] Document not found:', fetchError)
+      
+      // Audit log: document not found
+      await logAudit({
+        action: 'document.delete',
+        resourceType: 'document',
+        resourceId: documentId,
+        status: 'failure',
+        ip: clientIp,
+        details: { reason: 'document_not_found' }
+      });
+      
       return NextResponse.json(
         { error: 'Document not found' },
         { status: 404 }
@@ -46,6 +59,20 @@ export async function DELETE(request: NextRequest) {
     const allowedStatuses = ['draft', 'canceled', 'expired']
     if (!allowedStatuses.includes(doc.status?.toLowerCase() || '')) {
       console.warn('⚠️ [DELETE API] Cannot delete signed document')
+      
+      // Audit log: deletion denied
+      await logAudit({
+        action: 'auth.denied',
+        resourceType: 'document',
+        resourceId: documentId,
+        status: 'denied',
+        ip: clientIp,
+        details: { 
+          reason: 'cannot_delete_signed_document',
+          documentStatus: doc.status
+        }
+      });
+      
       return NextResponse.json(
         { error: 'Cannot delete signed documents. Cancel them first.' },
         { status: 403 }
@@ -78,11 +105,36 @@ export async function DELETE(request: NextRequest) {
 
     if (deleteError) {
       console.error('❌ [DELETE API] Database deletion failed:', deleteError)
+      
+      // Audit log: deletion failed
+      await logAudit({
+        action: 'document.delete',
+        resourceType: 'document',
+        resourceId: documentId,
+        status: 'error',
+        ip: clientIp,
+        details: { error: deleteError.message }
+      });
+      
       return NextResponse.json(
         { error: `Failed to delete document: ${deleteError.message}` },
         { status: 500 }
       )
     }
+
+    // Audit log: successful deletion
+    await logAudit({
+      action: 'document.delete',
+      resourceType: 'document',
+      resourceId: documentId,
+      status: 'success',
+      ip: clientIp,
+      userAgent: request.headers.get('user-agent') || undefined,
+      details: { 
+        documentStatus: doc.status,
+        hadPdf: !!doc.signed_pdf_url
+      }
+    });
 
     console.log('✅✅✅ [DELETE API] Document deleted successfully!')
     return NextResponse.json({
@@ -92,6 +144,19 @@ export async function DELETE(request: NextRequest) {
 
   } catch (error) {
     console.error('❌❌❌ [DELETE API] FATAL ERROR:', error)
+    
+    // Audit log: exception
+    const clientIp = extractIpFromRequest(request);
+    await logAudit({
+      action: 'document.delete',
+      resourceType: 'document',
+      status: 'error',
+      ip: clientIp,
+      details: { 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }
+    });
+    
     return NextResponse.json(
       { 
         error: 'Failed to delete document', 

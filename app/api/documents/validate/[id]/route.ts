@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { logAudit, extractIpFromRequest } from '@/lib/audit'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,6 +15,7 @@ export async function GET(
     const { id } = params
     const { searchParams } = new URL(request.url)
     const validationCode = searchParams.get('code')
+    const clientIp = extractIpFromRequest(request);
 
     if (!id) {
       return NextResponse.json(
@@ -30,6 +32,16 @@ export async function GET(
       .single()
 
     if (error || !document) {
+      // Audit log: document not found
+      await logAudit({
+        action: 'document.validate',
+        resourceType: 'document',
+        resourceId: id,
+        status: 'failure',
+        ip: clientIp,
+        details: { reason: 'document_not_found' }
+      });
+      
       return NextResponse.json(
         { 
           error: 'Document not found',
@@ -95,6 +107,16 @@ export async function GET(
 
       // Validar código
       if (validationCode !== document.validation_code) {
+        // Audit log: wrong validation code (access denied)
+        await logAudit({
+          action: 'auth.denied',
+          resourceType: 'validation',
+          resourceId: id,
+          status: 'denied',
+          ip: clientIp,
+          details: { reason: 'invalid_validation_code' }
+        });
+        
         return NextResponse.json(
           {
             error: 'Invalid validation code',
@@ -105,6 +127,21 @@ export async function GET(
         )
       }
     }
+
+    // Audit log: successful validation
+    await logAudit({
+      action: 'document.validate',
+      resourceType: 'document',
+      resourceId: id,
+      status: 'success',
+      ip: clientIp,
+      userAgent: request.headers.get('user-agent') || undefined,
+      details: {
+        documentStatus: document.status,
+        requiresCode: document.require_validation_code || false,
+        codeProvided: !!validationCode
+      }
+    });
 
     // Documento válido - retornar informações
     return NextResponse.json({
