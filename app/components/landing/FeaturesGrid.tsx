@@ -1,3 +1,5 @@
+'use client'
+
 import { FileCheck2, QrCode, Users, BarChart3, Lock, Zap } from 'lucide-react'
 
 interface Feature {
