@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import { ArrowRight, Check } from 'lucide-react'
 
@@ -66,11 +68,10 @@ export default function CTASection() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
                   <p className="text-2xl font-bold text-cyan-300">99.9%</p>
-                  <p className="text-sm text-slate-400">Uptime
-                  </p>
+                  <p className="text-sm text-slate-400">Uptime</p>
                 </div>
                 <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
-                  <p className="text-2xl font-bold text-emerald-300">< 2s</p>
+                  <p className="text-2xl font-bold text-emerald-300">&lt; 2s</p>
                   <p className="text-sm text-slate-400">Assinatura</p>
                 </div>
               </div>
