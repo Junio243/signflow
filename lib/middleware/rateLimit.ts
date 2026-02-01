@@ -63,7 +63,7 @@ function getClientIp(req: NextRequest): string {
   }
   
   // x-forwarded-for can be a comma-separated list
-  const ip = (ipHeader as string).split(',')[0].trim();
+  const ip = ipHeader.split(',')[0]?.trim() ?? '0.0.0.0';
   return ip || '0.0.0.0';
 }
 
