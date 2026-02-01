@@ -13,6 +13,7 @@ import {
   qrPositionSchema,
   qrPageSchema,
 } from '@/lib/validation/documentSchemas';
+import { createRateLimiter, addRateLimitHeaders } from '@/lib/middleware/rateLimit';
 
 const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB
 const MAX_PDF_SIZE_MB = 20;
@@ -70,7 +71,18 @@ const parseJsonField = (
   }
 };
 
+// Rate limiter: max 10 requests per hour per IP
+const rateLimiter = createRateLimiter('/api/upload', {
+  maxRequests: 10,
+  windowMs: 60 * 60 * 1000, // 1 hour
+  message: 'Limite de upload excedido. Máximo de 10 uploads por hora.',
+});
+
 export async function POST(req: NextRequest) {
+  // Apply rate limiting
+  const rateLimitResponse = await rateLimiter(req);
+  if (rateLimitResponse) return rateLimitResponse;
+
   const reqId = randomUUID();
   const baseCtx = { reqId, route: 'POST /api/upload' };
 
@@ -386,7 +398,8 @@ export async function POST(req: NextRequest) {
 
     structuredLog('info', { ...baseCtx, event: 'db_insert_success', documentId: id });
 
-    return NextResponse.json({ ok: true, id });
+    const response = NextResponse.json({ ok: true, id });
+    return addRateLimitHeaders(response, req);
   } catch (e: any) {
     structuredLog('error', { reqId, route: 'POST /api/upload', event: 'unhandled_exception', error: String(e?.message || e), stack: e?.stack ? e.stack.split('\n').slice(0,5).join(' | ') : undefined });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });

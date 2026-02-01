@@ -4,6 +4,7 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { documentIdSchema, storedMetadataSchema, Metadata, Position } from '@/lib/validation/documentSchemas';
+import { createRateLimiter, addRateLimitHeaders } from '@/lib/middleware/rateLimit';
 
 type ValidationPayload = {
   requires_code: boolean;
@@ -43,9 +44,26 @@ const getValidationConfig = (metadata: Metadata | null) => {
   return { requiresCode, accessCode };
 };
 
-const buildResponse = (payload: ValidationPayload) => NextResponse.json(payload, { status: 200 });
+const buildResponse = (payload: ValidationPayload, req?: NextRequest) => {
+  const response = NextResponse.json(payload, { status: 200 });
+  if (req) {
+    return addRateLimitHeaders(response, req);
+  }
+  return response;
+};
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+// Rate limiter: max 30 attempts per 5 minutes
+const rateLimiter = createRateLimiter('/api/validate', {
+  maxRequests: 30,
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  message: 'Muitas tentativas de validação. Tente novamente em alguns minutos.',
+});
+
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  // Apply rate limiting
+  const rateLimitResponse = await rateLimiter(req);
+  if (rateLimitResponse) return rateLimitResponse;
+
   const idResult = documentIdSchema.safeParse(params.id);
   if (!idResult.success) {
     return NextResponse.json({ error: 'id inválido' }, { status: 400 });
@@ -69,7 +87,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   const { requiresCode } = getValidationConfig(metadata);
 
   if (requiresCode) {
-    return buildResponse({ requires_code: true });
+    return buildResponse({ requires_code: true }, req);
   }
 
   const docPayload = {
@@ -91,10 +109,14 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     requires_code: false,
     document: docPayload,
     events: eventsRes.data || [],
-  });
+  }, req);
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  // Apply rate limiting
+  const rateLimitResponse = await rateLimiter(req);
+  if (rateLimitResponse) return rateLimitResponse;
+
   const idResult = documentIdSchema.safeParse(params.id);
   if (!idResult.success) {
     return NextResponse.json({ error: 'id inválido' }, { status: 400 });
@@ -148,5 +170,5 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     requires_code: false,
     document: docPayload,
     events: eventsRes.data || [],
-  });
+  }, req);
 }
