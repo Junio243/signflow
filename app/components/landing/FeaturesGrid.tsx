@@ -1,83 +1,95 @@
-'use client'
+import { FileCheck2, QrCode, Users, BarChart3, Lock, Zap } from 'lucide-react'
 
-import type { LucideIcon } from 'lucide-react'
-import { MessageCircle, Scale, FolderKanban, FileText, ShieldCheck, Code, Circle } from 'lucide-react'
+interface Feature {
+  icon: React.ReactNode
+  title: string
+  description: string
+  badge?: string
+}
+
+const features: Feature[] = [
+  {
+    icon: <FileCheck2 className="h-6 w-6" />,
+    title: "Upload e assinatura rápida",
+    description: "Faça upload do seu PDF e assine em segundos com interface intuitiva. Dois modos: rápido ou avançado.",
+    badge: "Rápido"
+  },
+  {
+    icon: <QrCode className="h-6 w-6" />,
+    title: "QR Code de validação pública",
+    description: "Cada documento gerado recebe um QR Code único. Qualquer pessoa pode escanear e validar a autenticidade.",
+    badge: "Transparente"
+  },
+  {
+    icon: <Lock className="h-6 w-6" />,
+    title: "Hash criptográfico SHA-256",
+    description: "Assinaturas protegidas com hash criptográfico. Garante integridade e autenticidade do documento.",
+    badge: "Seguro"
+  },
+  {
+    icon: <Users className="h-6 w-6" />,
+    title: "Múltiplos signatários",
+    description: "Fluxo colaborativo com suporte a múltiplos signatários em sequência ou paralelo. Rastreamento completo.",
+    badge: "Colaborativo"
+  },
+  {
+    icon: <BarChart3 className="h-6 w-6" />,
+    title: "Dashboard em tempo real",
+    description: "Centralize todos os seus documentos. Filtros por status, busca rápida e atualização instantânea.",
+    badge: "Gestão"
+  },
+  {
+    icon: <Zap className="h-6 w-6" />,
+    title: "Certificado digital personalizado",
+    description: "Adicione dados do signatário, empresa e personalize o certificado. Incluso em cada assinatura.",
+    badge: "Profissional"
+  },
+]
 
 export default function FeaturesGrid() {
-  const features: Array<{
-    icon?: LucideIcon
-    title: string
-    description: string
-  }> = [
-    {
-      icon: MessageCircle,
-      title: 'Assinatura via WhatsApp',
-      description: 'Envie documentos e colete assinaturas diretamente pelo WhatsApp de forma rápida e segura.'
-    },
-    {
-      icon: Scale,
-      title: 'Validade Jurídica',
-      description: 'Certificação ICP-Brasil garante validade legal para contratos e documentos oficiais.'
-    },
-    {
-      icon: FolderKanban,
-      title: 'Gestão de Contratos',
-      description: 'Organize e acompanhe todos os seus documentos em um painel intuitivo e completo.'
-    },
-    {
-      icon: FileText,
-      title: 'Trilha de Auditoria',
-      description: 'Histórico completo e imutável de todas as ações realizadas em cada documento.'
-    },
-    {
-      icon: ShieldCheck,
-      title: 'Segurança LGPD',
-      description: 'Conformidade total com a legislação brasileira de proteção de dados pessoais.'
-    },
-    {
-      icon: Code,
-      title: 'API para Integração',
-      description: 'Integre facilmente com seus sistemas através de nossa API REST completa.'
-    }
-  ]
-
   return (
-    <section className="py-16 sm:py-20 bg-gradient-to-b from-gray-50 to-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div>
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-              Funcionalidades inteligentes
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Tudo que você precisa para assinar documentos com segurança e praticidade
-            </p>
-          </div>
+    <section id="recursos" className="border-t border-white/5 bg-slate-950/60">
+      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+        {/* Seção header */}
+        <div className="mb-12">
+          <h2 className="text-3xl font-bold tracking-tight text-slate-50 sm:text-4xl">
+            Recursos profissionais pensados para seu fluxo
+          </h2>
+          <p className="mt-4 max-w-2xl text-lg text-slate-300">
+            Do assinante individual à empresa com múltiplas assinaturas, o SignFlow se adapta ao seu contexto.
+          </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature, i) => {
-            const Icon = feature.icon ?? Circle
+        {/* Grid de features */}
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          {features.map((feature, idx) => (
+            <div
+              key={idx}
+              className="group rounded-2xl border border-slate-800 bg-slate-900/50 p-6 transition hover:border-cyan-500/50 hover:bg-slate-900/80"
+            >
+              {/* Badge */}
+              {feature.badge && (
+                <span className="mb-3 inline-flex items-center rounded-full bg-cyan-500/10 px-2 py-1 text-xs font-semibold text-cyan-300 border border-cyan-500/30">
+                  {feature.badge}
+                </span>
+              )}
 
-            return (
-              <div key={i}>
-                <div className="group bg-white rounded-xl p-6 border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 h-full">
-                  {/* Icon */}
-                  <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center mb-4 group-hover:bg-blue-600 group-hover:scale-110 transition-all duration-300">
-                    <Icon className="w-6 h-6 text-blue-600 group-hover:text-white transition-colors duration-300" />
-                  </div>
-
-                  {/* Content */}
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">
-                    {feature.title}
-                  </h3>
-                  <p className="text-gray-600 leading-relaxed">
-                    {feature.description}
-                  </p>
-                </div>
+              {/* Icon */}
+              <div className="mb-4 inline-flex rounded-lg bg-cyan-500/10 p-3 text-cyan-300 group-hover:bg-cyan-500/20 transition">
+                {feature.icon}
               </div>
-            )
-          })}
+
+              {/* Título */}
+              <h3 className="mb-2 text-lg font-semibold text-slate-50">
+                {feature.title}
+              </h3>
+
+              {/* Descrição */}
+              <p className="text-sm leading-relaxed text-slate-400">
+                {feature.description}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
     </section>
