@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import { ArrowRight, CheckCircle2, Shield, Zap } from 'lucide-react'
 
