@@ -14,6 +14,7 @@ import {
   qrPageSchema,
 } from '@/lib/validation/documentSchemas';
 import { createRateLimiter, addRateLimitHeaders } from '@/lib/middleware/rateLimit';
+import { logAudit, extractIpFromRequest } from '@/lib/audit';
 
 const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB
 const MAX_PDF_SIZE_MB = 20;
@@ -393,15 +394,62 @@ export async function POST(req: NextRequest) {
 
     if (ins.error) {
       structuredLog('error', { ...baseCtx, event: 'db_insert_failed', documentId: id, error: ins.error.message });
+      
+      // Audit log: failed upload
+      await logAudit({
+        action: 'document.upload',
+        resourceType: 'document',
+        resourceId: id,
+        status: 'error',
+        userId,
+        ip,
+        requestId: reqId,
+        details: { 
+          error: ins.error.message,
+          fileName: original_pdf_name 
+        }
+      });
+      
       return NextResponse.json({ error: ins.error.message }, { status: 500 });
     }
 
     structuredLog('info', { ...baseCtx, event: 'db_insert_success', documentId: id });
 
+    // Audit log: successful upload
+    await logAudit({
+      action: 'document.upload',
+      resourceType: 'document',
+      resourceId: id,
+      status: 'success',
+      userId,
+      ip,
+      requestId: reqId,
+      userAgent: req.headers.get('user-agent') || undefined,
+      details: {
+        fileName: original_pdf_name,
+        fileSize: pdf?.size,
+        hasSignature: !!signature,
+        signersCount: sanitizedSigners?.length || 0
+      }
+    });
+
     const response = NextResponse.json({ ok: true, id });
     return addRateLimitHeaders(response, rateLimitResult.headers);
   } catch (e: any) {
     structuredLog('error', { reqId, route: 'POST /api/upload', event: 'unhandled_exception', error: String(e?.message || e), stack: e?.stack ? e.stack.split('\n').slice(0,5).join(' | ') : undefined });
+    
+    // Audit log: exception
+    await logAudit({
+      action: 'document.upload',
+      resourceType: 'document',
+      status: 'error',
+      ip: extractIpFromRequest(req),
+      requestId: reqId,
+      details: { 
+        error: String(e?.message || e)
+      }
+    });
+    
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
 }
