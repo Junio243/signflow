@@ -44,12 +44,12 @@ const getValidationConfig = (metadata: Metadata | null) => {
   return { requiresCode, accessCode };
 };
 
-const buildResponse = (payload: ValidationPayload, req?: NextRequest) => {
+const buildResponse = (
+  payload: ValidationPayload,
+  headers: Record<string, string>
+) => {
   const response = NextResponse.json(payload, { status: 200 });
-  if (req) {
-    return addRateLimitHeaders(response, req);
-  }
-  return response;
+  return addRateLimitHeaders(response, headers);
 };
 
 // Rate limiter: max 30 attempts per 5 minutes
@@ -61,8 +61,8 @@ const rateLimiter = createRateLimiter('/api/validate', {
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   // Apply rate limiting
-  const rateLimitResponse = await rateLimiter(req);
-  if (rateLimitResponse) return rateLimitResponse;
+  const rateLimitResult = await rateLimiter(req);
+  if (!rateLimitResult.allowed) return rateLimitResult.response;
 
   const idResult = documentIdSchema.safeParse(params.id);
   if (!idResult.success) {
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const { requiresCode } = getValidationConfig(metadata);
 
   if (requiresCode) {
-    return buildResponse({ requires_code: true }, req);
+    return buildResponse({ requires_code: true }, rateLimitResult.headers);
   }
 
   const docPayload = {
@@ -109,13 +109,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     requires_code: false,
     document: docPayload,
     events: eventsRes.data || [],
-  }, req);
+  }, rateLimitResult.headers);
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   // Apply rate limiting
-  const rateLimitResponse = await rateLimiter(req);
-  if (rateLimitResponse) return rateLimitResponse;
+  const rateLimitResult = await rateLimiter(req);
+  if (!rateLimitResult.allowed) return rateLimitResult.response;
 
   const idResult = documentIdSchema.safeParse(params.id);
   if (!idResult.success) {
@@ -170,5 +170,5 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     requires_code: false,
     document: docPayload,
     events: eventsRes.data || [],
-  }, req);
+  }, rateLimitResult.headers);
 }

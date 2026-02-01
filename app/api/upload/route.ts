@@ -80,8 +80,8 @@ const rateLimiter = createRateLimiter('/api/upload', {
 
 export async function POST(req: NextRequest) {
   // Apply rate limiting
-  const rateLimitResponse = await rateLimiter(req);
-  if (rateLimitResponse) return rateLimitResponse;
+  const rateLimitResult = await rateLimiter(req);
+  if (!rateLimitResult.allowed) return rateLimitResult.response;
 
   const reqId = randomUUID();
   const baseCtx = { reqId, route: 'POST /api/upload' };
@@ -399,7 +399,7 @@ export async function POST(req: NextRequest) {
     structuredLog('info', { ...baseCtx, event: 'db_insert_success', documentId: id });
 
     const response = NextResponse.json({ ok: true, id });
-    return addRateLimitHeaders(response, req);
+    return addRateLimitHeaders(response, rateLimitResult.headers);
   } catch (e: any) {
     structuredLog('error', { reqId, route: 'POST /api/upload', event: 'unhandled_exception', error: String(e?.message || e), stack: e?.stack ? e.stack.split('\n').slice(0,5).join(' | ') : undefined });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });

@@ -193,8 +193,8 @@ const rateLimiter = createRateLimiter('/api/sign', {
 
 export async function POST(req: NextRequest) {
   // Apply rate limiting
-  const rateLimitResponse = await rateLimiter(req);
-  if (rateLimitResponse) return rateLimitResponse;
+  const rateLimitResult = await rateLimiter(req);
+  if (!rateLimitResult.allowed) return rateLimitResult.response;
 
   try {
     const supabaseAdmin = getSupabaseAdmin(); // ← client dentro do handler
@@ -545,7 +545,7 @@ export async function POST(req: NextRequest) {
       qr_code_url: pubQr.data.publicUrl,
       validate_url: validateUrl,
     });
-    return addRateLimitHeaders(response, req);
+    return addRateLimitHeaders(response, rateLimitResult.headers);
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }

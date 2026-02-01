@@ -7,6 +7,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+type RateLimitResult = {
+  allowed: true;
+  headers: Record<string, string>;
+} | {
+  allowed: false;
+  response: NextResponse;
+};
+
 type RateLimitConfig = {
   /** Maximum number of requests allowed within the time window */
   maxRequests: number;
@@ -27,7 +35,7 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 
 /**
  * Cleanup expired entries from the rate limit store
- * This runs periodically to prevent memory leaks
+ * This runs on-demand to prevent memory leaks
  */
 function cleanupExpiredEntries() {
   const now = Date.now();
@@ -38,8 +46,8 @@ function cleanupExpiredEntries() {
   }
 }
 
-// Run cleanup every 5 minutes
-setInterval(cleanupExpiredEntries, 5 * 60 * 1000);
+// Track last cleanup time
+let lastCleanup = Date.now();
 
 /**
  * Extract client IP from request headers
@@ -48,8 +56,7 @@ function getClientIp(req: NextRequest): string {
   // Try multiple headers in order of preference
   const ipHeader = 
     req.headers.get('x-forwarded-for') || 
-    req.headers.get('x-real-ip') || 
-    (req as any).ip;
+    req.headers.get('x-real-ip');
   
   if (!ipHeader) {
     return '0.0.0.0';
@@ -96,10 +103,12 @@ function logRateLimitViolation(
  * });
  * 
  * export async function POST(req: NextRequest) {
- *   const rateLimitResponse = await rateLimiter(req);
- *   if (rateLimitResponse) return rateLimitResponse;
+ *   const result = await rateLimiter(req);
+ *   if (!result.allowed) return result.response;
  *   
  *   // ... your endpoint logic
+ *   const response = NextResponse.json({ ok: true });
+ *   return addRateLimitHeaders(response, result.headers);
  * }
  * ```
  */
@@ -109,10 +118,16 @@ export function createRateLimiter(
 ) {
   return async function rateLimitMiddleware(
     req: NextRequest
-  ): Promise<NextResponse | null> {
+  ): Promise<RateLimitResult> {
     const identifier = getClientIp(req);
     const key = `${endpoint}:${identifier}`;
     const now = Date.now();
+    
+    // Run cleanup every 5 minutes on-demand (serverless-friendly)
+    if (now - lastCleanup > 5 * 60 * 1000) {
+      cleanupExpiredEntries();
+      lastCleanup = now;
+    }
     
     // Get or create rate limit entry
     let entry = rateLimitStore.get(key);
@@ -147,27 +162,25 @@ export function createRateLimiter(
       const message = config.message || 
         `Rate limit exceeded. Please try again in ${resetInSeconds} seconds.`;
       
-      return NextResponse.json(
-        { 
-          error: message,
-          retryAfter: resetInSeconds,
-        },
-        { 
-          status: 429,
-          headers: {
-            ...headers,
-            'Retry-After': resetInSeconds.toString(),
+      return {
+        allowed: false,
+        response: NextResponse.json(
+          { 
+            error: message,
+            retryAfter: resetInSeconds,
           },
-        }
-      );
+          { 
+            status: 429,
+            headers: {
+              ...headers,
+              'Retry-After': resetInSeconds.toString(),
+            },
+          }
+        ),
+      };
     }
     
-    // Rate limit not exceeded, add headers to the request for downstream use
-    // Note: We can't directly add headers to the request, so we return null
-    // and the calling code should add these headers to the response
-    (req as any).rateLimitHeaders = headers;
-    
-    return null; // Continue to the actual handler
+    return { allowed: true, headers };
   };
 }
 
@@ -176,13 +189,10 @@ export function createRateLimiter(
  */
 export function addRateLimitHeaders(
   response: NextResponse,
-  req: NextRequest
+  headers: Record<string, string>
 ): NextResponse {
-  const headers = (req as any).rateLimitHeaders;
-  if (headers) {
-    Object.entries(headers).forEach(([key, value]) => {
-      response.headers.set(key, value as string);
-    });
-  }
+  Object.entries(headers).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
   return response;
 }
