@@ -1,3 +1,5 @@
+'use client'
+
 import { Upload, PenTool, Users, CheckCircle } from 'lucide-react'
 
 interface Step {
