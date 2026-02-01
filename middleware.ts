@@ -35,7 +35,7 @@ export function middleware(request: NextRequest) {
   ]
   response.headers.set('Content-Security-Policy', cspDirectives.join('; '))
 
-  // Previne clickjacking
+  // Previne clickjacking (redundante com frame-ancestors no CSP, mas mantido para navegadores legados)
   response.headers.set('X-Frame-Options', 'DENY')
 
   // Previne MIME type sniffing
