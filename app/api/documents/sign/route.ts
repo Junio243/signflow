@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PDFDocument, rgb } from 'pdf-lib'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { logAudit, extractIpFromRequest } from '@/lib/audit'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -295,6 +296,24 @@ export async function POST(request: NextRequest) {
     }
     console.log('✅ [SIGN API] Document record updated')
 
+    // Audit log: successful signature
+    const clientIp = extractIpFromRequest(request);
+    await logAudit({
+      action: 'document.sign',
+      resourceType: 'document',
+      resourceId: documentId,
+      status: 'success',
+      ip: clientIp,
+      userAgent: request.headers.get('user-agent') || undefined,
+      details: {
+        fileName: pdfFile.name,
+        hash: hash.substring(0, 16),
+        signatureType: signature?.type || 'drawn',
+        positionsCount: positions.length,
+        hasQrCode: true
+      }
+    });
+
     // 13. Retornar sucesso
     console.log('✅✅✅ [SIGN API] Document signed successfully!')
     return NextResponse.json({
@@ -312,6 +331,19 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('❌❌❌ [SIGN API] FATAL ERROR:', error)
     console.error('❌ [SIGN API] Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+    
+    // Audit log: signature failure
+    const clientIp = extractIpFromRequest(request);
+    await logAudit({
+      action: 'document.sign',
+      resourceType: 'document',
+      status: 'error',
+      ip: clientIp,
+      details: {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
+    });
+    
     return NextResponse.json(
       { 
         error: 'Failed to sign document', 
