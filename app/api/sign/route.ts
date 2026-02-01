@@ -24,6 +24,7 @@ import {
   QrPosition,
   QrPage,
 } from '@/lib/validation/documentSchemas';
+import { createRateLimiter, addRateLimitHeaders } from '@/lib/middleware/rateLimit';
 
 type SignerMetadata = {
   name: string;
@@ -183,7 +184,18 @@ function generateValidationText(
   return `Documento assinado digitalmente de acordo com a ICP-Brasil, MP 2.200-2/2001, no sistema SignFlow, por ${signerName}${regText}, certificado${serialText} em ${signatureDate} e pode ser validado em ${validateUrl}.${accessText}`;
 }
 
+// Rate limiter: max 20 requests per hour
+const rateLimiter = createRateLimiter('/api/sign', {
+  maxRequests: 20,
+  windowMs: 60 * 60 * 1000, // 1 hour
+  message: 'Limite de assinatura excedido. Máximo de 20 assinaturas por hora.',
+});
+
 export async function POST(req: NextRequest) {
+  // Apply rate limiting
+  const rateLimitResult = await rateLimiter(req);
+  if (!rateLimitResult.allowed) return rateLimitResult.response;
+
   try {
     const supabaseAdmin = getSupabaseAdmin(); // ← client dentro do handler
 
@@ -526,13 +538,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       ok: true,
       id,
       signed_pdf_url: pubSigned.data.publicUrl,
       qr_code_url: pubQr.data.publicUrl,
       validate_url: validateUrl,
     });
+    return addRateLimitHeaders(response, rateLimitResult.headers);
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }

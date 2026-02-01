@@ -31,3 +31,36 @@ Faça login com seu e‑mail para receber o link mágico, envie um PDF e uma ima
 
 ## 5) Observação legal (Brasil/DF)
 A assinatura gerada é uma **assinatura eletrônica simples**. Para atos formais com órgãos como **GDF/SEI‑DF**, costuma ser exigida assinatura **ICP‑Brasil (qualificada)**.
+
+## 6) Rate Limiting (Proteção contra Abuso)
+
+A aplicação implementa **rate limiting** nas APIs críticas para proteger contra abuso, força bruta e ataques DDoS:
+
+### Limites por Endpoint
+
+| Endpoint | Limite | Janela | Descrição |
+|----------|--------|--------|-----------|
+| `/api/upload` | 10 requests | 1 hora | Upload de documentos |
+| `/api/sign` | 20 requests | 1 hora | Assinatura de documentos |
+| `/api/validate/[id]` | 30 requests | 5 minutos | Validação de documentos |
+
+### Headers de Rate Limit
+
+Todas as respostas incluem os seguintes headers informativos:
+
+- `X-RateLimit-Limit`: Número máximo de requests permitidos
+- `X-RateLimit-Remaining`: Número de requests restantes na janela atual
+- `X-RateLimit-Reset`: Timestamp (em ms) de quando o limite será resetado
+- `Retry-After`: Segundos até poder tentar novamente (apenas em respostas 429)
+
+### Resposta ao Exceder o Limite
+
+Quando o limite é excedido, a API retorna:
+- **Status**: `429 Too Many Requests`
+- **Corpo**: `{ "error": "mensagem descritiva", "retryAfter": segundos }`
+- Violações são registradas nos logs para análise de segurança
+
+### Implementação
+
+O rate limiting usa cache em memória com limpeza automática de entradas expiradas. Para produção em escala, considere integrar com **Vercel KV** ou **Redis** para state compartilhado entre instâncias serverless.
+

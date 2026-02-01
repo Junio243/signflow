@@ -13,6 +13,7 @@ import {
   qrPositionSchema,
   qrPageSchema,
 } from '@/lib/validation/documentSchemas';
+import { createRateLimiter, addRateLimitHeaders } from '@/lib/middleware/rateLimit';
 import { logAudit, extractIpFromRequest } from '@/lib/audit';
 
 const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB
@@ -71,7 +72,18 @@ const parseJsonField = (
   }
 };
 
+// Rate limiter: max 10 requests per hour per IP
+const rateLimiter = createRateLimiter('/api/upload', {
+  maxRequests: 10,
+  windowMs: 60 * 60 * 1000, // 1 hour
+  message: 'Limite de upload excedido. Máximo de 10 uploads por hora.',
+});
+
 export async function POST(req: NextRequest) {
+  // Apply rate limiting
+  const rateLimitResult = await rateLimiter(req);
+  if (!rateLimitResult.allowed) return rateLimitResult.response;
+
   const reqId = randomUUID();
   const baseCtx = { reqId, route: 'POST /api/upload' };
 
@@ -421,7 +433,8 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    return NextResponse.json({ ok: true, id });
+    const response = NextResponse.json({ ok: true, id });
+    return addRateLimitHeaders(response, rateLimitResult.headers);
   } catch (e: any) {
     structuredLog('error', { reqId, route: 'POST /api/upload', event: 'unhandled_exception', error: String(e?.message || e), stack: e?.stack ? e.stack.split('\n').slice(0,5).join(' | ') : undefined });
     
