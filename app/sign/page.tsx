@@ -12,29 +12,18 @@ import type { Certificate } from '@/types/certificates'
 export default function SignPage() {
   const router = useRouter()
   
-  // Auth
   const [isLogged, setIsLogged] = useState(false)
   const [loading, setLoading] = useState(true)
-  
-  // Certificados
   const [certificates, setCertificates] = useState<Certificate[]>([])
   const [loadingCerts, setLoadingCerts] = useState(true)
-  
-  // Step 1: Upload
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  
-  // Step 2: Certificado
   const [selectedCertificateId, setSelectedCertificateId] = useState<string | null>(null)
   const [certificatePassword, setCertificatePassword] = useState('')
   const [validating, setValidating] = useState(false)
   const [validated, setValidated] = useState(false)
-  
-  // Step 3: Processamento
   const [signing, setSigning] = useState(false)
   const [signed, setSigned] = useState(false)
   const [signedDocumentUrl, setSignedDocumentUrl] = useState<string | null>(null)
-  
-  // Feedback
   const [feedback, setFeedback] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -69,18 +58,33 @@ export default function SignPage() {
     if (!supabase) return
 
     try {
+      console.log('🔍 Buscando certificados...')
+      
+      // Buscar TODOS os certificados (não só ativos)
       const { data, error: fetchError } = await supabase
         .from('certificates')
         .select('*')
-        .eq('is_active', true)
         .order('created_at', { ascending: false })
 
-      if (fetchError) throw fetchError
+      if (fetchError) {
+        console.error('❌ Erro ao buscar:', fetchError)
+        throw fetchError
+      }
 
-      setCertificates((data || []) as Certificate[])
+      console.log('✅ Certificados encontrados:', data?.length || 0)
+      console.log('Dados:', data)
+
+      // Filtrar apenas válidos (não expirados)
+      const validCerts = (data || []).filter(cert => {
+        const expiresAt = new Date(cert.expires_at)
+        return expiresAt > new Date()
+      })
+
+      console.log('✅ Certificados válidos:', validCerts.length)
+      setCertificates(validCerts as Certificate[])
     } catch (err) {
-      console.error('Erro ao buscar certificados:', err)
-      setError('Erro ao carregar certificados')
+      console.error('❌ Erro ao buscar certificados:', err)
+      setError('Erro ao carregar certificados: ' + (err instanceof Error ? err.message : 'Desconhecido'))
     } finally {
       setLoadingCerts(false)
     }
@@ -150,12 +154,11 @@ export default function SignPage() {
       const { data: { session } } = await supabase!.auth.getSession()
       if (!session) throw new Error('Sessão expirada')
 
-      // Converter arquivo para base64
       const fileBase64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = () => {
           const result = reader.result as string
-          resolve(result.split(',')[1]) // Remove o prefixo data:application/pdf;base64,
+          resolve(result.split(',')[1])
         }
         reader.onerror = reject
         reader.readAsDataURL(selectedFile)
@@ -172,7 +175,7 @@ export default function SignPage() {
           certificate_password: certificatePassword,
           document_name: selectedFile.name,
           document_base64: fileBase64,
-          signature_type: 'both', // Visual + Digital
+          signature_type: 'both',
         }),
       })
 
@@ -204,7 +207,6 @@ export default function SignPage() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
-      {/* Header */}
       <header className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/70 p-6 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 p-2.5">
@@ -224,7 +226,6 @@ export default function SignPage() {
         </Link>
       </header>
 
-      {/* Feedback */}
       {feedback && (
         <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
           <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
@@ -239,7 +240,6 @@ export default function SignPage() {
         </div>
       )}
 
-      {/* Step 1: Upload */}
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900 mb-4">1. Selecione o Documento</h2>
         <DocumentUpload
@@ -250,10 +250,19 @@ export default function SignPage() {
         />
       </section>
 
-      {/* Step 2: Certificado */}
       {selectedFile && (
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">2. Selecione o Certificado</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-slate-900">2. Selecione o Certificado</h2>
+            {certificates.length === 0 && !loadingCerts && (
+              <Link
+                href="/certificates/generate"
+                className="text-sm font-semibold text-brand-600 hover:text-brand-700"
+              >
+                + Gerar Certificado
+              </Link>
+            )}
+          </div>
           {loadingCerts ? (
             <p className="text-sm text-slate-500">Carregando certificados...</p>
           ) : (
@@ -272,7 +281,6 @@ export default function SignPage() {
         </section>
       )}
 
-      {/* Step 3: Assinar */}
       {selectedFile && validated && !signed && (
         <div className="flex justify-end rounded-2xl border border-brand-200 bg-brand-50 p-6">
           <button
@@ -295,7 +303,6 @@ export default function SignPage() {
         </div>
       )}
 
-      {/* Resultado */}
       {signed && signedDocumentUrl && (
         <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
           <div className="flex items-start gap-3 mb-4">
