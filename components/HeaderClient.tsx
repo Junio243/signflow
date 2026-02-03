@@ -6,8 +6,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import classNames from 'classnames'
-import { Building2, ChevronDown, LayoutDashboard, LogIn, LogOut, Menu, Settings, User, Shield } from 'lucide-react'
-// REMOVIDO: import NotificationBell from '../app/components/notifications/NotificationBell'
+import { 
+  Building2, 
+  ChevronDown, 
+  LayoutDashboard, 
+  LogIn, 
+  LogOut, 
+  Menu, 
+  Settings, 
+  User, 
+  Shield,
+  FileSignature,
+  History,
+  ShieldCheck
+} from 'lucide-react'
 
 import { supabase } from '@/lib/supabaseClient'
 
@@ -20,8 +32,6 @@ type SessionUser = {
 
 const NAV_LINKS = [
   { href: '/dashboard', label: 'Dashboard', requiresAuth: true },
-  { href: '/settings', label: 'Configurações', requiresAuth: true },
-  { href: '/orgs', label: 'Organizações', requiresAuth: true },
   { href: '/contato', label: 'Contato', requiresAuth: false },
 ]
 
@@ -87,12 +97,13 @@ export default function HeaderClient() {
 
   const handleAuth = useCallback(async () => {
     if (!supabase) {
-      alert('Serviço de autenticação indisponível. Configure as variáveis NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+      alert('Serviço de autenticação indisponível.')
       return
     }
     if (user) {
       await supabase.auth.signOut()
       setMenuOpen(false)
+      router.push('/')
       router.refresh()
       return
     }
@@ -176,9 +187,6 @@ export default function HeaderClient() {
             </span>
           )}
           
-          {/* REMOVIDO TEMPORARIAMENTE - NotificationBell causando erro React #130 */}
-          {/* {user && <NotificationBell />} */}
-          
           {user ? (
             <div className="relative" ref={dropdownRef}>
               <button
@@ -198,14 +206,19 @@ export default function HeaderClient() {
                   role="menu"
                   className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 text-sm shadow-xl"
                 >
-                  <HeaderMenuLink href="/dashboard" icon={<LayoutDashboard className="h-4 w-4" aria-hidden />}>Meus documentos</HeaderMenuLink>
-                  <HeaderMenuLink href="/settings" icon={<Settings className="h-4 w-4" aria-hidden />}>Meu perfil</HeaderMenuLink>
-                  <HeaderMenuLink href="/settings/certificates" icon={<Shield className="h-4 w-4" aria-hidden />}>Certificados</HeaderMenuLink>
+                  <HeaderMenuLink href="/dashboard" icon={<LayoutDashboard className="h-4 w-4" aria-hidden />}>Dashboard</HeaderMenuLink>
+                  <HeaderMenuLink href="/profile" icon={<User className="h-4 w-4" aria-hidden />}>Meu perfil</HeaderMenuLink>
+                  <HeaderMenuLink href="/certificates" icon={<Shield className="h-4 w-4" aria-hidden />}>Certificados</HeaderMenuLink>
+                  <HeaderMenuLink href="/sign" icon={<FileSignature className="h-4 w-4" aria-hidden />}>Assinar</HeaderMenuLink>
+                  <HeaderMenuLink href="/history" icon={<History className="h-4 w-4" aria-hidden />}>Histórico</HeaderMenuLink>
+                  <HeaderMenuLink href="/verify" icon={<ShieldCheck className="h-4 w-4" aria-hidden />}>Verificar</HeaderMenuLink>
                   <HeaderMenuLink href="/orgs" icon={<Building2 className="h-4 w-4" aria-hidden />}>Organizações</HeaderMenuLink>
+                  <HeaderMenuLink href="/settings" icon={<Settings className="h-4 w-4" aria-hidden />}>Configurações</HeaderMenuLink>
+                  <div className="my-1 border-t border-slate-200" />
                   <button
                     type="button"
                     onClick={handleAuth}
-                    className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
                     role="menuitem"
                   >
                     <LogOut className="h-4 w-4" aria-hidden />
@@ -258,18 +271,56 @@ export default function HeaderClient() {
                 )
               })}
               {user && (
-                <li>
-                  <Link
-                    href="/settings/certificates"
-                    className={classNames(
-                      'flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
-                      pathname === '/settings/certificates' && 'bg-slate-100 text-slate-900 font-semibold'
-                    )}
-                  >
-                    <Shield className="h-4 w-4" aria-hidden />
-                    Certificados
-                  </Link>
-                </li>
+                <>
+                  <li>
+                    <Link
+                      href="/certificates"
+                      className={classNames(
+                        'flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
+                        pathname === '/certificates' && 'bg-slate-100 text-slate-900 font-semibold'
+                      )}
+                    >
+                      <Shield className="h-4 w-4" aria-hidden />
+                      Certificados
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/sign"
+                      className={classNames(
+                        'flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
+                        pathname === '/sign' && 'bg-slate-100 text-slate-900 font-semibold'
+                      )}
+                    >
+                      <FileSignature className="h-4 w-4" aria-hidden />
+                      Assinar
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/history"
+                      className={classNames(
+                        'flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
+                        pathname === '/history' && 'bg-slate-100 text-slate-900 font-semibold'
+                      )}
+                    >
+                      <History className="h-4 w-4" aria-hidden />
+                      Histórico
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/verify"
+                      className={classNames(
+                        'flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
+                        pathname === '/verify' && 'bg-slate-100 text-slate-900 font-semibold'
+                      )}
+                    >
+                      <ShieldCheck className="h-4 w-4" aria-hidden />
+                      Verificar
+                    </Link>
+                  </li>
+                </>
               )}
               {!user && pathname === '/' && (
                 <li className="mt-4">
