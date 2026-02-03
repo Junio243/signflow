@@ -1,11 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
 import { 
   Shield, 
   RefreshCw, 
@@ -21,7 +16,6 @@ import {
   Trash2,
   Settings
 } from 'lucide-react';
-import { toast } from 'sonner';
 
 interface CertificateInfo {
   serialNumber: string;
@@ -38,10 +32,18 @@ export default function CertificatesPage() {
   const [certificate, setCertificate] = useState<CertificateInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     loadCertificate();
   }, []);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   async function loadCertificate() {
     try {
@@ -56,7 +58,7 @@ export default function CertificatesPage() {
       }
     } catch (error) {
       console.error('Erro ao carregar certificado:', error);
-      toast.error('Erro ao carregar certificado');
+      setToast({ message: 'Erro ao carregar certificado', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -74,14 +76,14 @@ export default function CertificatesPage() {
       const data = await response.json();
 
       if (data.success) {
-        toast.success(data.message);
+        setToast({ message: data.message, type: 'success' });
         await loadCertificate();
       } else {
-        toast.error(data.error || 'Erro ao executar ação');
+        setToast({ message: data.error || 'Erro ao executar ação', type: 'error' });
       }
     } catch (error) {
       console.error('Erro na ação:', error);
-      toast.error('Erro ao executar ação');
+      setToast({ message: 'Erro ao executar ação', type: 'error' });
     } finally {
       setActionLoading(null);
     }
@@ -104,8 +106,7 @@ export default function CertificatesPage() {
       return {
         icon: <AlertTriangle className="h-5 w-5" />,
         text: 'Expirado',
-        variant: 'destructive' as const,
-        color: 'text-red-600'
+        color: 'bg-red-100 text-red-800 border-red-300'
       };
     }
 
@@ -113,16 +114,14 @@ export default function CertificatesPage() {
       return {
         icon: <Clock className="h-5 w-5" />,
         text: 'Próximo do Vencimento',
-        variant: 'warning' as const,
-        color: 'text-yellow-600'
+        color: 'bg-yellow-100 text-yellow-800 border-yellow-300'
       };
     }
 
     return {
       icon: <CheckCircle2 className="h-5 w-5" />,
       text: 'Válido',
-      variant: 'default' as const,
-      color: 'text-green-600'
+      color: 'bg-green-100 text-green-800 border-green-300'
     };
   }
 
@@ -130,8 +129,8 @@ export default function CertificatesPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Carregando certificado...</p>
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">Carregando certificado...</p>
         </div>
       </div>
     );
@@ -141,116 +140,127 @@ export default function CertificatesPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-6xl">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
+          toast.type === 'success' ? 'bg-green-50 text-green-800 border border-green-300' : 'bg-red-50 text-red-800 border border-red-300'
+        }`}>
+          {toast.message}
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <Shield className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">Certificados Digitais</h1>
+          <Shield className="h-8 w-8 text-blue-600" />
+          <h1 className="text-3xl font-bold text-gray-900">Certificados Digitais</h1>
         </div>
-        <p className="text-muted-foreground">
+        <p className="text-gray-600">
           Gerencie os certificados auto-gerenciados do SignFlow para assinatura digital de PDFs
         </p>
       </div>
 
       {/* Status Alert */}
       {!certificate ? (
-        <Alert className="mb-6 border-yellow-200 bg-yellow-50">
-          <Info className="h-4 w-4 text-yellow-600" />
-          <AlertDescription className="text-yellow-800">
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex gap-3">
+          <Info className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+          <p className="text-yellow-800 text-sm">
             Nenhum certificado encontrado. Clique em "Inicializar Certificado" para gerar um novo automaticamente.
-          </AlertDescription>
-        </Alert>
+          </p>
+        </div>
       ) : certificate.isNearExpiry ? (
-        <Alert className="mb-6 border-yellow-200 bg-yellow-50">
-          <AlertTriangle className="h-4 w-4 text-yellow-600" />
-          <AlertDescription className="text-yellow-800">
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex gap-3">
+          <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+          <p className="text-yellow-800 text-sm">
             <strong>Atenção:</strong> Seu certificado vencerá em {certificate.daysUntilExpiry} dias. Considere renová-lo em breve.
-          </AlertDescription>
-        </Alert>
+          </p>
+        </div>
       ) : !certificate.isValid ? (
-        <Alert className="mb-6 border-red-200 bg-red-50">
-          <AlertTriangle className="h-4 w-4 text-red-600" />
-          <AlertDescription className="text-red-800">
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex gap-3">
+          <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <p className="text-red-800 text-sm">
             <strong>Certificado Expirado!</strong> Renove imediatamente para continuar assinando documentos.
-          </AlertDescription>
-        </Alert>
+          </p>
+        </div>
       ) : null}
 
-      <div className="grid gap-6">
+      <div className="space-y-6">
         {/* Certificate Info Card */}
-        <Card>
-          <CardHeader>
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+          <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
                   <FileKey className="h-5 w-5" />
                   Certificado Atual
-                </CardTitle>
-                <CardDescription>
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
                   Certificado auto-gerenciado ativo no sistema
-                </CardDescription>
+                </p>
               </div>
               {statusInfo && (
-                <Badge variant={statusInfo.variant} className="flex items-center gap-2">
+                <span className={`px-3 py-1 rounded-full text-sm font-medium border flex items-center gap-2 ${statusInfo.color}`}>
                   {statusInfo.icon}
                   {statusInfo.text}
-                </Badge>
+                </span>
               )}
             </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div className="p-6">
             {certificate ? (
               <div className="space-y-4">
                 {/* Serial Number */}
                 <div className="flex items-start gap-3">
-                  <Key className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <Key className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-muted-foreground">Número de Série</p>
-                    <p className="font-mono text-sm break-all">{certificate.serialNumber}</p>
+                    <p className="text-sm font-medium text-gray-600">Número de Série</p>
+                    <p className="font-mono text-sm break-all text-gray-900">{certificate.serialNumber}</p>
                   </div>
                 </div>
 
-                <Separator />
+                <div className="border-t border-gray-200" />
 
                 {/* Issuer */}
                 <div className="flex items-start gap-3">
-                  <Server className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <Server className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-muted-foreground">Emissor</p>
-                    <p className="text-sm">{certificate.issuer}</p>
+                    <p className="text-sm font-medium text-gray-600">Emissor</p>
+                    <p className="text-sm text-gray-900">{certificate.issuer}</p>
                   </div>
                 </div>
 
-                <Separator />
+                <div className="border-t border-gray-200" />
 
                 {/* Subject */}
                 <div className="flex items-start gap-3">
-                  <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <Shield className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-muted-foreground">Titular</p>
-                    <p className="text-sm">{certificate.subject}</p>
+                    <p className="text-sm font-medium text-gray-600">Titular</p>
+                    <p className="text-sm text-gray-900">{certificate.subject}</p>
                   </div>
                 </div>
 
-                <Separator />
+                <div className="border-t border-gray-200" />
 
                 {/* Validity Period */}
                 <div className="flex items-start gap-3">
-                  <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <Calendar className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-muted-foreground">Período de Validade</p>
+                    <p className="text-sm font-medium text-gray-600">Período de Validade</p>
                     <div className="space-y-1 mt-1">
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Início:</span>
-                        <span className="font-medium">{formatDate(certificate.validFrom)}</span>
+                        <span className="text-gray-600">Início:</span>
+                        <span className="font-medium text-gray-900">{formatDate(certificate.validFrom)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Vencimento:</span>
-                        <span className="font-medium">{formatDate(certificate.validUntil)}</span>
+                        <span className="text-gray-600">Vencimento:</span>
+                        <span className="font-medium text-gray-900">{formatDate(certificate.validUntil)}</span>
                       </div>
-                      <div className="flex justify-between text-sm pt-2 border-t">
-                        <span className="text-muted-foreground">Dias restantes:</span>
-                        <span className={`font-bold ${statusInfo?.color}`}>
+                      <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
+                        <span className="text-gray-600">Dias restantes:</span>
+                        <span className={`font-bold ${
+                          certificate.isValid ? (certificate.isNearExpiry ? 'text-yellow-600' : 'text-green-600') : 'text-red-600'
+                        }`}>
                           {certificate.daysUntilExpiry} dias
                         </span>
                       </div>
@@ -260,119 +270,117 @@ export default function CertificatesPage() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <FileKey className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">
+                <FileKey className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 mb-4">
                   Nenhum certificado configurado
                 </p>
-                <Button 
+                <button 
                   onClick={() => handleAction('initialize')}
                   disabled={actionLoading === 'initialize'}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
                 >
                   {actionLoading === 'initialize' ? (
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    <RefreshCw className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Shield className="h-4 w-4 mr-2" />
+                    <Shield className="h-4 w-4" />
                   )}
                   Inicializar Certificado
-                </Button>
+                </button>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Actions Card */}
         {certificate && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
                 <Settings className="h-5 w-5" />
                 Ações
-              </CardTitle>
-              <CardDescription>
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
                 Gerencie e mantenha seu certificado digital
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </p>
+            </div>
+            <div className="p-6">
               <div className="grid gap-3 sm:grid-cols-2">
                 {/* Renovar Certificado */}
-                <Button 
-                  variant="outline"
-                  className="justify-start h-auto py-4"
+                <button 
                   onClick={() => handleAction('renew')}
                   disabled={!!actionLoading}
+                  className="border border-gray-300 rounded-lg p-4 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-left"
                 >
-                  <div className="flex items-start gap-3 text-left w-full">
+                  <div className="flex items-start gap-3">
                     {actionLoading === 'renew' ? (
                       <RefreshCw className="h-5 w-5 animate-spin flex-shrink-0 mt-0.5" />
                     ) : (
                       <RefreshCw className="h-5 w-5 flex-shrink-0 mt-0.5" />
                     )}
                     <div>
-                      <p className="font-medium">Renovar Certificado</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="font-medium text-gray-900">Renovar Certificado</p>
+                      <p className="text-xs text-gray-600 mt-1">
                         Gera um novo certificado e desativa o atual
                       </p>
                     </div>
                   </div>
-                </Button>
+                </button>
 
                 {/* Limpar Cache */}
-                <Button 
-                  variant="outline"
-                  className="justify-start h-auto py-4"
+                <button 
                   onClick={() => handleAction('clear-cache')}
                   disabled={!!actionLoading}
+                  className="border border-gray-300 rounded-lg p-4 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-left"
                 >
-                  <div className="flex items-start gap-3 text-left w-full">
+                  <div className="flex items-start gap-3">
                     {actionLoading === 'clear-cache' ? (
                       <RefreshCw className="h-5 w-5 animate-spin flex-shrink-0 mt-0.5" />
                     ) : (
                       <Trash2 className="h-5 w-5 flex-shrink-0 mt-0.5" />
                     )}
                     <div>
-                      <p className="font-medium">Limpar Cache</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="font-medium text-gray-900">Limpar Cache</p>
+                      <p className="text-xs text-gray-600 mt-1">
                         Força recarregamento do certificado do banco
                       </p>
                     </div>
                   </div>
-                </Button>
+                </button>
 
                 {/* Recarregar Info */}
-                <Button 
-                  variant="outline"
-                  className="justify-start h-auto py-4"
+                <button 
                   onClick={loadCertificate}
                   disabled={loading}
+                  className="border border-gray-300 rounded-lg p-4 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-left"
                 >
-                  <div className="flex items-start gap-3 text-left w-full">
+                  <div className="flex items-start gap-3">
                     {loading ? (
                       <RefreshCw className="h-5 w-5 animate-spin flex-shrink-0 mt-0.5" />
                     ) : (
                       <Download className="h-5 w-5 flex-shrink-0 mt-0.5" />
                     )}
                     <div>
-                      <p className="font-medium">Atualizar Informações</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="font-medium text-gray-900">Atualizar Informações</p>
+                      <p className="text-xs text-gray-600 mt-1">
                         Recarrega os dados do certificado
                       </p>
                     </div>
                   </div>
-                </Button>
+                </button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
         {/* Info Card */}
-        <Card className="border-blue-200 bg-blue-50/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-blue-900">
+        <div className="bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+          <div className="p-6 border-b border-blue-200">
+            <h2 className="text-xl font-semibold text-blue-900 flex items-center gap-2">
               <Info className="h-5 w-5" />
               Sobre os Certificados Auto-Gerenciados
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-blue-800">
+            </h2>
+          </div>
+          <div className="p-6 space-y-3 text-sm text-blue-800">
             <div className="flex gap-3">
               <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-blue-600" />
               <p>
@@ -397,14 +405,13 @@ export default function CertificatesPage() {
                 <strong>Validade:</strong> Certificados têm validade de 10 anos e podem ser renovados a qualquer momento.
               </p>
             </div>
-            <Separator className="bg-blue-200" />
-            <div className="pt-2">
+            <div className="border-t border-blue-200 pt-3">
               <p className="text-xs">
                 <strong>Nota:</strong> Para uso com certificados ICP-Brasil (e-CPF/e-CNPJ), configure manualmente no arquivo .env.local.
               </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
