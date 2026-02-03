@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { PDFDocument } from 'pdf-lib';
 import QRCode from 'qrcode';
+import { signPdfComplete, isCertificateConfigured } from '@/lib/digitalSignature';
 
 const supabaseAdmin = getSupabaseAdmin();
 
@@ -196,12 +197,32 @@ async function signDocument(
       maxWidth: pageWidth - 130
     });
 
-    const signedPdfBytes = await pdfDoc.save();
+    // Salvar PDF com assinaturas visuais e QR Code
+    let finalPdfBytes = await pdfDoc.save();
+
+    // ✨ NOVO: Adicionar assinatura digital PKI se certificado estiver configurado
+    const hasCertificate = isCertificateConfigured();
+    if (hasCertificate) {
+      try {
+        console.log(`🔐 Aplicando assinatura digital PKI no documento ${document.id}...`);
+        finalPdfBytes = await signPdfComplete(Buffer.from(finalPdfBytes), {
+          reason: 'Documento assinado digitalmente via SignFlow (Lote)',
+          contactInfo: 'suporte@signflow.com',
+          name: signerName || 'SignFlow Digital Signature',
+          location: 'SignFlow Platform',
+        });
+        console.log(`✅ Assinatura digital PKI aplicada no documento ${document.id}`);
+      } catch (certError) {
+        console.warn(`⚠️ Erro ao aplicar assinatura digital PKI no documento ${document.id}:`, certError);
+        console.warn('📝 Continuando sem assinatura digital (apenas visual + QR Code)');
+      }
+    }
+
     const signedFileName = `signed/${document.id}_${Date.now()}.pdf`;
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from('signflow')
-      .upload(signedFileName, signedPdfBytes, {
+      .upload(signedFileName, finalPdfBytes, {
         contentType: 'application/pdf',
         upsert: true
       });
@@ -240,7 +261,8 @@ async function signDocument(
 
     return {
       signedPdfUrl: urlData.publicUrl,
-      validateUrl
+      validateUrl,
+      digitalSignatureApplied: hasCertificate
     };
 
   } catch (error) {
