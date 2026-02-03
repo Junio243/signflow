@@ -1,96 +1,116 @@
 #!/bin/bash
 
-# Script para gerar certificado digital auto-assinado para desenvolvimento
-# Para produção, use certificados de uma CA confiável (ICP-Brasil, GlobalSign, etc.)
+# Script para gerar certificado digital P12/PFX para assinatura de PDFs
+# Uso: npm run generate-certificate
 
 set -e
 
-echo "🔐 Gerando Certificado Digital para SignFlow"
-echo "============================================="
+echo "====================================="
+echo "🔐 Gerador de Certificado Digital PKI"
+echo "====================================="
 echo ""
 
-# Criar pasta de certificados se não existir
-mkdir -p certificates
-
-# Configurações do certificado
-COUNTRY="BR"
-STATE="Sao Paulo"
-CITY="Sao Paulo"
-ORGANIZATION="SignFlow"
-ORGANIZATIONAL_UNIT="Digital Signature"
-COMMON_NAME="SignFlow Certificate"
-EMAIL="suporte@signflow.com"
-VALIDITY_DAYS=3650  # 10 anos
-PASSWORD="signflow2026"
-
-echo "📝 Configurações:"
-echo "   País: $COUNTRY"
-echo "   Estado: $STATE"
-echo "   Cidade: $CITY"
-echo "   Organização: $ORGANIZATION"
-echo "   Nome Comum: $COMMON_NAME"
-echo "   Validade: $VALIDITY_DAYS dias ($(($VALIDITY_DAYS / 365)) anos)"
-echo "   Senha: $PASSWORD"
-echo ""
-
-# Verificar se OpenSSL está instalado
-if ! command -v openssl &> /dev/null; then
-    echo "❌ Erro: OpenSSL não está instalado"
-    echo "   Instale com: brew install openssl (macOS) ou apt-get install openssl (Linux)"
-    exit 1
+# Cria diretório de certificados se não existir
+if [ ! -d "certificates" ]; then
+  echo "📁 Criando diretório certificates/..."
+  mkdir -p certificates
 fi
 
-echo "1️⃣ Gerando chave privada RSA (2048 bits)..."
+# Verifica se OpenSSL está instalado
+if ! command -v openssl &> /dev/null; then
+  echo "❌ Erro: OpenSSL não está instalado."
+  echo "💻 Instale o OpenSSL:"
+  echo "   - macOS: brew install openssl"
+  echo "   - Ubuntu/Debian: sudo apt-get install openssl"
+  echo "   - Windows: https://slproweb.com/products/Win32OpenSSL.html"
+  exit 1
+fi
+
+echo "✅ OpenSSL encontrado: $(openssl version)"
+echo ""
+
+# Coleta informações do usuário
+read -p "🇧🇷 País (default: BR): " COUNTRY
+COUNTRY=${COUNTRY:-BR}
+
+read -p "📍 Estado (default: Sao Paulo): " STATE
+STATE=${STATE:-Sao Paulo}
+
+read -p "🌆 Cidade (default: Sao Paulo): " CITY
+CITY=${CITY:-Sao Paulo}
+
+read -p "🏢 Organização (default: SignFlow): " ORG
+ORG=${ORG:-SignFlow}
+
+read -p "👥 Departamento (default: Digital Signature): " DEPT
+DEPT=${DEPT:-Digital Signature}
+
+read -p "👤 Nome Comum/CN (default: SignFlow Certificate): " CN
+CN=${CN:-SignFlow Certificate}
+
+read -sp "🔑 Senha do certificado (min 4 caracteres): " PASSWORD
+echo ""
+
+if [ ${#PASSWORD} -lt 4 ]; then
+  echo "❌ Erro: Senha deve ter pelo menos 4 caracteres"
+  exit 1
+fi
+
+echo ""
+echo "🔧 Gerando certificado digital..."
+echo ""
+
+# 1. Gerar chave privada RSA 2048 bits
+echo "1/3 Gerando chave privada RSA..."
 openssl genrsa -out certificates/private-key.pem 2048 2>/dev/null
-echo "   ✅ Chave privada criada: certificates/private-key.pem"
-echo ""
+echo "✅ Chave privada gerada: certificates/private-key.pem"
 
-echo "2️⃣ Criando certificado auto-assinado X.509..."
-openssl req -new -x509 \
-  -key certificates/private-key.pem \
+# 2. Criar certificado auto-assinado (válido por 10 anos)
+echo ""
+echo "2/3 Criando certificado auto-assinado..."
+openssl req -new -x509 -key certificates/private-key.pem \
   -out certificates/certificate.pem \
-  -days $VALIDITY_DAYS \
-  -subj "/C=$COUNTRY/ST=$STATE/L=$CITY/O=$ORGANIZATION/OU=$ORGANIZATIONAL_UNIT/CN=$COMMON_NAME/emailAddress=$EMAIL" \
-  2>/dev/null
-echo "   ✅ Certificado criado: certificates/certificate.pem"
-echo ""
+  -days 3650 \
+  -subj "/C=$COUNTRY/ST=$STATE/L=$CITY/O=$ORG/OU=$DEPT/CN=$CN" 2>/dev/null
+echo "✅ Certificado criado: certificates/certificate.pem"
 
-echo "3️⃣ Convertendo para formato P12/PFX..."
+# 3. Converter para formato P12/PFX
+echo ""
+echo "3/3 Convertendo para formato P12/PFX..."
 openssl pkcs12 -export \
   -out certificates/certificate.p12 \
   -inkey certificates/private-key.pem \
   -in certificates/certificate.pem \
-  -password pass:$PASSWORD \
-  2>/dev/null
-echo "   ✅ Certificado P12 criado: certificates/certificate.p12"
-echo ""
+  -password pass:$PASSWORD 2>/dev/null
+echo "✅ Certificado P12 gerado: certificates/certificate.p12"
 
-echo "4️⃣ Extraindo informações do certificado..."
-CERT_INFO=$(openssl x509 -in certificates/certificate.pem -noout -subject -dates 2>/dev/null)
-echo "$CERT_INFO"
 echo ""
-
-echo "✨ Certificado gerado com sucesso!"
+echo "====================================="
+echo "✅ Certificado gerado com sucesso!"
+echo "====================================="
 echo ""
-echo "📂 Arquivos criados:"
-echo "   - certificates/private-key.pem    (Chave privada)"
-echo "   - certificates/certificate.pem    (Certificado X.509)"
-echo "   - certificates/certificate.p12    (Certificado P12 para uso)"
+echo "📄 Arquivos gerados:"
+echo "   - certificates/private-key.pem    (chave privada)"
+echo "   - certificates/certificate.pem    (certificado X.509)"
+echo "   - certificates/certificate.p12    (certificado P12 - usar este!)"
 echo ""
-echo "🔧 Próximos passos:"
-echo "   1. Configure a variável de ambiente no .env.local:"
-echo "      CERTIFICATE_PASSWORD=$PASSWORD"
+echo "🔑 Senha do certificado: [OCULTA]"
 echo ""
-echo "   2. Reinicie o servidor Next.js:"
-echo "      npm run dev"
+echo "⚠️  IMPORTANTE:"
+echo "   1. Adicione a senha ao arquivo .env.local:"
+echo "      CERTIFICATE_PASSWORD=sua_senha_aqui"
 echo ""
-echo "⚠️  Nota: Este é um certificado AUTO-ASSINADO para desenvolvimento"
-echo "   Para produção, adquira um certificado de uma CA confiável:"
-echo "   - ICP-Brasil (e-CPF, e-CNPJ): https://www.gov.br/iti/pt-br/assuntos/icp-brasil"
-echo "   - GlobalSign: https://www.globalsign.com"
-echo "   - DigiCert: https://www.digicert.com"
+echo "   2. NUNCA commite os arquivos de certificado para o Git!"
+echo "      (Já está configurado no .gitignore)"
 echo ""
-echo "🔒 O Adobe Reader exibirá aviso 'certificado não confiável' até que você:"
-echo "   - Adicione o certificado à lista de certificados confiáveis do Adobe"
-echo "   - Ou use um certificado de CA confiável em produção"
+echo "   3. Para produção, use um certificado de CA confiável:"
+echo "      - Brasil: ICP-Brasil (e-CPF, e-CNPJ)"
+echo "      - Internacional: GlobalSign, DigiCert, Sectigo"
 echo ""
+echo "📦 Próximos passos:"
+echo "   1. Configure a senha no .env.local"
+echo "   2. Teste assinando um documento"
+echo "   3. Abra o PDF no Adobe Reader para validar"
+echo ""
+echo "📚 Documentação completa: docs/DIGITAL_SIGNATURE.md"
+echo "====================================="
