@@ -3,8 +3,8 @@ import { PDFDocument } from 'pdf-lib'
 import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +12,12 @@ export async function POST(request: NextRequest) {
 
     if (!document_base64) {
       return NextResponse.json(
-        { error: 'Documento não fornecido' },
+        { 
+          isValid: false,
+          isSigned: false,
+          message: 'Nenhum documento foi fornecido para verificação.',
+          error: 'Documento não fornecido'
+        },
         { status: 400 }
       )
     }
@@ -20,26 +25,49 @@ export async function POST(request: NextRequest) {
     console.log('🔍 Iniciando verificação de assinatura...')
 
     // 1. Decodificar PDF
-    const pdfBuffer = Buffer.from(document_base64, 'base64')
-    const pdfDoc = await PDFDocument.load(pdfBuffer)
+    let pdfBuffer: Buffer
+    let pdfDoc: any
+
+    try {
+      pdfBuffer = Buffer.from(document_base64, 'base64')
+      pdfDoc = await PDFDocument.load(pdfBuffer)
+    } catch (err) {
+      return NextResponse.json({
+        isValid: false,
+        isSigned: false,
+        message: 'O arquivo enviado não é um PDF válido ou está corrompido.',
+        error: 'Arquivo inválido'
+      })
+    }
 
     // 2. Extrair texto do PDF (buscar assinatura visual)
     const pages = pdfDoc.getPages()
     let hasVisualSignature = false
     let signatureText = ''
 
-    // Verificar se tem texto "Assinado digitalmente por" (da assinatura visual)
+    // Verificar se tem texto "Assinado digitalmente por" ou "SignFlow"
     try {
-      const lastPage = pages[pages.length - 1]
-      const textContent = await lastPage.getTextContent()
-      const pageText = textContent?.items?.map((item: any) => item.str).join(' ') || ''
-      
-      if (pageText.includes('Assinado digitalmente por') || pageText.includes('SignFlow')) {
-        hasVisualSignature = true
-        signatureText = pageText
+      for (const page of pages) {
+        try {
+          const textContent = await page.getTextContent?.()
+          if (textContent) {
+            const pageText = textContent?.items?.map((item: any) => item.str).join(' ') || ''
+            
+            if (pageText.includes('Assinado digitalmente por') || 
+                pageText.includes('SignFlow') ||
+                pageText.includes('Documento assinado digitalmente')) {
+              hasVisualSignature = true
+              signatureText = pageText
+              break
+            }
+          }
+        } catch (pageErr) {
+          // Página sem conteúdo de texto
+          continue
+        }
       }
     } catch (err) {
-      console.log('Não foi possível extrair texto do PDF')
+      console.log('⚠️ Não foi possível extrair texto do PDF')
     }
 
     // 3. Calcular hash do documento
@@ -49,19 +77,29 @@ export async function POST(request: NextRequest) {
     console.log('✅ Assinatura visual encontrada:', hasVisualSignature)
 
     // 4. Buscar no banco se existe registro desta assinatura
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    // Se Supabase não estiver configurado, apenas verifica marca visual
+    let signatures = null
 
-    const { data: signatures, error: dbError } = await supabase
-      .from('signatures')
-      .select('*')
-      .eq('document_hash', documentHash)
-      .eq('status', 'completed')
+    if (supabaseUrl && supabaseServiceKey) {
+      try {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    if (dbError) {
-      console.error('Erro ao buscar no banco:', dbError)
+        const { data, error: dbError } = await supabase
+          .from('signatures')
+          .select('*')
+          .eq('document_hash', documentHash)
+          .eq('status', 'completed')
+
+        if (dbError) {
+          console.error('⚠️ Erro ao buscar no banco:', dbError)
+        } else {
+          signatures = data
+          console.log('📄 Assinaturas encontradas no banco:', signatures?.length || 0)
+        }
+      } catch (dbErr) {
+        console.error('⚠️ Erro ao conectar com banco:', dbErr)
+      }
     }
-
-    console.log('📄 Assinaturas encontradas no banco:', signatures?.length || 0)
 
     // 5. Se encontrou no banco, é válido
     if (signatures && signatures.length > 0) {
@@ -71,13 +109,14 @@ export async function POST(request: NextRequest) {
         isValid: true,
         isSigned: true,
         signatureData: {
-          signerName: signature.signature_data?.signerName || 'N/A',
-          signerEmail: signature.signature_data?.signerEmail || 'N/A',
-          certificateIssuer: signature.signature_data?.certificateIssuer || 'N/A',
-          timestamp: signature.signed_at,
+          signerName: signature.signature_data?.signerName || signature.signer_name || 'N/A',
+          signerEmail: signature.signature_data?.signerEmail || signature.signer_email || 'N/A',
+          certificateIssuer: signature.signature_data?.certificateIssuer || 'SignFlow',
+          timestamp: signature.signed_at || signature.created_at,
           signatureAlgorithm: signature.signature_data?.signatureAlgorithm || 'RSA-SHA256',
           documentHash: signature.document_hash,
         },
+        message: 'Documento autenticado! Assinatura digital válida e verificada.'
       })
     }
 
@@ -87,7 +126,7 @@ export async function POST(request: NextRequest) {
         isValid: false,
         isSigned: true,
         signatureData: null,
-        message: 'Documento possui marca de assinatura, mas não foi possível validar completamente.',
+        message: 'Este documento possui uma marca de assinatura do SignFlow, mas não foi possível validar sua autenticidade no banco de dados. O documento pode ter sido assinado em uma versão antiga do sistema ou a assinatura pode ter sido adulterada.',
       })
     }
 
@@ -96,13 +135,19 @@ export async function POST(request: NextRequest) {
       isValid: false,
       isSigned: false,
       signatureData: null,
-      message: 'Documento não contém assinatura digital.',
+      message: 'Este documento NÃO foi assinado digitalmente pelo SignFlow. Não foram encontradas marcas de assinatura digital no arquivo.',
     })
   } catch (error) {
-    console.error('Erro ao verificar assinatura:', error)
-    return NextResponse.json(
-      { error: 'Erro ao verificar assinatura: ' + (error instanceof Error ? error.message : 'Desconhecido') },
-      { status: 500 }
-    )
+    console.error('❌ Erro ao verificar assinatura:', error)
+    
+    // Erro genérico mais amigável
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+    
+    return NextResponse.json({
+      isValid: false,
+      isSigned: false,
+      message: 'Ocorreu um erro ao tentar verificar o documento. Por favor, certifique-se de que o arquivo está no formato PDF e tente novamente.',
+      error: errorMessage
+    }, { status: 500 })
   }
 }
