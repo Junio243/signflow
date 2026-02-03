@@ -1,28 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import forge from 'node-forge'
 import type { GenerateCertificatePayload } from '@/types/certificates'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 /**
  * API: Gerar Certificado Auto-Assinado (Self-Signed)
  * Método: POST
  * Body: GenerateCertificatePayload
- * 
- * Gera um par de chaves RSA + certificado X.509 auto-assinado
- * Empacota em formato PKCS#12 (.p12)
- * Armazena no Supabase Storage criptografado
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    // Pegar token do header Authorization
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: 'Não autenticado - Token não fornecido' },
+        { status: 401 }
+      )
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+    
+    // Criar cliente Supabase
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
+    })
 
     // Verificar autenticação
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    
+    if (authError || !user) {
       return NextResponse.json(
-        { error: 'Não autenticado' },
+        { error: 'Não autenticado - Token inválido' },
         { status: 401 }
       )
     }
@@ -49,7 +66,7 @@ export async function POST(request: NextRequest) {
       .from('certificate_profiles')
       .select('*')
       .eq('id', payload.profile_id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single()
 
     if (profileError || !profile) {
@@ -64,24 +81,23 @@ export async function POST(request: NextRequest) {
     // 1. Gerar par de chaves RSA
     const keypair = forge.pki.rsa.generateKeyPair({
       bits: payload.key_strength || 2048,
-      workers: -1, // Usar todos os workers disponíveis
+      workers: -1,
     })
 
-    console.log('✅ Par de chaves gerado com sucesso')
+    console.log('✅ Par de chaves gerado')
 
     // 2. Criar certificado X.509
     const cert = forge.pki.createCertificate()
     cert.publicKey = keypair.publicKey
     cert.serialNumber = '01' + crypto.randomBytes(8).toString('hex')
     
-    // Validade
     const validityYears = payload.validity_years || 5
     const now = new Date()
     cert.validity.notBefore = now
     cert.validity.notAfter = new Date()
     cert.validity.notAfter.setFullYear(now.getFullYear() + validityYears)
 
-    // 3. Subject (titular do certificado)
+    // 3. Subject
     const subjectData = payload.subject_data || {}
     const subjectAttrs = [
       { name: 'commonName', value: subjectData.commonName || profile.profile_name },
@@ -89,10 +105,10 @@ export async function POST(request: NextRequest) {
       { name: 'countryName', value: subjectData.country || 'BR' },
     ]
 
-    if (subjectData.emailAddress || session.user.email) {
+    if (subjectData.emailAddress || user.email) {
       subjectAttrs.push({
         name: 'emailAddress',
-        value: subjectData.emailAddress || session.user.email || '',
+        value: subjectData.emailAddress || user.email || '',
       })
     }
 
@@ -105,46 +121,27 @@ export async function POST(request: NextRequest) {
     }
 
     cert.setSubject(subjectAttrs)
-    cert.setIssuer(subjectAttrs) // Auto-assinado (issuer = subject)
+    cert.setIssuer(subjectAttrs)
 
-    // 4. Extensões do certificado
+    // 4. Extensões
     cert.setExtensions([
-      {
-        name: 'basicConstraints',
-        cA: false,
-      },
-      {
-        name: 'keyUsage',
-        digitalSignature: true,
-        nonRepudiation: true,
-        keyEncipherment: true,
-      },
-      {
-        name: 'extKeyUsage',
-        serverAuth: false,
-        clientAuth: true,
-        codeSigning: false,
-        emailProtection: true,
-      },
-      {
-        name: 'subjectKeyIdentifier',
-      },
+      { name: 'basicConstraints', cA: false },
+      { name: 'keyUsage', digitalSignature: true, nonRepudiation: true, keyEncipherment: true },
+      { name: 'extKeyUsage', serverAuth: false, clientAuth: true, codeSigning: false, emailProtection: true },
+      { name: 'subjectKeyIdentifier' },
     ])
 
-    // 5. Assinar o certificado (self-signed)
+    // 5. Assinar
     cert.sign(keypair.privateKey, forge.md.sha256.create())
 
-    console.log('✅ Certificado X.509 criado e assinado')
+    console.log('✅ Certificado X.509 criado')
 
-    // 6. Criar PKCS#12 (.p12)
+    // 6. Criar PKCS#12
     const p12Asn1 = forge.pkcs12.toPkcs12Asn1(
       keypair.privateKey,
       cert,
       payload.password,
-      {
-        algorithm: '3des', // Algoritmo de criptografia
-        friendlyName: payload.certificate_name,
-      }
+      { algorithm: '3des', friendlyName: payload.certificate_name }
     )
 
     const p12Der = forge.asn1.toDer(p12Asn1).getBytes()
@@ -152,8 +149,8 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ PKCS#12 gerado:', p12Buffer.length, 'bytes')
 
-    // 7. Upload para Supabase Storage
-    const fileName = `${session.user.id}/${crypto.randomUUID()}.p12`
+    // 7. Upload
+    const fileName = `${user.id}/${crypto.randomUUID()}.p12`
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('certificates')
       .upload(fileName, p12Buffer, {
@@ -171,7 +168,7 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Certificado armazenado:', uploadData.path)
 
-    // 8. Criptografar senha (AES-256)
+    // 8. Criptografar senha
     const encryptionKey = process.env.CERTIFICATE_ENCRYPTION_KEY
     if (!encryptionKey) {
       throw new Error('CERTIFICATE_ENCRYPTION_KEY não configurada')
@@ -185,17 +182,17 @@ export async function POST(request: NextRequest) {
     encryptedPassword += cipher.final('hex')
     const encryptedPasswordWithIv = iv.toString('hex') + ':' + encryptedPassword
 
-    // 9. Desativar outros certificados ativos
+    // 9. Desativar outros certificados
     await supabase
       .from('certificates')
       .update({ is_active: false })
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
 
-    // 10. Salvar no banco de dados
+    // 10. Salvar no banco
     const { data: newCert, error: dbError } = await supabase
       .from('certificates')
       .insert({
-        user_id: session.user.id,
+        user_id: user.id,
         profile_id: payload.profile_id,
         certificate_name: payload.certificate_name,
         certificate_type: 'auto',
@@ -221,17 +218,14 @@ export async function POST(request: NextRequest) {
 
     if (dbError) {
       console.error('Erro ao salvar no banco:', dbError)
-      
-      // Tentar deletar o arquivo do storage
       await supabase.storage.from('certificates').remove([uploadData.path])
-      
       return NextResponse.json(
         { error: 'Erro ao salvar certificado no banco: ' + dbError.message },
         { status: 500 }
       )
     }
 
-    console.log('✅ Certificado salvo no banco:', newCert.id)
+    console.log('✅ Certificado salvo:', newCert.id)
 
     return NextResponse.json({
       success: true,
@@ -241,9 +235,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Erro ao gerar certificado:', error)
     return NextResponse.json(
-      { 
-        error: 'Erro ao gerar certificado: ' + (error instanceof Error ? error.message : 'Erro desconhecido') 
-      },
+      { error: 'Erro ao gerar certificado: ' + (error instanceof Error ? error.message : 'Erro desconhecido') },
       { status: 500 }
     )
   }
