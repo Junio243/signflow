@@ -26,6 +26,7 @@ import {
 } from '@/lib/validation/documentSchemas';
 import { createRateLimiter, addRateLimitHeaders } from '@/lib/middleware/rateLimit';
 import { signPdfComplete, isCertificateConfigured } from '@/lib/digitalSignature';
+import crypto from 'crypto';
 
 type SignerMetadata = {
   name: string;
@@ -429,12 +430,55 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let finalPdfBytes = await pdfDoc.save();
+    // Adicionar página final com informações de assinatura
+    const lastPage = pdfDoc.addPage();
+    const lastPageWidth = lastPage.getWidth();
+    const lastPageHeight = lastPage.getHeight();
+    const marginPage = 50;
+    let currentY = lastPageHeight - marginPage;
 
-    // ✨ NOVO: Adicionar assinatura digital PKI
-    const hasCertificate = isCertificateConfigured();
-    if (hasCertificate) {
-      try {
+    // Título
+    const titleFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    lastPage.drawText('Assinado digitalmente por:', {
+      x: marginPage,
+      y: currentY,
+      size: 12,
+      font: titleFont,
+      color: rgb(0, 0, 0),
+    });
+    currentY -= 30;
+
+    // Nome do assinante
+    lastPage.drawText(firstSigner.name, {
+      x: marginPage,
+      y: currentY,
+      size: 14,
+      font: titleFont,
+      color: rgb(0, 0, 0),
+    });
+    currentY -= 25;
+
+    // Data
+    lastPage.drawText(`Data: ${new Date().toLocaleString('pt-BR')}`, {
+      x: marginPage,
+      y: currentY,
+      size: 10,
+      font: font,
+      color: rgb(0, 0, 0),
+    });
+    currentY -= 40;
+
+    let finalPdfBytes = await pdfDoc.save();
+    
+    // Calcular hash do documento
+    const documentHash = crypto.createHash('sha256').update(finalPdfBytes).digest('hex');
+
+    // ✨ Aplicar assinatura digital PKI (se disponível)
+    let hasCertificate = false;
+    try {
+      hasCertificate = await isCertificateConfigured();
+      
+      if (hasCertificate) {
         console.log('🔐 Aplicando assinatura digital PKI...');
         finalPdfBytes = await signPdfComplete(Buffer.from(finalPdfBytes), {
           reason: 'Documento assinado digitalmente via SignFlow',
@@ -443,12 +487,13 @@ export async function POST(req: NextRequest) {
           location: 'SignFlow Platform',
         });
         console.log('✅ Assinatura digital PKI aplicada com sucesso!');
-      } catch (certError) {
-        console.warn('⚠️ Erro ao aplicar assinatura digital PKI:', certError);
-        console.warn('📝 Continuando sem assinatura digital (apenas visual + QR Code)');
+      } else {
+        console.log('ℹ️ Certificado digital não configurado. PDF assinado apenas com assinatura visual.');
       }
-    } else {
-      console.log('ℹ️ Certificado digital não configurado. PDF assinado apenas com assinatura visual e QR Code.');
+    } catch (certError) {
+      console.warn('⚠️ Erro ao aplicar assinatura digital PKI:', certError);
+      console.warn('📝 Continuando sem assinatura PKI (apenas visual + QR Code)');
+      hasCertificate = false;
     }
 
     const upSigned = await supabaseAdmin.storage
@@ -503,6 +548,35 @@ export async function POST(req: NextRequest) {
     }
 
     const nowIso = new Date().toISOString();
+    
+    // Salvar assinatura na tabela signatures
+    const signatureData = {
+      document_id: id,
+      document_hash: documentHash,
+      signer_name: firstSigner.name,
+      signer_email: firstSigner.email,
+      signature_type: hasCertificate ? 'digital_pki' : 'visual',
+      signature_data: {
+        signerName: firstSigner.name,
+        signerReg: firstSigner.reg,
+        signerEmail: firstSigner.email,
+        certificateType: firstSigner.certificate_type,
+        certificateIssuer: firstSigner.certificate_issuer || 'SignFlow',
+        signatureAlgorithm: hasCertificate ? 'RSA-SHA256' : 'Visual',
+        documentHash: documentHash,
+      },
+      signed_at: nowIso,
+      status: 'completed',
+    };
+
+    const insSignature = await supabaseAdmin
+      .from('signatures')
+      .insert(signatureData);
+
+    if (insSignature.error) {
+      console.warn('⚠️ Erro ao salvar assinatura:', insSignature.error);
+    }
+
     if (signers.length) {
       const payload = signers.map(signer => ({
         document_id: id,
@@ -533,9 +607,11 @@ export async function POST(req: NextRequest) {
       qr_code_url: pubQr.data.publicUrl,
       validate_url: validateUrl,
       digital_signature_applied: hasCertificate,
+      document_hash: documentHash,
     });
     return addRateLimitHeaders(response, rateLimitResult.headers);
   } catch (e: any) {
+    console.error('❌ Erro ao assinar documento:', e);
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
 }
