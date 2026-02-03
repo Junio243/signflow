@@ -1,74 +1,69 @@
 #!/bin/bash
 
-# Script para gerar certificado digital auto-assinado para desenvolvimento
-# Para produção, usar certificado de CA confiável (ICP-Brasil, GlobalSign, etc.)
+# Script para gerar certificado digital de teste para assinatura PKI
+# Para produção, use certificados emitidos por CA confiável (ICP-Brasil, GlobalSign, etc.)
 
-echo "🔐 Gerando certificado digital para SignFlow..."
+set -e
+
+echo "🔐 Gerando certificado digital de teste para SignFlow..."
 echo ""
 
 # Criar pasta certificates se não existir
 mkdir -p certificates
+cd certificates
 
-# Verificar se OpenSSL está instalado
-if ! command -v openssl &> /dev/null; then
-    echo "❌ OpenSSL não encontrado!"
-    echo "Instale com: apt-get install openssl (Linux) ou brew install openssl (Mac)"
-    exit 1
-fi
+# Configurar variáveis
+COUNTRY="BR"
+STATE="Sao Paulo"
+CITY="Sao Paulo"
+ORGANIZATION="SignFlow"
+ORGANIZATIONAL_UNIT="Digital Signature"
+COMMON_NAME="SignFlow Certificate"
+EMAIL="suporte@signflow.com"
+PASSWORD="signflow2026"
+VALIDITY_DAYS=3650  # 10 anos
 
-echo "1/3 Gerando chave privada RSA 2048 bits..."
-openssl genrsa -out certificates/private-key.pem 2048
-
-if [ $? -ne 0 ]; then
-    echo "❌ Erro ao gerar chave privada"
-    exit 1
-fi
-
-echo "✅ Chave privada gerada: certificates/private-key.pem"
-echo ""
+echo "1/3 Gerando chave privada..."
+openssl genrsa -out private-key.pem 2048 2>/dev/null
 
 echo "2/3 Criando certificado auto-assinado (válido por 10 anos)..."
-openssl req -new -x509 -key certificates/private-key.pem -out certificates/certificate.pem -days 3650 \
-  -subj "/C=BR/ST=Sao Paulo/L=Sao Paulo/O=SignFlow/OU=Digital Signature/CN=SignFlow Certificate"
-
-if [ $? -ne 0 ]; then
-    echo "❌ Erro ao criar certificado"
-    exit 1
-fi
-
-echo "✅ Certificado gerado: certificates/certificate.pem"
-echo ""
+openssl req -new -x509 \
+  -key private-key.pem \
+  -out certificate.pem \
+  -days $VALIDITY_DAYS \
+  -subj "/C=$COUNTRY/ST=$STATE/L=$CITY/O=$ORGANIZATION/OU=$ORGANIZATIONAL_UNIT/CN=$COMMON_NAME/emailAddress=$EMAIL" \
+  2>/dev/null
 
 echo "3/3 Convertendo para formato P12/PFX..."
-echo "Senha do certificado: signflow2026"
-openssl pkcs12 -export -out certificates/certificate.p12 \
-  -inkey certificates/private-key.pem \
-  -in certificates/certificate.pem \
-  -password pass:signflow2026
+openssl pkcs12 -export \
+  -out certificate.p12 \
+  -inkey private-key.pem \
+  -in certificate.pem \
+  -password pass:$PASSWORD \
+  2>/dev/null
 
-if [ $? -ne 0 ]; then
-    echo "❌ Erro ao converter para P12"
-    exit 1
-fi
+cd ..
 
-echo "✅ Certificado P12 gerado: certificates/certificate.p12"
 echo ""
-
-echo "✨ Certificado digital criado com sucesso!"
+echo "✅ Certificado gerado com sucesso!"
 echo ""
-echo "📝 Informações do certificado:"
-echo "  - Arquivo: certificates/certificate.p12"
-echo "  - Senha: signflow2026"
-echo "  - Validade: 10 anos"
-echo "  - Emissor: SignFlow (auto-assinado)"
+echo "📝 Arquivos criados:"
+echo "  - certificates/private-key.pem   (Chave privada)"
+echo "  - certificates/certificate.pem   (Certificado)"
+echo "  - certificates/certificate.p12   (Certificado P12 para assinatura)"
+echo ""
+echo "🔑 Senha do certificado: $PASSWORD"
 echo ""
 echo "⚠️  IMPORTANTE:"
-echo "  - Este é um certificado AUTO-ASSINADO para desenvolvimento"
-echo "  - Leitores de PDF mostrarão aviso 'certificado não confiável'"
-echo "  - Para produção, use certificado de CA confiável:"
-echo "    * Brasil: ICP-Brasil (e-CPF, e-CNPJ)"
-echo "    * Internacional: GlobalSign, DigiCert, Sectigo"
+echo "  1. Este é um certificado AUTO-ASSINADO apenas para TESTES"
+echo "  2. Adobe Reader mostrará aviso 'certificado não confiável'"
+echo "  3. Para PRODUÇÃO, use certificado de CA confiável (ICP-Brasil)"
 echo ""
-echo "✅ Para usar o certificado, adicione no .env.local:"
-echo "   CERTIFICATE_PATH=./certificates/certificate.p12"
-echo "   CERTIFICATE_PASSWORD=signflow2026"
+echo "🚀 Próximos passos:"
+echo "  1. Adicione no .env.local:"
+echo "     CERTIFICATE_PASSWORD=$PASSWORD"
+echo ""
+echo "  2. Reinicie o servidor: npm run dev"
+echo ""
+echo "  3. PDFs assinados agora terão assinatura digital PKI!"
+echo ""
