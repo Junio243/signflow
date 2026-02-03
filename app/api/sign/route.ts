@@ -129,7 +129,6 @@ function extractSignersFromMetadata(metadata: Metadata): SignerMetadata[] {
   ];
 }
 
-// Function to calculate QR coordinates based on position
 function getQrCoordinates(pageWidth: number, pageHeight: number, position: QrPosition, margin: number, qrSize: number) {
   switch (position) {
     case 'bottom-right':
@@ -138,12 +137,11 @@ function getQrCoordinates(pageWidth: number, pageHeight: number, position: QrPos
       return { x: margin, y: pageHeight - margin - qrSize };
     case 'top-right':
       return { x: pageWidth - margin - qrSize, y: pageHeight - margin - qrSize };
-    default: // bottom-left
+    default:
       return { x: margin, y: margin };
   }
 }
 
-// Function to wrap text to fit within a given width
 function wrapText(text: string, font: PDFFont, fontSize: number, maxWidth: number): string[] {
   const words = text.split(' ');
   const lines: string[] = [];
@@ -168,7 +166,6 @@ function wrapText(text: string, font: PDFFont, fontSize: number, maxWidth: numbe
   return lines;
 }
 
-// Function to generate validation text content
 function generateValidationText(
   signerName: string,
   signerReg: string | null,
@@ -185,15 +182,13 @@ function generateValidationText(
   return `Documento assinado digitalmente de acordo com a ICP-Brasil, MP 2.200-2/2001, no sistema SignFlow, por ${signerName}${regText}, certificado${serialText} em ${signatureDate} e pode ser validado em ${validateUrl}.${accessText}`;
 }
 
-// Rate limiter: max 20 requests per hour
 const rateLimiter = createRateLimiter('/api/sign', {
   maxRequests: 20,
-  windowMs: 60 * 60 * 1000, // 1 hour
+  windowMs: 60 * 60 * 1000,
   message: 'Limite de assinatura excedido. Máximo de 20 assinaturas por hora.',
 });
 
 export async function POST(req: NextRequest) {
-  // Apply rate limiting
   const rateLimitResult = await rateLimiter(req);
   if (!rateLimitResult.allowed) return rateLimitResult.response;
 
@@ -207,7 +202,6 @@ export async function POST(req: NextRequest) {
     }
     const id = idResult.data;
 
-    // busca doc
     const docRes = await supabaseAdmin
       .from('documents')
       .select('id, metadata, signed_pdf_url, qr_code_url, status')
@@ -222,14 +216,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Documento não encontrado' }, { status: 404 });
     }
 
-    // baixa o original
     const orig = await supabaseAdmin.storage.from('signflow').download(`${id}/original.pdf`);
     if (orig.error || !orig.data) {
       return NextResponse.json({ error: orig.error?.message || 'original.pdf não encontrado' }, { status: 500 });
     }
     const originalBytes = new Uint8Array(await orig.data.arrayBuffer());
 
-    // tenta pegar a assinatura (opcional)
     const sig = await supabaseAdmin.storage.from('signflow').download(`${id}/signature`);
     let sigBytes: Uint8Array | null = null;
     let sigMime = 'image/png';
@@ -238,11 +230,9 @@ export async function POST(req: NextRequest) {
       sigMime = sig.data.type || 'image/png';
     }
 
-    // monta PDF
     const pdfDoc = await PDFDocument.load(originalBytes);
     const pages = pdfDoc.getPages();
 
-    // desenha assinaturas
     const metadataParsed = storedMetadataSchema.safeParse(doc?.metadata);
 
     if (!metadataParsed.success) {
@@ -333,13 +323,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // gera QR e insere nas páginas configuradas
     const base = process.env.NEXT_PUBLIC_BASE_URL || req.nextUrl.origin;
     const validateUrl = `${base}/validate/${id}`;
     const qrPng = await QRCode.toBuffer(validateUrl, { width: 256 });
     const qrImage = await pdfDoc.embedPng(qrPng);
     
-    // Extract QR position settings from metadata with proper validation
     const qrPositionRaw = (normalizedMetadata as any).qr_position || 'bottom-left';
     const qrPageRaw = (normalizedMetadata as any).qr_page || 'last';
     
@@ -352,7 +340,6 @@ export async function POST(req: NextRequest) {
     const margin = 30;
     const qrSize = 80;
     
-    // Extract signer information early for both validation text and database insert
     const signers = extractSignersFromMetadata(normalizedMetadata);
     const firstSigner = signers[0] || {
       name: 'Signatário',
@@ -366,24 +353,21 @@ export async function POST(req: NextRequest) {
         ? accessCodeRaw.trim()
         : null;
     
-    // Determine which pages receive the QR code
     let targetPages: any[] = [];
     if (qrPage === 'first') {
       targetPages = [pages[0]];
     } else if (qrPage === 'all') {
       targetPages = pages;
-    } else { // last
+    } else {
       targetPages = [pages[pages.length - 1]];
     }
     
-    // Insert QR code in selected pages
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontSize = 7;
     const textMaxWidth = 200;
     const textMargin = 10;
     const lineSpacing = 2;
     
-    // Format signature date
     const signatureDate = new Date().toLocaleDateString('pt-BR');
     
     for (const page of targetPages) {
@@ -391,10 +375,8 @@ export async function POST(req: NextRequest) {
       const pageHeight = page.getHeight();
       const coords = getQrCoordinates(pageWidth, pageHeight, qrPosition, margin, qrSize);
       
-      // Draw QR code
       page.drawImage(qrImage, { x: coords.x, y: coords.y, width: qrSize, height: qrSize });
       
-      // Generate validation text
       const validationText = generateValidationText(
         firstSigner.name,
         firstSigner.reg,
@@ -405,10 +387,8 @@ export async function POST(req: NextRequest) {
         requiresAccessCode
       );
       
-      // Wrap text to fit within maxWidth
       const wrappedLines = wrapText(validationText, font, fontSize, textMaxWidth);
       
-      // Calculate text position based on QR position
       let textX = coords.x;
       let textY = coords.y;
       
@@ -449,10 +429,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Salvar PDF com assinaturas visuais e QR Code
     let finalPdfBytes = await pdfDoc.save();
 
-    // ✨ NOVO: Adicionar assinatura digital PKI se certificado estiver configurado
+    // ✨ NOVO: Adicionar assinatura digital PKI
     const hasCertificate = isCertificateConfigured();
     if (hasCertificate) {
       try {
@@ -467,13 +446,11 @@ export async function POST(req: NextRequest) {
       } catch (certError) {
         console.warn('⚠️ Erro ao aplicar assinatura digital PKI:', certError);
         console.warn('📝 Continuando sem assinatura digital (apenas visual + QR Code)');
-        // Continua com o PDF sem assinatura digital
       }
     } else {
       console.log('ℹ️ Certificado digital não configurado. PDF assinado apenas com assinatura visual e QR Code.');
     }
 
-    // sobe arquivos gerados
     const upSigned = await supabaseAdmin.storage
       .from('signflow')
       .upload(`${id}/signed.pdf`, finalPdfBytes, {
@@ -494,7 +471,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: upQr.error.message }, { status: 500 });
     }
 
-    // URLs públicas
     const pubSigned = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/signed.pdf`);
     if (!pubSigned.data?.publicUrl) {
       console.error('Erro ao gerar URL pública do PDF assinado: URL não disponível');
@@ -513,7 +489,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // atualiza registro
     const upd = await supabaseAdmin
       .from('documents')
       .update({
