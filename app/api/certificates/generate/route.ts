@@ -5,28 +5,19 @@ import forge from 'node-forge'
 import type { GenerateCertificatePayload } from '@/types/certificates'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-/**
- * API: Gerar Certificado Auto-Assinado (Self-Signed)
- * Método: POST
- * Body: GenerateCertificatePayload
- */
 export async function POST(request: NextRequest) {
   try {
-    // Pegar token do header Authorization
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
       return NextResponse.json(
-        { error: 'Não autenticado - Token não fornecido' },
+        { error: 'Não autenticado' },
         { status: 401 }
       )
     }
 
-    const token = authHeader.replace('Bearer ', '')
-    
-    // Criar cliente Supabase
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: {
           Authorization: authHeader,
@@ -34,19 +25,8 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Verificar autenticação
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Não autenticado - Token inválido' },
-        { status: 401 }
-      )
-    }
-
     const payload: GenerateCertificatePayload = await request.json()
 
-    // Validações
     if (!payload.profile_id || !payload.certificate_name || !payload.password) {
       return NextResponse.json(
         { error: 'Perfil, nome do certificado e senha são obrigatórios' },
@@ -66,7 +46,6 @@ export async function POST(request: NextRequest) {
       .from('certificate_profiles')
       .select('*')
       .eq('id', payload.profile_id)
-      .eq('user_id', user.id)
       .single()
 
     if (profileError || !profile) {
@@ -76,17 +55,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('🔑 Gerando par de chaves RSA...', payload.key_strength || 2048, 'bits')
+    // Pegar user_id do token
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Usuário não autenticado' },
+        { status: 401 }
+      )
+    }
 
-    // 1. Gerar par de chaves RSA
+    console.log('🔑 Gerando certificado para:', user.id)
+
+    // Gerar par de chaves RSA
     const keypair = forge.pki.rsa.generateKeyPair({
       bits: payload.key_strength || 2048,
       workers: -1,
     })
 
-    console.log('✅ Par de chaves gerado')
-
-    // 2. Criar certificado X.509
+    // Criar certificado X.509
     const cert = forge.pki.createCertificate()
     cert.publicKey = keypair.publicKey
     cert.serialNumber = '01' + crypto.randomBytes(8).toString('hex')
@@ -97,7 +83,6 @@ export async function POST(request: NextRequest) {
     cert.validity.notAfter = new Date()
     cert.validity.notAfter.setFullYear(now.getFullYear() + validityYears)
 
-    // 3. Subject
     const subjectData = payload.subject_data || {}
     const subjectAttrs = [
       { name: 'commonName', value: subjectData.commonName || profile.profile_name },
@@ -123,7 +108,6 @@ export async function POST(request: NextRequest) {
     cert.setSubject(subjectAttrs)
     cert.setIssuer(subjectAttrs)
 
-    // 4. Extensões
     cert.setExtensions([
       { name: 'basicConstraints', cA: false },
       { name: 'keyUsage', digitalSignature: true, nonRepudiation: true, keyEncipherment: true },
@@ -131,12 +115,9 @@ export async function POST(request: NextRequest) {
       { name: 'subjectKeyIdentifier' },
     ])
 
-    // 5. Assinar
     cert.sign(keypair.privateKey, forge.md.sha256.create())
 
-    console.log('✅ Certificado X.509 criado')
-
-    // 6. Criar PKCS#12
+    // Criar PKCS#12
     const p12Asn1 = forge.pkcs12.toPkcs12Asn1(
       keypair.privateKey,
       cert,
@@ -149,7 +130,7 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ PKCS#12 gerado:', p12Buffer.length, 'bytes')
 
-    // 7. Upload
+    // Upload
     const fileName = `${user.id}/${crypto.randomUUID()}.p12`
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('certificates')
@@ -166,9 +147,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('✅ Certificado armazenado:', uploadData.path)
-
-    // 8. Criptografar senha
+    // Criptografar senha
     const encryptionKey = process.env.CERTIFICATE_ENCRYPTION_KEY
     if (!encryptionKey) {
       throw new Error('CERTIFICATE_ENCRYPTION_KEY não configurada')
@@ -182,13 +161,13 @@ export async function POST(request: NextRequest) {
     encryptedPassword += cipher.final('hex')
     const encryptedPasswordWithIv = iv.toString('hex') + ':' + encryptedPassword
 
-    // 9. Desativar outros certificados
+    // Desativar outros certificados
     await supabase
       .from('certificates')
       .update({ is_active: false })
       .eq('user_id', user.id)
 
-    // 10. Salvar no banco
+    // Salvar no banco
     const { data: newCert, error: dbError } = await supabase
       .from('certificates')
       .insert({
@@ -220,7 +199,7 @@ export async function POST(request: NextRequest) {
       console.error('Erro ao salvar no banco:', dbError)
       await supabase.storage.from('certificates').remove([uploadData.path])
       return NextResponse.json(
-        { error: 'Erro ao salvar certificado no banco: ' + dbError.message },
+        { error: 'Erro ao salvar certificado: ' + dbError.message },
         { status: 500 }
       )
     }
@@ -235,7 +214,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Erro ao gerar certificado:', error)
     return NextResponse.json(
-      { error: 'Erro ao gerar certificado: ' + (error instanceof Error ? error.message : 'Erro desconhecido') },
+      { error: 'Erro: ' + (error instanceof Error ? error.message : 'Desconhecido') },
       { status: 500 }
     )
   }
