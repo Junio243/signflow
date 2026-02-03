@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import classNames from 'classnames'
-import { Building2, ChevronDown, LayoutDashboard, LogIn, LogOut, Menu, Settings, User } from 'lucide-react'
+import { Building2, ChevronDown, LayoutDashboard, LogIn, LogOut, Menu, Settings, User, Shield } from 'lucide-react'
 // REMOVIDO: import NotificationBell from '../app/components/notifications/NotificationBell'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -200,6 +200,7 @@ export default function HeaderClient() {
                 >
                   <HeaderMenuLink href="/dashboard" icon={<LayoutDashboard className="h-4 w-4" aria-hidden />}>Meus documentos</HeaderMenuLink>
                   <HeaderMenuLink href="/settings" icon={<Settings className="h-4 w-4" aria-hidden />}>Meu perfil</HeaderMenuLink>
+                  <HeaderMenuLink href="/settings/certificates" icon={<Shield className="h-4 w-4" aria-hidden />}>Certificados</HeaderMenuLink>
                   <HeaderMenuLink href="/orgs" icon={<Building2 className="h-4 w-4" aria-hidden />}>Organizações</HeaderMenuLink>
                   <button
                     type="button"
@@ -256,6 +257,20 @@ export default function HeaderClient() {
                   </li>
                 )
               })}
+              {user && (
+                <li>
+                  <Link
+                    href="/settings/certificates"
+                    className={classNames(
+                      'flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
+                      pathname === '/settings/certificates' && 'bg-slate-100 text-slate-900 font-semibold'
+                    )}
+                  >
+                    <Shield className="h-4 w-4" aria-hidden />
+                    Certificados
+                  </Link>
+                </li>
+              )}
               {!user && pathname === '/' && (
                 <li className="mt-4">
                   <Link
