@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ShieldCheck, Upload, FileText, CheckCircle, XCircle, AlertTriangle, Loader2, ArrowLeft } from 'lucide-react'
+import { ShieldCheck, Upload, FileText, CheckCircle, XCircle, AlertTriangle, Loader2, Home } from 'lucide-react'
 import Link from 'next/link'
 import { useDropzone } from 'react-dropzone'
 import { format } from 'date-fns'
@@ -18,6 +18,7 @@ interface VerificationResult {
     signatureAlgorithm: string
     documentHash: string
   }
+  message?: string
   error?: string
 }
 
@@ -50,7 +51,6 @@ export default function VerifyPage() {
     setResult(null)
 
     try {
-      // Converter para base64
       const fileBase64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = () => {
@@ -94,15 +94,15 @@ export default function VerifyPage() {
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">Verificar Assinatura</h1>
-            <p className="text-sm text-slate-500">Valide a autenticidade de documentos assinados</p>
+            <p className="text-sm text-slate-500">🌐 Página pública - sem necessidade de login</p>
           </div>
         </div>
         <Link
-          href="/dashboard"
+          href="/"
           className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
         >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar
+          <Home className="h-4 w-4" />
+          Início
         </Link>
       </header>
 
@@ -128,6 +128,9 @@ export default function VerifyPage() {
               </p>
               <p className="text-sm text-slate-500">
                 Envie o documento assinado para verificar sua autenticidade
+              </p>
+              <p className="text-xs text-slate-400 mt-2">
+                Máximo: 10MB
               </p>
             </div>
           </div>
@@ -198,20 +201,28 @@ export default function VerifyPage() {
             'rounded-2xl border p-6',
             result.isValid
               ? 'border-emerald-200 bg-emerald-50'
-              : 'border-amber-200 bg-amber-50',
+              : result.isSigned
+              ? 'border-amber-200 bg-amber-50'
+              : 'border-rose-200 bg-rose-50',
           ].join(' ')}
         >
           <div className="flex items-start gap-3 mb-4">
             {result.isValid ? (
               <CheckCircle className="h-8 w-8 text-emerald-600 flex-shrink-0" />
-            ) : (
+            ) : result.isSigned ? (
               <AlertTriangle className="h-8 w-8 text-amber-600 flex-shrink-0" />
+            ) : (
+              <XCircle className="h-8 w-8 text-rose-600 flex-shrink-0" />
             )}
             <div>
               <h3
                 className={[
                   'text-lg font-semibold mb-1',
-                  result.isValid ? 'text-emerald-900' : 'text-amber-900',
+                  result.isValid
+                    ? 'text-emerald-900'
+                    : result.isSigned
+                    ? 'text-amber-900'
+                    : 'text-rose-900',
                 ].join(' ')}
               >
                 {result.isValid
@@ -223,14 +234,18 @@ export default function VerifyPage() {
               <p
                 className={[
                   'text-sm',
-                  result.isValid ? 'text-emerald-700' : 'text-amber-700',
+                  result.isValid
+                    ? 'text-emerald-700'
+                    : result.isSigned
+                    ? 'text-amber-700'
+                    : 'text-rose-700',
                 ].join(' ')}
               >
                 {result.isValid
                   ? 'Este documento possui uma assinatura digital válida e não foi modificado.'
                   : result.isSigned
-                  ? 'Este documento possui marca de assinatura, mas não foi possível validar completamente.'
-                  : 'Este documento não contém assinatura digital.'}
+                  ? result.message || 'Este documento possui marca de assinatura, mas não foi possível validar completamente.'
+                  : result.message || 'Este documento não contém assinatura digital.'}
               </p>
             </div>
           </div>
@@ -291,13 +306,34 @@ export default function VerifyPage() {
 
       {/* Informações */}
       <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-700">
-        <p className="font-medium mb-2">🛈 Como funciona a verificação?</p>
+        <p className="font-medium mb-2">🛌 Como funciona a verificação?</p>
         <ul className="space-y-1 text-xs">
           <li>• Verifica se o documento contém assinatura visual do SignFlow</li>
           <li>• Valida o hash do documento contra a assinatura digital</li>
           <li>• Confirma que o documento não foi modificado após a assinatura</li>
           <li>• Exibe informações do certificado usado na assinatura</li>
         </ul>
+      </div>
+
+      {/* CTA */}
+      <div className="rounded-2xl border border-brand-200 bg-brand-50 p-6 text-center">
+        <p className="text-sm font-medium text-brand-900 mb-3">
+          Quer assinar seus próprios documentos?
+        </p>
+        <div className="flex gap-3 justify-center">
+          <Link
+            href="/signup"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+          >
+            Criar Conta Grátis
+          </Link>
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-2 rounded-xl border border-brand-600 px-4 py-2 text-sm font-semibold text-brand-600 hover:bg-brand-50"
+          >
+            Fazer Login
+          </Link>
+        </div>
       </div>
     </div>
   )
