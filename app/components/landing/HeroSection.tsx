@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Zap, Play, CheckCircle2 } from 'lucide-react'
+import { Zap, Play, CheckCircle2, ShieldCheck } from 'lucide-react'
 
 export default function HeroSection() {
   return (
@@ -52,10 +52,21 @@ export default function HeroSection() {
                 Testar Grátis Agora
               </Link>
               <Link
-                href="/validate/demo"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white text-gray-700 text-sm sm:text-base font-semibold border-2 border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200"
+                href="/verify"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 text-white text-sm sm:text-base font-semibold shadow-lg shadow-emerald-500/50 hover:shadow-xl hover:shadow-emerald-600/50 hover:scale-105 transition-all duration-200"
               >
-                <Play className="w-4 h-4 sm:w-5 sm:h-5" />
+                <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
+                Verificar Documento
+              </Link>
+            </div>
+
+            {/* Link secundário */}
+            <div className="flex justify-center lg:justify-start mb-6">
+              <Link
+                href="/validate/demo"
+                className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 transition-colors"
+              >
+                <Play className="w-4 h-4" />
                 Ver Demonstração
               </Link>
             </div>
