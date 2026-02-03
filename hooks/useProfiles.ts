@@ -9,7 +9,7 @@ export function useProfiles() {
 
   const fetchProfiles = useCallback(async () => {
     if (!supabase) {
-      setError('Supabase n\u00e3o configurado')
+      setError('Supabase não configurado')
       setLoading(false)
       return
     }
@@ -46,10 +46,21 @@ export function useProfiles() {
     registration_number?: string
     is_default?: boolean
   }) => {
+    if (!supabase) throw new Error('Supabase não configurado')
+
     try {
+      // Pegar token de autenticação
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error('Usuário não autenticado')
+      }
+
       const response = await fetch('/api/profiles/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify(payload),
       })
 
@@ -67,7 +78,7 @@ export function useProfiles() {
   }
 
   const deleteProfile = async (profileId: string) => {
-    if (!supabase) throw new Error('Supabase n\u00e3o configurado')
+    if (!supabase) throw new Error('Supabase não configurado')
 
     try {
       const { error: deleteError } = await supabase
@@ -85,7 +96,7 @@ export function useProfiles() {
   }
 
   const setDefaultProfile = async (profileId: string) => {
-    if (!supabase) throw new Error('Supabase n\u00e3o configurado')
+    if (!supabase) throw new Error('Supabase não configurado')
 
     try {
       // O trigger do banco vai desmarcar os outros automaticamente
