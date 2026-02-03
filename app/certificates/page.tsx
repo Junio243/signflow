@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, CheckCircle, AlertCircle, ArrowLeft, FileKey, Trash2 } from 'lucide-react'
+import { Upload, CheckCircle, AlertCircle, ArrowLeft, FileKey, Trash2, Sparkles } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import Link from 'next/link'
 
@@ -11,6 +11,7 @@ type Certificate = {
   user_id: string
   certificate_name: string
   certificate_type: 'auto' | 'icp-brasil' | 'custom'
+  generation_method?: 'uploaded' | 'auto_generated'
   is_active: boolean
   created_at: string
   expires_at: string | null
@@ -86,7 +87,6 @@ export default function CertificatesPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validar extensão
     const validExtensions = ['.p12', '.pfx', '.pem']
     const extension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
     
@@ -95,7 +95,6 @@ export default function CertificatesPage() {
       return
     }
 
-    // Validar tamanho (max 5MB)
     const maxSize = 5 * 1024 * 1024
     if (file.size > maxSize) {
       setError('Arquivo muito grande. Máximo: 5MB')
@@ -104,7 +103,6 @@ export default function CertificatesPage() {
 
     setCertificateFile(file)
     
-    // Sugerir nome baseado no arquivo
     if (!certificateName) {
       const name = file.name.replace(/\.(p12|pfx|pem)$/i, '')
       setCertificateName(name)
@@ -153,12 +151,10 @@ export default function CertificatesPage() {
 
       setFeedback('✅ Certificado enviado com sucesso!')
       
-      // Limpar formulário
       setCertificateFile(null)
       setCertificateName('')
       setCertificatePassword('')
       
-      // Recarregar lista
       await loadCertificates()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao fazer upload')
@@ -230,15 +226,24 @@ export default function CertificatesPage() {
       <header className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/70 p-6 shadow-sm">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Gerenciar Certificados</h1>
-          <p className="text-sm text-slate-500">Faça upload e gerencie seus certificados digitais</p>
+          <p className="text-sm text-slate-500">Faça upload ou gere certificados digitais</p>
         </div>
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/certificates/generate"
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-md hover:from-brand-700 hover:to-brand-800"
+          >
+            <Sparkles className="h-4 w-4" />
+            Gerar Certificado
+          </Link>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar
+          </Link>
+        </div>
       </header>
 
       {/* Feedback/Error */}
@@ -258,14 +263,11 @@ export default function CertificatesPage() {
 
       {/* Upload Form */}
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Enviar Novo Certificado</h2>
+        <h2 className="mb-4 text-lg font-semibold text-slate-900">Enviar Certificado Existente</h2>
         
         <form onSubmit={handleUpload} className="space-y-4">
-          {/* Tipo de Certificado */}
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Tipo de Certificado
-            </label>
+            <label className="mb-2 block text-sm font-medium text-slate-700">Tipo de Certificado</label>
             <div className="flex gap-4">
               <label className="flex items-center gap-2">
                 <input
@@ -292,7 +294,6 @@ export default function CertificatesPage() {
             </div>
           </div>
 
-          {/* Nome do Certificado */}
           <div>
             <label htmlFor="cert-name" className="mb-2 block text-sm font-medium text-slate-700">
               Nome do Certificado *
@@ -308,7 +309,6 @@ export default function CertificatesPage() {
             />
           </div>
 
-          {/* Arquivo */}
           <div>
             <label htmlFor="cert-file" className="mb-2 block text-sm font-medium text-slate-700">
               Arquivo do Certificado * (.p12, .pfx, .pem)
@@ -335,7 +335,6 @@ export default function CertificatesPage() {
             <p className="mt-1 text-xs text-slate-400">Máximo: 5MB</p>
           </div>
 
-          {/* Senha */}
           <div>
             <label htmlFor="cert-password" className="mb-2 block text-sm font-medium text-slate-700">
               Senha do Certificado *
@@ -354,7 +353,6 @@ export default function CertificatesPage() {
             </p>
           </div>
 
-          {/* Botão */}
           <button
             type="submit"
             disabled={uploading || !certificateFile}
@@ -374,7 +372,7 @@ export default function CertificatesPage() {
           <div className="py-8 text-center text-slate-500">
             <FileKey className="mx-auto mb-3 h-12 w-12 text-slate-300" />
             <p className="font-medium">Nenhum certificado cadastrado</p>
-            <p className="mt-1 text-sm">Envie seu primeiro certificado usando o formulário acima</p>
+            <p className="mt-1 text-sm">Gere um novo certificado ou faça upload de um existente</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -410,9 +408,14 @@ export default function CertificatesPage() {
                           Ativo
                         </span>
                       )}
+                      {cert.generation_method === 'auto_generated' && (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                          Auto-gerado
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-slate-500">
-                      {cert.certificate_type === 'icp-brasil' ? 'ICP-Brasil' : 'Certificado Próprio'} •{' '}
+                      {cert.certificate_type === 'icp-brasil' ? 'ICP-Brasil' : cert.certificate_type === 'auto' ? 'Auto-assinado' : 'Certificado Próprio'} •{' '}
                       Adicionado em {new Date(cert.created_at).toLocaleDateString('pt-BR')}
                     </p>
                     {cert.expires_at && (
@@ -451,7 +454,8 @@ export default function CertificatesPage() {
       <section className="rounded-2xl border border-blue-200 bg-blue-50 p-6">
         <h3 className="mb-2 text-sm font-semibold text-blue-900">📊 Sobre Certificados</h3>
         <ul className="space-y-1 text-sm text-blue-700">
-          <li>• <strong>Certificado Próprio:</strong> Criado por você, requer validação manual no Adobe Reader</li>
+          <li>• <strong>Auto-gerado:</strong> Criado pela plataforma, ideal para uso interno</li>
+          <li>• <strong>Certificado Próprio:</strong> Uploadado por você, requer validação manual no Adobe Reader</li>
           <li>• <strong>ICP-Brasil:</strong> Reconhecido automaticamente, selo verde no Adobe Reader</li>
           <li>• Apenas um certificado pode estar ativo por vez</li>
           <li>• Documentos já assinados não são afetados ao trocar certificados</li>
