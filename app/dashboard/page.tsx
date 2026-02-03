@@ -11,6 +11,7 @@ import {
   Clock3,
   Copy,
   Download,
+  FileKey,
   FileSignature,
   FileText,
   Filter,
@@ -389,14 +390,25 @@ export default function DashboardPage() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {isLogged && (
-            <Link
-              href="/profile"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
-              title="Editar meu perfil"
-            >
-              <User className="h-4 w-4" aria-hidden />
-              Perfil
-            </Link>
+            <>
+              <Link
+                href="/profile"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+                title="Editar meu perfil"
+              >
+                <User className="h-4 w-4" aria-hidden />
+                Perfil
+              </Link>
+              
+              <Link
+                href="/certificates"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+                title="Gerenciar certificados digitais"
+              >
+                <FileKey className="h-4 w-4" aria-hidden />
+                Certificados
+              </Link>
+            </>
           )}
 
           {selectedDocs.length > 0 && (
