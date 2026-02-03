@@ -35,8 +35,6 @@ import { supabase } from '@/lib/supabaseClient'
 import { useUserProfile } from '@/hooks/useUserProfile'
 import BatchSignModal from '@/components/BatchSignModal'
 
-// ... (resto do código continua igual até a parte do header)
-
 const STATUS_META = {
   signed: {
     label: 'Assinado',
@@ -105,7 +103,7 @@ export default function DashboardPage() {
 
   const fetchSession = useCallback(async () => {
     if (!supabaseClient) {
-      setErrorMsg('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+      setErrorMsg('Serviço de autenticação indisponível')
       setIsLogged(false)
       setUserEmail(null)
       return null
@@ -130,26 +128,12 @@ export default function DashboardPage() {
       .limit(200)
 
     if (error) {
-      const message = String(error.message || '')
-      const missingColumn = message.includes('does not exist') || message.includes('não existe')
-      if (missingColumn) {
-        const retry = await supabaseClient
-          .from('documents')
-          .select('id, status, created_at, signed_pdf_url, qr_code_url, original_pdf_name, canceled_at')
-          .order('created_at', { ascending: false })
-          .limit(200)
-        data = retry.data
-        error = retry.error
-      }
-    }
-
-    if (error) {
       setErrorMsg(error.message ?? 'Erro ao consultar documentos')
       return
     }
 
     setDocs((data ?? []) as Doc[])
-  }, [])
+  }, [supabaseClient])
 
   useEffect(() => {
     let active = true
@@ -165,7 +149,6 @@ export default function DashboardPage() {
       try {
         await fetchSession()
         if (!active) return
-
         await fetchDocs()
       } catch (err) {
         if (active) {
@@ -225,10 +208,7 @@ export default function DashboardPage() {
   }
 
   const handleQuickCreate = async () => {
-    if (!supabaseClient) {
-      setErrorMsg('Serviço indisponível')
-      return
-    }
+    if (!supabaseClient) return
     const { data } = await supabaseClient.auth.getSession()
     if (!data?.session) {
       router.push(`/login?next=${encodeURIComponent('/editor')}`)
@@ -238,10 +218,7 @@ export default function DashboardPage() {
   }
 
   const handleAdvancedCreate = async () => {
-    if (!supabaseClient) {
-      setErrorMsg('Serviço indisponível')
-      return
-    }
+    if (!supabaseClient) return
     const { data } = await supabaseClient.auth.getSession()
     if (!data?.session) {
       router.push(`/login?next=${encodeURIComponent('/create-document')}`)
@@ -256,9 +233,7 @@ export default function DashboardPage() {
       return
     }
 
-    const confirmed = window.confirm(
-      'Tem certeza que deseja CANCELAR este documento?'
-    )
+    const confirmed = window.confirm('Tem certeza que deseja CANCELAR este documento?')
     if (!confirmed) return
 
     try {
@@ -288,18 +263,14 @@ export default function DashboardPage() {
       return
     }
 
-    const confirmed = window.confirm(
-      '🗑️ Tem certeza que deseja DELETAR permanentemente este documento?'
-    )
+    const confirmed = window.confirm('🗑️ Deletar permanentemente?')
     if (!confirmed) return
 
     try {
       setActionBusyId(doc.id)
-      
       const response = await fetch(`/api/documents/delete?id=${doc.id}`, {
         method: 'DELETE',
       })
-
       const result = await response.json()
 
       if (!response.ok) {
@@ -356,8 +327,6 @@ export default function DashboardPage() {
     )
   }, [docs])
 
-  const statusOptions = useMemo(() => STATUS_FILTERS, [])
-
   if (!supabaseClient) {
     return (
       <div className="mx-auto flex max-w-4xl flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-800">
@@ -372,16 +341,14 @@ export default function DashboardPage() {
       <header className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white/70 p-6 shadow-sm sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
-          <p className="text-sm text-slate-500">Acompanhe documentos, status de assinatura e ações rápidas.</p>
+          <p className="text-sm text-slate-500">Gerencie seus documentos e assinaturas</p>
           {isLogged && (
             <div className="mt-2 space-y-1">
               {profileLoading ? (
-                <p className="text-xs text-slate-400">Carregando perfil...</p>
+                <p className="text-xs text-slate-400">Carregando...</p>
               ) : profile ? (
                 <>
-                  <p className="text-sm font-medium text-slate-700">
-                    👋 Olá, {profile.full_name || 'Usuário'}!
-                  </p>
+                  <p className="text-sm font-medium text-slate-700">👋 {profile.full_name || 'Usuário'}</p>
                   <p className="text-xs text-slate-400">✉️ {userEmail}</p>
                 </>
               ) : (
@@ -395,8 +362,7 @@ export default function DashboardPage() {
             <>
               <Link
                 href="/profile"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-                title="Editar meu perfil"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
               >
                 <User className="h-4 w-4" />
                 Perfil
@@ -404,8 +370,7 @@ export default function DashboardPage() {
               
               <Link
                 href="/certificates"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-                title="Gerenciar certificados digitais"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
               >
                 <FileKey className="h-4 w-4" />
                 Certificados
@@ -413,8 +378,7 @@ export default function DashboardPage() {
 
               <Link
                 href="/sign"
-                className="inline-flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 shadow-sm transition hover:bg-brand-100"
-                title="Assinar documento PDF"
+                className="inline-flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 shadow-sm hover:bg-brand-100"
               >
                 <PenTool className="h-4 w-4" />
                 Assinar
@@ -422,8 +386,7 @@ export default function DashboardPage() {
 
               <Link
                 href="/history"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-                title="Histórico de assinaturas"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
               >
                 <History className="h-4 w-4" />
                 Histórico
@@ -431,8 +394,7 @@ export default function DashboardPage() {
 
               <Link
                 href="/verify"
-                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100"
-                title="Verificar assinatura"
+                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm hover:bg-emerald-100"
               >
                 <ShieldCheck className="h-4 w-4" />
                 Verificar
@@ -451,32 +413,26 @@ export default function DashboardPage() {
           )}
 
           <button
-            type="button"
             onClick={handleQuickCreate}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-            title="Criação rápida"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
           >
             <Zap className="h-4 w-4" />
             Rápida
           </button>
 
           <button
-            type="button"
             onClick={handleAdvancedCreate}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-md hover:from-brand-700 hover:to-brand-800"
-            title="Criação avançada"
           >
             <Sparkles className="h-4 w-4" />
             Avançada
           </button>
 
           <button
-            type="button"
             onClick={handleRefresh}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-brand-500 hover:text-brand-600"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:text-brand-600"
           >
             <RefreshCcw className="h-4 w-4" />
-            Atualizar
           </button>
         </div>
       </header>
@@ -487,7 +443,6 @@ export default function DashboardPage() {
           <div>
             <p className="font-semibold">Você não está autenticado</p>
             <button
-              type="button"
               onClick={() => router.push(`/login?next=${encodeURIComponent('/dashboard')}`)}
               className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white shadow hover:bg-amber-700"
             >
@@ -508,10 +463,7 @@ export default function DashboardPage() {
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-            <div>
-              <p className="font-semibold">Erro</p>
-              <p className="mt-1 text-rose-700/80">{errorMsg}</p>
-            </div>
+            <p>{errorMsg}</p>
           </div>
         </div>
       )}
@@ -520,13 +472,13 @@ export default function DashboardPage() {
         <StatCard
           title="Documentos"
           value={totalsByStatus.total}
-          description="Total cadastrados"
+          description="Total"
           icon={<FileText className="h-5 w-5 text-brand-600" />}
         />
         <StatCard
           title="Assinados"
           value={totalsByStatus.signed}
-          description="Disponíveis"
+          description="Válidos"
           icon={<CheckCircle2 className="h-5 w-5 text-emerald-600" />}
         />
         <StatCard
@@ -538,13 +490,165 @@ export default function DashboardPage() {
         <StatCard
           title="Cancelados"
           value={totalsByStatus.canceled + totalsByStatus.expired}
-          description="Indisponíveis"
+          description="Inativos"
           icon={<XCircle className="h-5 w-5 text-rose-600" />}
         />
       </section>
 
-      {/* Resto da página continua igual... (tabela de documentos) */}
-      
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            <Filter className="h-4 w-4" />
+            Filtros
+          </div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex flex-wrap gap-2">
+              {STATUS_FILTERS.map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => setStatusFilter(option.value)}
+                  className={[
+                    'rounded-full border px-3 py-1.5 text-xs font-semibold',
+                    statusFilter === option.value
+                      ? 'border-brand-500 bg-brand-50 text-brand-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300',
+                  ].join(' ')}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <input
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-600"
+              placeholder="Buscar..."
+            />
+          </div>
+        </div>
+
+        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold">
+                  <button onClick={toggleSelectAll}>
+                    {selectedDocs.length > 0 ? (
+                      <CheckSquare className="h-5 w-5 text-brand-600" />
+                    ) : (
+                      <Square className="h-5 w-5 text-slate-400" />
+                    )}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-semibold">ID</th>
+                <th className="px-4 py-3 text-left font-semibold">Nome</th>
+                <th className="px-4 py-3 text-left font-semibold">Status</th>
+                <th className="px-4 py-3 text-left font-semibold">Data</th>
+                <th className="px-4 py-3 text-left font-semibold">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center">
+                    <Loader2 className="mx-auto h-6 w-6 animate-spin text-brand-600" />
+                    <p className="mt-2 text-sm text-slate-500">Carregando…</p>
+                  </td>
+                </tr>
+              )}
+
+              {!loading && filteredDocs.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center">
+                    <p className="font-medium text-slate-500">Nenhum documento encontrado</p>
+                  </td>
+                </tr>
+              )}
+
+              {!loading &&
+                filteredDocs.map(doc => {
+                  const statusKey = (doc.status ?? 'default').toLowerCase() as StatusKey
+                  const meta = STATUS_META[statusKey] ?? STATUS_META.default
+                  const Icon = meta.icon
+                  const canDelete = ['draft', 'canceled', 'expired'].includes(statusKey)
+                  const canSelect = statusKey === 'draft'
+                  
+                  return (
+                    <tr key={doc.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        {canSelect && (
+                          <button onClick={() => toggleDocSelection(doc.id)}>
+                            {selectedDocs.includes(doc.id) ? (
+                              <CheckSquare className="h-5 w-5 text-brand-600" />
+                            ) : (
+                              <Square className="h-5 w-5 text-slate-400" />
+                            )}
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-500">{doc.id.slice(0, 8)}…</td>
+                      <td className="px-4 py-3 text-slate-700">{doc.original_pdf_name ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${meta.badge}`}>
+                          <Icon className="h-3.5 w-3.5" />
+                          {meta.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{formatDate(doc.created_at)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <Link
+                            href={`/validate/${doc.id}`}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-brand-600"
+                          >
+                            <Link2 className="h-3.5 w-3.5" />
+                            Validar
+                          </Link>
+                          {doc.signed_pdf_url && (
+                            <a
+                              href={doc.signed_pdf_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-brand-600"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              Baixar
+                            </a>
+                          )}
+                          <button
+                            onClick={() => handleCopyLink(doc.id)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-brand-600"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                          {statusKey !== 'canceled' && (
+                            <button
+                              onClick={() => cancelDoc(doc)}
+                              disabled={actionBusyId === doc.id}
+                              className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:border-rose-300 disabled:opacity-60"
+                            >
+                              <Ban className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => deleteDoc(doc)}
+                              disabled={actionBusyId === doc.id}
+                              className="inline-flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       {showBatchSignModal && (
         <BatchSignModal
           selectedDocuments={getSelectedDocuments()}
@@ -560,6 +664,19 @@ export default function DashboardPage() {
       )}
     </div>
   )
+}
+
+function formatDate(value: string) {
+  try {
+    const date = new Date(value)
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(date)
+  } catch {
+    return value
+  }
 }
 
 function StatCard({
