@@ -13,8 +13,6 @@ import {
   GraduationCap,
   Scale,
   Briefcase,
-  Key,
-  FileKey,
   Shield
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
@@ -112,7 +110,7 @@ export default function GenerateCertificatePage() {
         cpf_cnpj: newProfile.cpf_cnpj || undefined,
         organization: newProfile.organization || undefined,
         registration_number: newProfile.registration_number || undefined,
-        is_default: profiles.length === 0, // Primeiro perfil é padrão
+        is_default: profiles.length === 0,
       })
 
       setFeedback('✅ Perfil criado com sucesso!')
@@ -137,7 +135,6 @@ export default function GenerateCertificatePage() {
     setError(null)
     setFeedback(null)
 
-    // Validações
     if (!selectedProfileId) {
       setError('Selecione um perfil')
       return
@@ -158,12 +155,26 @@ export default function GenerateCertificatePage() {
       return
     }
 
+    if (!supabase) {
+      setError('Supabase não configurado')
+      return
+    }
+
     setGenerating(true)
 
     try {
+      // Pegar token
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error('Sessão expirada')
+      }
+
       const response = await fetch('/api/certificates/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({
           profile_id: selectedProfileId,
           certificate_name: certificateName.trim(),
@@ -187,7 +198,6 @@ export default function GenerateCertificatePage() {
 
       setFeedback('✅ Certificado gerado com sucesso! Redirecionando...')
       
-      // Redirecionar após 2 segundos
       setTimeout(() => {
         router.push('/certificates')
       }, 2000)
@@ -518,7 +528,7 @@ export default function GenerateCertificatePage() {
           <button
             type="submit"
             disabled={generating || !selectedProfileId}
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60 flex-shrink-0"
           >
             {generating ? (
               <>
@@ -527,8 +537,8 @@ export default function GenerateCertificatePage() {
               </>
             ) : (
               <>
-                <FileKey className="h-4 w-4" />
-                Gerar Certificado
+                <Sparkles className="h-4 w-4" />
+                Gerar
               </>
             )}
           </button>
