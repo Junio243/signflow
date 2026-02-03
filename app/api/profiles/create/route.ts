@@ -24,6 +24,19 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // Verificar autenticação e pegar user_id
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !user) {
+      console.error('Erro de autenticação:', authError)
+      return NextResponse.json(
+        { error: 'Não autenticado - token inválido' },
+        { status: 401 }
+      )
+    }
+
+    console.log('✅ Usuário autenticado:', user.id)
+
     const payload: CreateProfilePayload = await request.json()
 
     if (!payload.profile_name || !payload.profile_type) {
@@ -37,8 +50,9 @@ export async function POST(request: NextRequest) {
     const { data: existingProfile } = await supabase
       .from('certificate_profiles')
       .select('id')
+      .eq('user_id', user.id)
       .eq('profile_name', payload.profile_name)
-      .single()
+      .maybeSingle()
 
     if (existingProfile) {
       return NextResponse.json(
@@ -47,10 +61,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Criar perfil
+    // Criar perfil COM user_id explícito
     const { data: newProfile, error: createError } = await supabase
       .from('certificate_profiles')
       .insert({
+        user_id: user.id, // ⚠️ IMPORTANTE: adicionar explicitamente
         profile_name: payload.profile_name,
         profile_type: payload.profile_type,
         cpf_cnpj: payload.cpf_cnpj || null,
@@ -69,6 +84,8 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    console.log('✅ Perfil criado:', newProfile.id)
 
     return NextResponse.json({
       success: true,
