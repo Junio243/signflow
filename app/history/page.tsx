@@ -2,33 +2,30 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { History, ArrowLeft, Download, Eye, FileText, Calendar, Shield, Loader2, CheckCircle } from 'lucide-react'
+import { History, ArrowLeft, Download, FileText, Calendar, Shield, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-interface Signature {
+interface UnifiedSignature {
   id: string
-  original_document_name: string
-  signed_document_path: string
-  document_hash: string
+  document_name: string
+  signed_document_url: string | null
+  document_hash: string | null
   signature_type: string
   signature_data: any
   signed_at: string
   status: string
-  certificate_id: string
-  certificates: {
-    certificate_name: string
-    issuer: string
-  }
+  certificate_name: string | null
+  source: 'signatures' | 'documents' // Nova propriedade para identificar a origem
 }
 
 export default function HistoryPage() {
   const router = useRouter()
   const [isLogged, setIsLogged] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [signatures, setSignatures] = useState<Signature[]>([])
+  const [signatures, setSignatures] = useState<UnifiedSignature[]>([])
   const [loadingSignatures, setLoadingSignatures] = useState(true)
   const [filter, setFilter] = useState<'all' | 'completed' | 'failed'>('all')
 
@@ -38,7 +35,7 @@ export default function HistoryPage() {
 
   useEffect(() => {
     if (isLogged) {
-      fetchSignatures()
+      fetchAllSignatures()
     }
   }, [isLogged, filter])
 
@@ -58,13 +55,15 @@ export default function HistoryPage() {
     setLoading(false)
   }
 
-  const fetchSignatures = async () => {
+  const fetchAllSignatures = async () => {
     if (!supabase) return
 
     try {
       setLoadingSignatures(true)
-      
-      let query = supabase
+      const allSignatures: UnifiedSignature[] = []
+
+      // 1. Buscar da tabela 'signatures' (nova)
+      let sigQuery = supabase
         .from('signatures')
         .select(`
           *,
@@ -76,14 +75,72 @@ export default function HistoryPage() {
         .order('signed_at', { ascending: false })
 
       if (filter !== 'all') {
-        query = query.eq('status', filter)
+        sigQuery = sigQuery.eq('status', filter)
       }
 
-      const { data, error } = await query
+      const { data: sigData, error: sigError } = await sigQuery
 
-      if (error) throw error
+      if (!sigError && sigData) {
+        sigData.forEach((sig: any) => {
+          allSignatures.push({
+            id: sig.id,
+            document_name: sig.original_document_name,
+            signed_document_url: sig.signed_document_path,
+            document_hash: sig.document_hash,
+            signature_type: sig.signature_type || 'both',
+            signature_data: sig.signature_data,
+            signed_at: sig.signed_at,
+            status: sig.status,
+            certificate_name: sig.certificates?.certificate_name || null,
+            source: 'signatures',
+          })
+        })
+      }
 
-      setSignatures(data || [])
+      // 2. Buscar da tabela 'documents' (antiga - documentos assinados antes)
+      let docQuery = supabase
+        .from('documents')
+        .select('*')
+        .eq('status', 'signed')
+        .order('created_at', { ascending: false })
+
+      const { data: docData, error: docError } = await docQuery
+
+      if (!docError && docData) {
+        docData.forEach((doc: any) => {
+          // Evitar duplicatas (caso o documento exista em ambas as tabelas)
+          const exists = allSignatures.some(s => s.document_name === doc.original_pdf_name)
+          if (!exists) {
+            allSignatures.push({
+              id: doc.id,
+              document_name: doc.original_pdf_name || 'Documento',
+              signed_document_url: doc.signed_pdf_url,
+              document_hash: null,
+              signature_type: 'both',
+              signature_data: null,
+              signed_at: doc.created_at,
+              status: 'completed',
+              certificate_name: null,
+              source: 'documents',
+            })
+          }
+        })
+      }
+
+      // 3. Ordenar por data (mais recente primeiro)
+      allSignatures.sort((a, b) => 
+        new Date(b.signed_at).getTime() - new Date(a.signed_at).getTime()
+      )
+
+      // 4. Aplicar filtro se necessário
+      let filteredSignatures = allSignatures
+      if (filter === 'completed') {
+        filteredSignatures = allSignatures.filter(s => s.status === 'completed')
+      } else if (filter === 'failed') {
+        filteredSignatures = allSignatures.filter(s => s.status === 'failed')
+      }
+
+      setSignatures(filteredSignatures)
     } catch (err) {
       console.error('Erro ao buscar assinaturas:', err)
     } finally {
@@ -91,13 +148,25 @@ export default function HistoryPage() {
     }
   }
 
-  const handleDownload = async (signature: Signature) => {
+  const handleDownload = async (signature: UnifiedSignature) => {
     if (!supabase) return
 
     try {
+      if (!signature.signed_document_url) {
+        alert('Documento não disponível para download')
+        return
+      }
+
+      // Se for da tabela documents, é URL pública direta
+      if (signature.source === 'documents' && signature.signed_document_url.startsWith('http')) {
+        window.open(signature.signed_document_url, '_blank')
+        return
+      }
+
+      // Se for da tabela signatures, usar signed URL
       const { data, error } = await supabase.storage
         .from('documents')
-        .createSignedUrl(signature.signed_document_path, 3600)
+        .createSignedUrl(signature.signed_document_url, 3600)
 
       if (error) throw error
       if (data?.signedUrl) {
@@ -115,19 +184,36 @@ export default function HistoryPage() {
       digital: 'Digital',
       both: 'Visual + Digital',
     }
-    return types[type] || type
+    return types[type] || 'Visual + Digital'
   }
 
   const getStatusBadge = (status: string) => {
-    const styles: Record<string, { bg: string; text: string; label: string }> = {
-      completed: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Concluído' },
-      failed: { bg: 'bg-rose-100', text: 'text-rose-700', label: 'Falhou' },
-      processing: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Processando' },
+    const styles: Record<string, { bg: string; text: string; label: string; icon: any }> = {
+      completed: { 
+        bg: 'bg-emerald-100', 
+        text: 'text-emerald-700', 
+        label: 'Concluído',
+        icon: CheckCircle,
+      },
+      failed: { 
+        bg: 'bg-rose-100', 
+        text: 'text-rose-700', 
+        label: 'Falhou',
+        icon: AlertCircle,
+      },
+      processing: { 
+        bg: 'bg-amber-100', 
+        text: 'text-amber-700', 
+        label: 'Processando',
+        icon: Loader2,
+      },
     }
     const style = styles[status] || styles.completed
+    const Icon = style.icon
+    
     return (
       <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${style.bg} ${style.text}`}>
-        {status === 'completed' && <CheckCircle className="h-3 w-3" />}
+        <Icon className="h-3 w-3" />
         {style.label}
       </span>
     )
@@ -153,7 +239,9 @@ export default function HistoryPage() {
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">Histórico de Assinaturas</h1>
-            <p className="text-sm text-slate-500">Todos os documentos que você assinou</p>
+            <p className="text-sm text-slate-500">
+              {signatures.length} documento{signatures.length !== 1 ? 's' : ''} assinado{signatures.length !== 1 ? 's' : ''}
+            </p>
           </div>
         </div>
         <Link
@@ -169,18 +257,22 @@ export default function HistoryPage() {
       <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4">
         <span className="text-sm font-medium text-slate-700">Filtrar por:</span>
         <div className="flex gap-2">
-          {['all', 'completed', 'failed'].map((f) => (
+          {[
+            { value: 'all', label: 'Todos' },
+            { value: 'completed', label: 'Concluídos' },
+            { value: 'failed', label: 'Falhos' },
+          ].map((f) => (
             <button
-              key={f}
-              onClick={() => setFilter(f as any)}
+              key={f.value}
+              onClick={() => setFilter(f.value as any)}
               className={[
                 'rounded-lg px-3 py-1.5 text-sm font-medium transition',
-                filter === f
+                filter === f.value
                   ? 'bg-brand-600 text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
               ].join(' ')}
             >
-              {f === 'all' ? 'Todos' : f === 'completed' ? 'Concluídos' : 'Falhos'}
+              {f.label}
             </button>
           ))}
         </div>
@@ -195,7 +287,12 @@ export default function HistoryPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center">
           <FileText className="mx-auto h-12 w-12 text-slate-400 mb-3" />
           <h3 className="text-lg font-semibold text-slate-900 mb-1">Nenhuma assinatura encontrada</h3>
-          <p className="text-sm text-slate-500 mb-4">Você ainda não assinou nenhum documento</p>
+          <p className="text-sm text-slate-500 mb-4">
+            {filter === 'all' 
+              ? 'Você ainda não assinou nenhum documento'
+              : `Nenhum documento ${filter === 'completed' ? 'concluído' : 'com falha'} encontrado`
+            }
+          </p>
           <Link
             href="/sign"
             className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
@@ -215,7 +312,7 @@ export default function HistoryPage() {
                   <div className="flex items-center gap-3 mb-2">
                     <FileText className="h-5 w-5 text-slate-400 flex-shrink-0" />
                     <h3 className="text-base font-semibold text-slate-900 truncate">
-                      {sig.original_document_name}
+                      {sig.document_name}
                     </h3>
                     {getStatusBadge(sig.status)}
                   </div>
@@ -228,10 +325,12 @@ export default function HistoryPage() {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                      <Shield className="h-4 w-4 text-slate-400" />
-                      <span>{sig.certificates?.certificate_name || 'Certificado'}</span>
-                    </div>
+                    {sig.certificate_name && (
+                      <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <Shield className="h-4 w-4 text-slate-400" />
+                        <span>{sig.certificate_name}</span>
+                      </div>
+                    )}
 
                     <div className="text-sm text-slate-600">
                       <span className="font-medium">Tipo:</span> {getSignatureTypeLabel(sig.signature_type)}
@@ -245,7 +344,7 @@ export default function HistoryPage() {
                   </div>
                 </div>
 
-                {sig.status === 'completed' && (
+                {sig.status === 'completed' && sig.signed_document_url && (
                   <button
                     onClick={() => handleDownload(sig)}
                     className="inline-flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
