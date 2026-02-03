@@ -4,6 +4,9 @@
  * Implementa assinatura digital em PDFs usando certificados P12/PFX
  * Compatível com Adobe Reader, Foxit e outros leitores de PDF
  * 
+ * NOVIDADE: Agora usa certificados auto-gerenciados pelo SignFlow!
+ * O sistema gera e gerencia certificados automaticamente no banco de dados.
+ * 
  * @see https://www.npmjs.com/package/@signpdf/signpdf
  */
 
@@ -12,6 +15,11 @@ import { P12Signer } from '@signpdf/signer-p12';
 import { plainAddPlaceholder } from '@signpdf/placeholder-plain';
 import fs from 'fs';
 import path from 'path';
+import {
+  getOrCreateSignFlowCertificate,
+  getCertificateP12Buffer,
+  getCertificatePassword
+} from './certificateManager';
 
 /**
  * Opções para assinatura digital
@@ -25,9 +33,11 @@ export interface DigitalSignatureOptions {
   name?: string;
   /** Localização onde foi assinado */
   location?: string;
-  /** Caminho para o certificado P12/PFX */
+  /** Forçar uso de certificado externo (arquivo P12) */
+  useExternalCertificate?: boolean;
+  /** Caminho para certificado P12/PFX externo (sobrescreve auto-gerenciado) */
   certificatePath?: string;
-  /** Senha do certificado */
+  /** Senha do certificado externo */
   certificatePassword?: string;
 }
 
@@ -68,10 +78,46 @@ export function addSignaturePlaceholder(
 }
 
 /**
- * Assina digitalmente um PDF com certificado P12/PFX
+ * Assina digitalmente um PDF usando certificado gerenciado pelo SignFlow
  * 
- * Usa certificado digital padrão PKI para criar assinatura PKCS#7
- * que é reconhecida por Adobe Reader e outros leitores de PDF.
+ * Este método usa certificados auto-gerados e armazenados no banco de dados.
+ * Não requer configuração manual de certificados!
+ * 
+ * @param pdfBuffer Buffer do PDF com placeholder
+ * @returns PDF assinado digitalmente
+ */
+async function signPdfWithManagedCertificate(pdfBuffer: Buffer): Promise<Buffer> {
+  try {
+    console.log('🏭 Usando certificado auto-gerenciado SignFlow...');
+
+    // Obter ou gerar certificado automaticamente
+    const certificate = await getOrCreateSignFlowCertificate();
+    console.log(`✅ Certificado obtido: ${certificate.serial_number}`);
+
+    // Converter para buffer P12
+    const certificateBuffer = getCertificateP12Buffer(certificate);
+    const certificatePassword = getCertificatePassword();
+
+    // Criar signer com certificado P12
+    const signer = new P12Signer(certificateBuffer, {
+      passphrase: certificatePassword,
+    });
+
+    // Assinar PDF com PKCS#7
+    const signedPdf = await signpdf.sign(pdfBuffer, signer);
+
+    console.log('✅ PDF assinado com certificado SignFlow!');
+    return signedPdf;
+  } catch (error) {
+    console.error('❌ Erro ao assinar com certificado gerenciado:', error);
+    throw error;
+  }
+}
+
+/**
+ * Assina digitalmente um PDF com certificado P12/PFX externo
+ * 
+ * Usa certificado digital externo (ICP-Brasil, etc.) fornecido manualmente.
  * 
  * @param pdfBuffer Buffer do PDF com placeholder
  * @param certificatePath Caminho para o certificado P12
@@ -79,14 +125,16 @@ export function addSignaturePlaceholder(
  * @returns PDF assinado digitalmente
  * @throws Error se certificado não for encontrado ou senha inválida
  */
-export async function signPdfDigitally(
+export async function signPdfWithExternalCertificate(
   pdfBuffer: Buffer,
   certificatePath?: string,
   certificatePassword?: string
 ): Promise<Buffer> {
   try {
+    console.log('📄 Usando certificado externo...');
+
     // Usar certificado padrão se não especificado
-    const certPath = certificatePath || path.join(process.cwd(), 'certificates', 'certificate.p12');
+    const certPath = certificatePath || process.env.CERTIFICATE_PATH || path.join(process.cwd(), 'certificates', 'certificate.p12');
     const certPassword = certificatePassword || process.env.CERTIFICATE_PASSWORD || '';
 
     // Verificar se certificado existe
@@ -109,10 +157,10 @@ export async function signPdfDigitally(
     // Assinar PDF com PKCS#7
     const signedPdf = await signpdf.sign(pdfBuffer, signer);
 
-    console.log('✅ PDF assinado digitalmente com sucesso');
+    console.log('✅ PDF assinado com certificado externo!');
     return signedPdf;
   } catch (error) {
-    console.error('❌ Erro ao assinar PDF digitalmente:', error);
+    console.error('❌ Erro ao assinar PDF com certificado externo:', error);
     throw new Error(
       `Falha na assinatura digital: ${error instanceof Error ? error.message : 'erro desconhecido'}`
     );
@@ -123,10 +171,15 @@ export async function signPdfDigitally(
  * Fluxo completo: adiciona placeholder e assina digitalmente
  * 
  * Esta é a função principal para assinar PDFs com certificado digital.
- * Ela executa todo o processo:
- * 1. Adiciona placeholder de assinatura no PDF
- * 2. Assina digitalmente com certificado P12/PFX
- * 3. Retorna PDF final assinado
+ * 
+ * **MODO AUTOMÁTICO (Padrão)**:
+ * - Usa certificado auto-gerenciado pelo SignFlow
+ * - Gerado e armazenado automaticamente no banco de dados
+ * - Zero configuração necessária!
+ * 
+ * **MODO EXTERNO (Opcional)**:
+ * - Use `useExternalCertificate: true` para certificados ICP-Brasil
+ * - Requer certificado P12 e senha
  * 
  * @param pdfBuffer Buffer do PDF original
  * @param options Opções de assinatura (motivo, contato, certificado, etc.)
@@ -134,14 +187,19 @@ export async function signPdfDigitally(
  * 
  * @example
  * ```typescript
- * const pdfBuffer = fs.readFileSync('documento.pdf');
+ * // Modo automático (certificado SignFlow)
  * const signedPdf = await signPdfComplete(pdfBuffer, {
  *   reason: 'Aprovação de contrato',
- *   contactInfo: 'joao@empresa.com',
- *   name: 'João Silva',
- *   location: 'São Paulo, Brasil'
+ *   name: 'João Silva'
  * });
- * fs.writeFileSync('documento-assinado.pdf', signedPdf);
+ * 
+ * // Modo externo (certificado ICP-Brasil)
+ * const signedPdf = await signPdfComplete(pdfBuffer, {
+ *   reason: 'Aprovação de contrato',
+ *   useExternalCertificate: true,
+ *   certificatePath: './meu-certificado.p12',
+ *   certificatePassword: 'minha-senha'
+ * });
  * ```
  */
 export async function signPdfComplete(
@@ -163,11 +221,27 @@ export async function signPdfComplete(
 
     // 2. Assinar digitalmente com certificado
     console.log('2/2 Assinando com certificado digital...');
-    const signedPdf = await signPdfDigitally(
-      pdfWithPlaceholder,
-      options?.certificatePath,
-      options?.certificatePassword
-    );
+    
+    let signedPdf: Buffer;
+
+    // Decidir qual tipo de certificado usar
+    const useExternal = options?.useExternalCertificate || 
+                        options?.certificatePath || 
+                        process.env.CERTIFICATE_PATH;
+
+    if (useExternal) {
+      // Modo externo: usar certificado P12 fornecido
+      console.log('🔹 Modo: Certificado Externo (ICP-Brasil ou similar)');
+      signedPdf = await signPdfWithExternalCertificate(
+        pdfWithPlaceholder,
+        options?.certificatePath,
+        options?.certificatePassword
+      );
+    } else {
+      // Modo automático: usar certificado auto-gerenciado
+      console.log('🔸 Modo: Certificado Auto-Gerenciado SignFlow');
+      signedPdf = await signPdfWithManagedCertificate(pdfWithPlaceholder);
+    }
 
     console.log('✨ Assinatura digital completa!');
     return signedPdf;
@@ -180,15 +254,42 @@ export async function signPdfComplete(
 /**
  * Verifica se certificado digital está configurado
  * 
- * @returns true se certificado existe e é acessível
+ * Agora verifica tanto certificados externos quanto auto-gerenciados.
+ * 
+ * @returns true se algum tipo de certificado está disponível
  */
-export function isCertificateConfigured(): boolean {
+export async function isCertificateConfigured(): Promise<boolean> {
+  // Verificar certificado externo
+  const certPath = process.env.CERTIFICATE_PATH || path.join(process.cwd(), 'certificates', 'certificate.p12');
+  if (fs.existsSync(certPath)) {
+    return true;
+  }
+
+  // Verificar certificado auto-gerenciado
+  try {
+    const cert = await getOrCreateSignFlowCertificate();
+    return !!cert;
+  } catch (error) {
+    console.warn('⚠️ Erro ao verificar certificado auto-gerenciado:', error);
+    return false;
+  }
+}
+
+/**
+ * Verifica se certificado está configurado (versão síncrona)
+ * 
+ * Verifica apenas certificados externos.
+ * Para certificados auto-gerenciados, use isCertificateConfigured() (async).
+ * 
+ * @returns true se certificado externo existe
+ */
+export function isCertificateConfiguredSync(): boolean {
   const certPath = process.env.CERTIFICATE_PATH || path.join(process.cwd(), 'certificates', 'certificate.p12');
   return fs.existsSync(certPath);
 }
 
 /**
- * Obtém caminho do certificado configurado
+ * Obtém caminho do certificado configurado (externo)
  * 
  * @returns Caminho completo para o certificado ou null se não configurado
  */
