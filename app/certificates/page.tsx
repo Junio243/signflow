@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, CheckCircle, AlertCircle, ArrowLeft, FileKey, Trash2, Download } from 'lucide-react'
+import { Upload, CheckCircle, AlertCircle, ArrowLeft, FileKey, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import Link from 'next/link'
 
@@ -156,7 +156,8 @@ export default function CertificatesPage() {
       // Limpar formulário
       setCertificateFile(null)
       setCertificateName('')
-      setCertificatePassword('')n      
+      setCertificatePassword('')
+      
       // Recarregar lista
       await loadCertificates()
     } catch (err) {
