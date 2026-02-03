@@ -7,15 +7,18 @@ import {
   AlertCircle,
   Ban,
   CheckCircle2,
+  CheckSquare,
   Clock3,
   Copy,
   Download,
+  FileSignature,
   FileText,
   Filter,
   Link2,
   Loader2,
   LogIn,
   RefreshCcw,
+  Square,
   Timer,
   Trash2,
   User,
@@ -26,6 +29,7 @@ import {
 
 import { supabase } from '@/lib/supabaseClient'
 import { useUserProfile } from '@/hooks/useUserProfile'
+import BatchSignModal from '@/components/BatchSignModal'
 
 const STATUS_META = {
   signed: {
@@ -89,8 +93,9 @@ export default function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [selectedDocs, setSelectedDocs] = useState<string[]>([])
+  const [showBatchSignModal, setShowBatchSignModal] = useState(false)
 
-  // Hook do perfil do usuário
   const { profile, loading: profileLoading } = useUserProfile()
 
   const fetchSession = useCallback(async () => {
@@ -188,6 +193,27 @@ export default function DashboardPage() {
     const timeout = setTimeout(() => setFeedback(null), 4000)
     return () => clearTimeout(timeout)
   }, [feedback])
+
+  const toggleDocSelection = (docId: string) => {
+    setSelectedDocs(prev =>
+      prev.includes(docId)
+        ? prev.filter(id => id !== docId)
+        : [...prev, docId]
+    )
+  }
+
+  const toggleSelectAll = () => {
+    const draftDocs = filteredDocs.filter(d => (d.status ?? '').toLowerCase() === 'draft')
+    if (selectedDocs.length === draftDocs.length && draftDocs.length > 0) {
+      setSelectedDocs([])
+    } else {
+      setSelectedDocs(draftDocs.map(d => d.id))
+    }
+  }
+
+  const getSelectedDocuments = () => {
+    return docs.filter(doc => selectedDocs.includes(doc.id))
+  }
 
   const handleRefresh = async () => {
     setLoading(true)
@@ -362,7 +388,6 @@ export default function DashboardPage() {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {/* Botão de Perfil */}
           {isLogged && (
             <Link
               href="/profile"
@@ -374,7 +399,16 @@ export default function DashboardPage() {
             </Link>
           )}
 
-          {/* Quick Create Button */}
+          {selectedDocs.length > 0 && (
+            <button
+              onClick={() => setShowBatchSignModal(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-700"
+            >
+              <FileSignature className="h-4 w-4" />
+              Assinar {selectedDocs.length} Selecionado(s)
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleQuickCreate}
@@ -385,7 +419,6 @@ export default function DashboardPage() {
             Criação Rápida
           </button>
 
-          {/* Advanced Create Button with NEW badge */}
           <button
             type="button"
             onClick={handleAdvancedCreate}
@@ -399,7 +432,6 @@ export default function DashboardPage() {
             </span>
           </button>
 
-          {/* Refresh Button */}
           <button
             type="button"
             onClick={handleRefresh}
@@ -525,6 +557,19 @@ export default function DashboardPage() {
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
+                <th scope="col" className="px-4 py-3 text-left font-semibold">
+                  <button
+                    onClick={toggleSelectAll}
+                    className="flex items-center gap-2"
+                    title="Selecionar/Desselecionar todos os rascunhos"
+                  >
+                    {selectedDocs.length > 0 && selectedDocs.length === filteredDocs.filter(d => (d.status ?? '').toLowerCase() === 'draft').length ? (
+                      <CheckSquare className="h-5 w-5 text-brand-600" />
+                    ) : (
+                      <Square className="h-5 w-5 text-slate-400" />
+                    )}
+                  </button>
+                </th>
                 <th scope="col" className="px-4 py-3 text-left font-semibold">ID</th>
                 <th scope="col" className="px-4 py-3 text-left font-semibold">Nome</th>
                 <th scope="col" className="px-4 py-3 text-left font-semibold">Status</th>
@@ -535,7 +580,7 @@ export default function DashboardPage() {
             <tbody className="divide-y divide-slate-100 bg-white">
               {loading && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin text-brand-600" aria-hidden />
                     <p className="mt-2 text-sm">Carregando documentos…</p>
                   </td>
@@ -544,7 +589,7 @@ export default function DashboardPage() {
 
               {!loading && filteredDocs.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
                     <p className="font-medium">Nenhum documento encontrado com os filtros aplicados.</p>
                     <p className="mt-2 text-sm">Altere os filtros ou crie um novo documento.</p>
                     <div className="mt-4 flex justify-center gap-3">
@@ -575,9 +620,24 @@ export default function DashboardPage() {
                   const meta = STATUS_META[statusKey] ?? STATUS_META.default
                   const Icon = meta.icon
                   const canDelete = ['draft', 'canceled', 'expired'].includes(statusKey)
+                  const canSelect = statusKey === 'draft'
                   
                   return (
                     <tr key={doc.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        {canSelect && (
+                          <button
+                            onClick={() => toggleDocSelection(doc.id)}
+                            title="Selecionar para assinatura em lote"
+                          >
+                            {selectedDocs.includes(doc.id) ? (
+                              <CheckSquare className="h-5 w-5 text-brand-600" />
+                            ) : (
+                              <Square className="h-5 w-5 text-slate-400" />
+                            )}
+                          </button>
+                        )}
+                      </td>
                       <td className="px-4 py-3 font-mono text-xs text-slate-500">{doc.id.slice(0, 8)}…</td>
                       <td className="px-4 py-3 text-slate-700">{doc.original_pdf_name ?? '—'}</td>
                       <td className="px-4 py-3">
@@ -651,6 +711,20 @@ export default function DashboardPage() {
           </table>
         </div>
       </section>
+
+      {showBatchSignModal && (
+        <BatchSignModal
+          selectedDocuments={getSelectedDocuments()}
+          onClose={() => {
+            setShowBatchSignModal(false)
+            setSelectedDocs([])
+          }}
+          onSuccess={() => {
+            fetchDocs()
+            setSelectedDocs([])
+          }}
+        />
+      )}
     </div>
   )
 }
