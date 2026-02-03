@@ -25,6 +25,7 @@ import {
   QrPage,
 } from '@/lib/validation/documentSchemas';
 import { createRateLimiter, addRateLimitHeaders } from '@/lib/middleware/rateLimit';
+import { signPdfComplete, isCertificateConfigured } from '@/lib/digitalSignature';
 
 type SignerMetadata = {
   name: string;
@@ -197,7 +198,7 @@ export async function POST(req: NextRequest) {
   if (!rateLimitResult.allowed) return rateLimitResult.response;
 
   try {
-    const supabaseAdmin = getSupabaseAdmin(); // ← client dentro do handler
+    const supabaseAdmin = getSupabaseAdmin();
 
     const form = await req.formData();
     const idResult = documentIdSchema.safeParse(form.get('id')?.toString());
@@ -378,9 +379,9 @@ export async function POST(req: NextRequest) {
     // Insert QR code in selected pages
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontSize = 7;
-    const textMaxWidth = 200; // Maximum width for text block
-    const textMargin = 10; // Space between QR and text
-    const lineSpacing = 2; // Spacing between lines in pixels
+    const textMaxWidth = 200;
+    const textMargin = 10;
+    const lineSpacing = 2;
     
     // Format signature date
     const signatureDate = new Date().toLocaleDateString('pt-BR');
@@ -411,36 +412,28 @@ export async function POST(req: NextRequest) {
       let textX = coords.x;
       let textY = coords.y;
       
-      // Position text to the right or left of QR based on position
       if (qrPosition === 'bottom-right' || qrPosition === 'top-right') {
-        // Text on the left side of QR - ensure it doesn't overlap with QR
         const desiredX = coords.x - textMaxWidth - textMargin;
         textX = Math.max(margin, desiredX);
         
-        // If there's not enough space on the left, skip text rendering for this position
         if (textX + textMaxWidth + textMargin > coords.x) {
-          continue; // Skip rendering text if it would overlap with QR
+          continue;
         }
       } else {
-        // Text on the right side of QR
         textX = coords.x + qrSize + textMargin;
         
-        // If there's not enough space on the right, skip text rendering for this position
         if (textX + textMaxWidth > pageWidth - margin) {
-          continue; // Skip rendering text if it would go beyond page bounds
+          continue;
         }
       }
       
-      // Start text from top of QR code area
       textY = coords.y + qrSize - fontSize;
       
-      // Draw each line of text
       for (let i = 0; i < wrappedLines.length; i++) {
         const line = wrappedLines[i];
         const lineY = textY - (i * (fontSize + lineSpacing));
         const lineWidth = font.widthOfTextAtSize(line, fontSize);
         
-        // Only draw if within page bounds (check all boundaries with actual line width)
         if (lineY >= margin && 
             lineY <= pageHeight - margin &&
             textX >= margin && 
@@ -456,12 +449,34 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const signedBytes = await pdfDoc.save();
+    // Salvar PDF com assinaturas visuais e QR Code
+    let finalPdfBytes = await pdfDoc.save();
+
+    // ✨ NOVO: Adicionar assinatura digital PKI se certificado estiver configurado
+    const hasCertificate = isCertificateConfigured();
+    if (hasCertificate) {
+      try {
+        console.log('🔐 Aplicando assinatura digital PKI...');
+        finalPdfBytes = await signPdfComplete(Buffer.from(finalPdfBytes), {
+          reason: 'Documento assinado digitalmente via SignFlow',
+          contactInfo: 'suporte@signflow.com',
+          name: firstSigner.name || 'SignFlow Digital Signature',
+          location: 'SignFlow Platform',
+        });
+        console.log('✅ Assinatura digital PKI aplicada com sucesso!');
+      } catch (certError) {
+        console.warn('⚠️ Erro ao aplicar assinatura digital PKI:', certError);
+        console.warn('📝 Continuando sem assinatura digital (apenas visual + QR Code)');
+        // Continua com o PDF sem assinatura digital
+      }
+    } else {
+      console.log('ℹ️ Certificado digital não configurado. PDF assinado apenas com assinatura visual e QR Code.');
+    }
 
     // sobe arquivos gerados
     const upSigned = await supabaseAdmin.storage
       .from('signflow')
-      .upload(`${id}/signed.pdf`, signedBytes, {
+      .upload(`${id}/signed.pdf`, finalPdfBytes, {
         contentType: 'application/pdf',
         upsert: true,
       });
@@ -499,7 +514,6 @@ export async function POST(req: NextRequest) {
     }
 
     // atualiza registro
-    // @ts-ignore (evita never do types gerados no build)
     const upd = await supabaseAdmin
       .from('documents')
       .update({
@@ -530,7 +544,6 @@ export async function POST(req: NextRequest) {
 
       const insEvents = await supabaseAdmin
         .from('document_signing_events')
-        // @ts-ignore (tipagem gerada em tempo de build)
         .insert(payload);
 
       if (insEvents.error) {
@@ -544,6 +557,7 @@ export async function POST(req: NextRequest) {
       signed_pdf_url: pubSigned.data.publicUrl,
       qr_code_url: pubQr.data.publicUrl,
       validate_url: validateUrl,
+      digital_signature_applied: hasCertificate,
     });
     return addRateLimitHeaders(response, rateLimitResult.headers);
   } catch (e: any) {
