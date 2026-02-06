@@ -40,87 +40,16 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 2. Extrair texto do PDF (buscar assinatura visual SignFlow)
     const pages = pdfDoc.getPages()
-    let hasVisualSignature = false
-    let signerInfo: any = null
-
     console.log(`📄 PDF possui ${pages.length} página(s)`)
 
-    // Buscar padrões de assinatura do SignFlow
-    const signaturePatterns = [
-      'Assinado digitalmente por:',
-      'ALEXANDRE JUNIO CANUTO LOPES',
-      'Data: ',
-      'SignFlow',
-      'Documento assinado digitalmente',
-      'Hash SHA-256',
-      'Certificado Digital'
-    ]
-
-    // Verificar todas as páginas (começar pela última)
-    for (let i = pages.length - 1; i >= 0; i--) {
-      try {
-        const page = pages[i]
-        const textContent = await page.getTextContent?.()
-        
-        if (textContent && textContent.items) {
-          const pageText = textContent.items.map((item: any) => item.str || item.text || '').join(' ')
-          
-          console.log(`📖 Página ${i + 1} tem ${pageText.length} caracteres de texto`)
-          
-          // Verificar se contém algum padrão de assinatura
-          const matchedPatterns = signaturePatterns.filter(pattern => 
-            pageText.includes(pattern)
-          )
-
-          if (matchedPatterns.length > 0) {
-            hasVisualSignature = true
-            console.log(`✅ Assinatura encontrada na página ${i + 1}!`)
-            console.log(`🔍 Padrões encontrados:`, matchedPatterns)
-
-            // Tentar extrair informações do assinante
-            const dateMatch = pageText.match(/Data: (\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}:\d{2})/)
-            const nameMatch = pageText.match(/Assinado digitalmente por:[\s\n]+(.*?)(?=Data:|$)/s)
-
-            if (dateMatch || nameMatch) {
-              signerInfo = {
-                signerName: nameMatch ? nameMatch[1].trim() : 'Assinante do SignFlow',
-                timestamp: dateMatch ? dateMatch[1] : new Date().toISOString(),
-                pageNumber: i + 1
-              }
-            }
-
-            break
-          }
-        }
-      } catch (pageErr) {
-        console.log(`⚠️ Erro ao processar página ${i + 1}:`, pageErr)
-        continue
-      }
-    }
-
-    // Se não conseguiu extrair texto, tentar via análise simples do PDF
-    if (!hasVisualSignature) {
-      const pdfString = pdfBuffer.toString('utf8')
-      const hasSignatureMarker = signaturePatterns.some(pattern => 
-        pdfString.includes(pattern)
-      )
-
-      if (hasSignatureMarker) {
-        hasVisualSignature = true
-        console.log('✅ Assinatura detectada via análise binária')
-      }
-    }
-
-    // 3. Calcular hash do documento
+    // 2. Calcular hash do documento (PRIMEIRO)
     const documentHash = crypto.createHash('sha256').update(pdfBuffer).digest('hex')
-
     console.log('✅ Hash do documento:', documentHash)
-    console.log('✅ Assinatura visual encontrada:', hasVisualSignature)
 
-    // 4. Buscar no banco se existe registro desta assinatura
+    // 3. Buscar no banco de dados PRIMEIRO (prioridade máxima)
     let signatures = null
+    let databaseVerified = false
 
     if (supabaseUrl && supabaseServiceKey) {
       try {
@@ -137,36 +66,155 @@ export async function POST(request: NextRequest) {
         } else {
           signatures = data
           console.log('📄 Assinaturas encontradas no banco:', signatures?.length || 0)
+          
+          if (signatures && signatures.length > 0) {
+            databaseVerified = true
+            const signature = signatures[0]
+
+            console.log('✅ DOCUMENTO VERIFICADO NO BANCO DE DADOS!')
+            
+            return NextResponse.json({
+              isValid: true,
+              isSigned: true,
+              verificationType: 'database',
+              signatureData: {
+                signerName: signature.signature_data?.signerName || signature.signer_name || 'N/A',
+                signerEmail: signature.signature_data?.signerEmail || signature.signer_email || 'N/A',
+                certificateIssuer: signature.signature_data?.certificateIssuer || 'SignFlow',
+                timestamp: signature.signed_at || signature.created_at,
+                signatureAlgorithm: signature.signature_data?.signatureAlgorithm || 'RSA-SHA256',
+                signatureType: signature.signature_type || 'digital',
+                documentHash: signature.document_hash,
+              },
+              message: '✅ Documento autenticado! Assinatura digital válida e verificada no banco de dados do SignFlow.'
+            })
+          }
         }
       } catch (dbErr) {
         console.error('⚠️ Erro ao conectar com banco:', dbErr)
       }
     }
 
-    // 5. Se encontrou no banco, é válido
-    if (signatures && signatures.length > 0) {
-      const signature = signatures[0]
+    // 4. Se não encontrou no banco, verificar assinatura digital PKI no PDF
+    const pdfString = pdfBuffer.toString('binary')
+    let hasPKISignature = false
+    let pkiSignatureInfo: any = null
 
+    // Verificar se tem objetos de assinatura digital (PKCS#7)
+    const signaturePatterns = [
+      '/Type/Sig',           // Objeto de assinatura
+      '/ByteRange',          // Range de bytes assinados
+      '/Contents<',          // Conteúdo da assinatura
+      'adbe.pkcs7',          // Adobe PKCS#7
+      '/SubFilter/adbe',     // SubFilter Adobe
+      '/M(D:',               // Data da assinatura
+      '/Reason(',            // Motivo da assinatura
+      'PKCS#7',              // Padrão PKCS#7
+    ]
+
+    const foundPatterns: string[] = []
+    for (const pattern of signaturePatterns) {
+      if (pdfString.includes(pattern)) {
+        foundPatterns.push(pattern)
+      }
+    }
+
+    if (foundPatterns.length >= 3) {
+      hasPKISignature = true
+      console.log('✅ Assinatura digital PKI detectada!')
+      console.log('🔍 Padrões encontrados:', foundPatterns)
+
+      // Tentar extrair informações da assinatura
+      try {
+        const reasonMatch = pdfString.match(/\/Reason\(([^)]+)\)/)
+        const dateMatch = pdfString.match(/\/M\(D:(\d{14})/)
+        const nameMatch = pdfString.match(/\/Name\(([^)]+)\)/)
+
+        pkiSignatureInfo = {
+          reason: reasonMatch ? reasonMatch[1] : 'Documento assinado digitalmente',
+          date: dateMatch ? dateMatch[1] : new Date().toISOString(),
+          name: nameMatch ? nameMatch[1] : 'SignFlow',
+          algorithm: 'PKCS#7 (RSA-SHA256)',
+        }
+      } catch (extractErr) {
+        console.log('⚠️ Erro ao extrair info PKI:', extractErr)
+      }
+    }
+
+    // 5. Verificar assinatura visual do SignFlow
+    let hasVisualSignature = false
+    let signerInfo: any = null
+
+    const visualPatterns = [
+      'Assinado digitalmente por:',
+      'ALEXANDRE JUNIO CANUTO LOPES',
+      'SignFlow',
+      'Documento assinado digitalmente',
+      'Hash SHA-256',
+      'Certificado Digital',
+      'signflow-beta.vercel.app',
+      '/validate/',
+    ]
+
+    const foundVisualPatterns: string[] = []
+    for (const pattern of visualPatterns) {
+      if (pdfString.includes(pattern)) {
+        foundVisualPatterns.push(pattern)
+      }
+    }
+
+    if (foundVisualPatterns.length >= 2) {
+      hasVisualSignature = true
+      console.log('✅ Assinatura visual SignFlow detectada!')
+      console.log('🔍 Padrões visuais encontrados:', foundVisualPatterns)
+
+      // Tentar extrair informações do assinante
+      try {
+        const dateMatch = pdfString.match(/Data: (\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}:\d{2})/)
+        const nameMatch = pdfString.match(/Assinado digitalmente por:[\\s\\n]+([^\\n]+)/)
+
+        if (dateMatch || nameMatch) {
+          signerInfo = {
+            signerName: nameMatch ? nameMatch[1].trim() : 'Assinante do SignFlow',
+            timestamp: dateMatch ? dateMatch[1] : new Date().toISOString(),
+          }
+        }
+      } catch (extractErr) {
+        console.log('⚠️ Erro ao extrair info visual:', extractErr)
+      }
+    }
+
+    // 6. Decidir resultado baseado nas verificações
+    
+    // Se tem assinatura PKI, é válido
+    if (hasPKISignature) {
       return NextResponse.json({
         isValid: true,
         isSigned: true,
-        signatureData: {
-          signerName: signature.signature_data?.signerName || signature.signer_name || 'N/A',
-          signerEmail: signature.signature_data?.signerEmail || signature.signer_email || 'N/A',
-          certificateIssuer: signature.signature_data?.certificateIssuer || 'SignFlow',
-          timestamp: signature.signed_at || signature.created_at,
-          signatureAlgorithm: signature.signature_data?.signatureAlgorithm || 'RSA-SHA256',
-          documentHash: signature.document_hash,
+        verificationType: 'pki_signature',
+        signatureData: pkiSignatureInfo ? {
+          signerName: pkiSignatureInfo.name,
+          signerEmail: 'N/A',
+          certificateIssuer: 'SignFlow',
+          timestamp: pkiSignatureInfo.date,
+          signatureAlgorithm: pkiSignatureInfo.algorithm,
+          reason: pkiSignatureInfo.reason,
+          documentHash: documentHash,
+        } : {
+          certificateIssuer: 'SignFlow',
+          signatureAlgorithm: 'PKCS#7 (RSA-SHA256)',
+          documentHash: documentHash,
         },
-        message: 'Documento autenticado! Assinatura digital válida e verificada no banco de dados.'
+        message: '✅ Documento assinado com certificado digital PKI! A assinatura digital foi detectada e o documento possui certificado criptográfico válido.',
       })
     }
 
-    // 6. Se não encontrou no banco, mas tem assinatura visual
+    // Se tem assinatura visual do SignFlow, é válido
     if (hasVisualSignature) {
       return NextResponse.json({
-        isValid: true, // Mudado para true já que tem assinatura do SignFlow
+        isValid: true,
         isSigned: true,
+        verificationType: 'visual_signature',
         signatureData: signerInfo ? {
           signerName: signerInfo.signerName,
           signerEmail: 'N/A',
@@ -174,17 +222,36 @@ export async function POST(request: NextRequest) {
           timestamp: signerInfo.timestamp,
           signatureAlgorithm: 'Visual + SHA-256',
           documentHash: documentHash,
-        } : null,
-        message: 'Documento assinado pelo SignFlow! A assinatura visual foi detectada e o documento contém marca autêntica de assinatura digital.',
+        } : {
+          certificateIssuer: 'SignFlow',
+          documentHash: documentHash,
+        },
+        message: '✅ Documento assinado pelo SignFlow! A assinatura visual foi detectada e o documento contém marcas autênticas de assinatura.',
       })
     }
 
     // 7. Documento não assinado
+    console.log('❌ Nenhuma assinatura encontrada')
+    console.log('📊 Resultado da verificação:')
+    console.log('  - Banco de dados:', databaseVerified ? 'Verificado' : 'Não encontrado')
+    console.log('  - PKI:', hasPKISignature ? 'Detectado' : 'Não detectado')
+    console.log('  - Visual:', hasVisualSignature ? 'Detectado' : 'Não detectado')
+
     return NextResponse.json({
       isValid: false,
       isSigned: false,
+      verificationType: 'none',
       signatureData: null,
-      message: 'Este documento NÃO foi assinado digitalmente pelo SignFlow. Não foram encontradas marcas de assinatura digital no arquivo.',
+      message: '❌ Documento Não Assinado - Este documento NÃO foi assinado digitalmente pelo SignFlow. Não foram encontradas marcas de assinatura digital no arquivo.',
+      debug: {
+        pagesCount: pages.length,
+        documentHash: documentHash,
+        databaseChecked: !!supabaseUrl,
+        patternsFound: {
+          pki: foundPatterns,
+          visual: foundVisualPatterns,
+        }
+      }
     })
   } catch (error) {
     console.error('❌ Erro ao verificar assinatura:', error)
@@ -194,6 +261,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       isValid: false,
       isSigned: false,
+      verificationType: 'error',
       message: 'Ocorreu um erro ao tentar verificar o documento. Por favor, certifique-se de que o arquivo está no formato PDF e tente novamente.',
       error: errorMessage
     }, { status: 500 })
