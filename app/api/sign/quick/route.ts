@@ -217,27 +217,33 @@ export async function POST(req: NextRequest) {
 
     console.log('✅ Arquivos armazenados');
 
-    // 14. Criar registro em documents
+    // 14. Calcular expires_at (7 dias a partir de agora)
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    // 15. Criar registro em documents
     const { error: docError } = await supabase
       .from('documents')
       .insert({
         id: documentId,
         user_id: user.id,
-        document_type: 'quick',
         original_pdf_name: payload.document_name,
         signed_pdf_url: signedUrl.publicUrl,
         qr_code_url: qrUrl.publicUrl,
         status: 'signed',
+        expires_at: expiresAt.toISOString(),
         metadata: {
           quick_sign: true,
           signer_name: signerName,
           signer_email: payload.signer_email || user.email,
           signed_at: new Date().toISOString(),
+          has_pki_signature: hasPKISignature,
         },
       });
 
     if (docError) {
       console.error('Erro ao criar documento:', docError);
+      console.error('Detalhes do erro:', JSON.stringify(docError, null, 2));
       // Limpar arquivos
       await supabase.storage.from('signflow').remove([originalPath, signedPath, qrPath]);
       return NextResponse.json(
@@ -246,7 +252,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 15. Salvar em signatures
+    console.log('✅ Documento salvo:', documentId);
+
+    // 16. Salvar em signatures
     const { error: sigError } = await supabase
       .from('signatures')
       .insert({
@@ -254,7 +262,7 @@ export async function POST(req: NextRequest) {
         user_id: user.id,
         signer_name: signerName,
         signer_email: payload.signer_email || user.email,
-        signature_type: hasPKISignature ? 'both' : 'visual_only',
+        signature_type: hasPKISignature ? 'both' : 'visual',
         document_hash: documentHash,
         signature_data: {
           signerName: signerName,
@@ -264,13 +272,17 @@ export async function POST(req: NextRequest) {
           quickSign: true,
         },
         status: 'completed',
+        signed_at: new Date().toISOString(),
       });
 
     if (sigError) {
       console.warn('⚠️ Erro ao salvar em signatures:', sigError);
+      console.warn('Detalhes:', JSON.stringify(sigError, null, 2));
+    } else {
+      console.log('✅ Assinatura registrada');
     }
 
-    console.log('✅ Assinatura rápida concluída:', documentId);
+    console.log('✨ Assinatura rápida concluída:', documentId);
 
     return NextResponse.json({
       success: true,
@@ -285,6 +297,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('❌ Erro ao processar assinatura rápida:', error);
+    console.error('Stack:', error.stack);
     return NextResponse.json(
       { error: 'Erro ao processar assinatura: ' + (error.message || 'Desconhecido') },
       { status: 500 }
