@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
 
     // 5. Criar documento ID
     const documentId = crypto.randomUUID();
+    console.log('🎫 Document ID gerado:', documentId);
 
     // 6. Gerar QR Code
     const base = process.env.NEXT_PUBLIC_BASE_URL || req.nextUrl.origin;
@@ -169,7 +170,8 @@ export async function POST(req: NextRequest) {
     // 9. Calcular hash DEPOIS de adicionar PKI (IMPORTANTE!)
     // O hash deve ser do PDF FINAL, não do PDF intermediário
     const documentHash = crypto.createHash('sha256').update(pdfBytes).digest('hex');
-    console.log('✅ Hash do documento final:', documentHash.substring(0, 16) + '...');
+    console.log('🔑 Hash do documento final (COMPLETO):', documentHash);
+    console.log('   Tamanho do PDF final:', pdfBytes.length, 'bytes');
 
     // 10. Upload do PDF original
     const originalPath = `${documentId}/original.pdf`;
@@ -257,7 +259,10 @@ export async function POST(req: NextRequest) {
     console.log('✅ Documento salvo:', documentId);
 
     // 16. Salvar em signatures
-    const { error: sigError } = await supabase
+    console.log('💾 Salvando assinatura no banco...');
+    console.log('   Hash que será salvo:', documentHash);
+    
+    const { data: sigData, error: sigError } = await supabase
       .from('signatures')
       .insert({
         document_id: documentId,
@@ -275,13 +280,15 @@ export async function POST(req: NextRequest) {
         },
         status: 'completed',
         signed_at: new Date().toISOString(),
-      });
+      })
+      .select();
 
     if (sigError) {
-      console.warn('⚠️ Erro ao salvar em signatures:', sigError);
-      console.warn('Detalhes:', JSON.stringify(sigError, null, 2));
+      console.error('❌ ERRO ao salvar em signatures:', sigError);
+      console.error('Detalhes completos:', JSON.stringify(sigError, null, 2));
     } else {
-      console.log('✅ Assinatura registrada');
+      console.log('✅ Assinatura registrada com SUCESSO!');
+      console.log('   Dados salvos:', sigData);
     }
 
     console.log('✨ Assinatura rápida concluída:', documentId);
@@ -296,6 +303,10 @@ export async function POST(req: NextRequest) {
         has_pki_signature: hasPKISignature,
       },
       message: 'Documento assinado com sucesso!',
+      debug: {
+        documentHash: documentHash,
+        savedToDatabase: !sigError,
+      }
     });
   } catch (error: any) {
     console.error('❌ Erro ao processar assinatura rápida:', error);
