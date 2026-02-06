@@ -430,7 +430,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Adicionar página final com informações de assinatura
+    // Adicionar página final com informações detalhadas de assinatura
     const lastPage = pdfDoc.addPage();
     const lastPageWidth = lastPage.getWidth();
     const lastPageHeight = lastPage.getHeight();
@@ -466,7 +466,57 @@ export async function POST(req: NextRequest) {
       font: font,
       color: rgb(0, 0, 0),
     });
-    currentY -= 40;
+    currentY -= 20;
+
+    // CPF (se disponível)
+    if (firstSigner.reg) {
+      lastPage.drawText(`CPF: ${firstSigner.reg}`, {
+        x: marginPage,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+      currentY -= 20;
+    }
+
+    // Certificado (se disponível)
+    if (firstSigner.certificate_type) {
+      lastPage.drawText(`Certificado: ${firstSigner.certificate_type}`, {
+        x: marginPage,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+      currentY -= 20;
+    }
+
+    currentY -= 10;
+
+    // Texto dinâmico completo de validação ICP-Brasil
+    const fullValidationText = generateValidationText(
+      firstSigner.name,
+      firstSigner.reg,
+      firstSigner.certificate_type,
+      signatureDate,
+      validateUrl,
+      accessCode,
+      requiresAccessCode
+    );
+
+    const validationLines = wrapText(fullValidationText, font, 9, lastPageWidth - (marginPage * 2));
+    
+    for (const line of validationLines) {
+      lastPage.drawText(line, {
+        x: marginPage,
+        y: currentY,
+        size: 9,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+      currentY -= 14;
+    }
 
     let finalPdfBytes = await pdfDoc.save();
     
