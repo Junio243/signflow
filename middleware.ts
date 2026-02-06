@@ -22,15 +22,15 @@ export function middleware(request: NextRequest) {
     "default-src 'self'",
     "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // Next.js requer unsafe-eval e unsafe-inline
     "style-src 'self' 'unsafe-inline'", // Permite estilos inline usados na aplicação
-    "img-src 'self' data: blob: https://*.supabase.co", // Permite imagens de dados, blob e Supabase Storage
+    "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in", // Permite imagens de dados, blob e Supabase Storage
     "font-src 'self' data:", // Permite fontes locais e data URIs
     "object-src 'none'", // Bloqueia plugins como Flash
     "base-uri 'self'", // Restringe a tag <base>
     "form-action 'self'", // Permite envio de formulários apenas para mesma origem
     "frame-ancestors 'none'", // Equivalente ao X-Frame-Options DENY
     "upgrade-insecure-requests", // Atualiza requisições HTTP para HTTPS
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co", // Permite conexões ao Supabase (API + Realtime)
-    "media-src 'self' blob:", // Permite mídia de blob (para PDFs)
+    "connect-src 'self' data: blob: https://*.supabase.co https://*.supabase.in wss://*.supabase.co", // Permite conexões ao Supabase (API + Realtime) e data URIs
+    "media-src 'self' data: blob:", // Permite mídia de blob e data URIs (para PDFs)
     "worker-src 'self' blob:", // Permite workers de blob (pdf.js)
   ]
   response.headers.set('Content-Security-Policy', cspDirectives.join('; '))
