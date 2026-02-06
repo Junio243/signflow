@@ -16,6 +16,30 @@ const nextConfig = {
       bodySizeLimit: '20mb',
     },
   },
+
+  // Headers de segurança (CSP corrigido para permitir data: URIs)
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in",
+              "font-src 'self' data:",
+              "connect-src 'self' data: blob: https://*.supabase.co wss://*.supabase.co",
+              "frame-src 'self'",
+              "media-src 'self' data: blob:",
+            ].join('; '),
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
