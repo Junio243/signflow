@@ -143,11 +143,8 @@ export async function POST(req: NextRequest) {
 
     // 7. Salvar PDF modificado
     let pdfBytes = await pdfDoc.save();
-    
-    // 8. Calcular hash ANTES da assinatura PKI
-    const documentHash = crypto.createHash('sha256').update(pdfBytes).digest('hex');
 
-    // 9. Adicionar assinatura digital PKI
+    // 8. Adicionar assinatura digital PKI
     let hasPKISignature = false;
     try {
       const hasCert = await isCertificateConfigured();
@@ -168,6 +165,11 @@ export async function POST(req: NextRequest) {
       console.warn('⚠️ Erro ao aplicar PKI:', pkiError);
       hasPKISignature = false;
     }
+    
+    // 9. Calcular hash DEPOIS de adicionar PKI (IMPORTANTE!)
+    // O hash deve ser do PDF FINAL, não do PDF intermediário
+    const documentHash = crypto.createHash('sha256').update(pdfBytes).digest('hex');
+    console.log('✅ Hash do documento final:', documentHash.substring(0, 16) + '...');
 
     // 10. Upload do PDF original
     const originalPath = `${documentId}/original.pdf`;
