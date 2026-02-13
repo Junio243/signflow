@@ -1,231 +1,155 @@
+// lib/audit.ts
 /**
- * Sistema de Auditoria
+ * Sistema de Auditoria Completo
  * 
- * Este módulo fornece funções para registrar eventos de auditoria
- * no banco de dados para rastreabilidade e compliance.
+ * Registra todas as ações críticas no sistema para compliance e segurança
  */
 
 import { getSupabaseAdmin } from './supabaseAdmin';
-import { createHash } from 'crypto';
+import { logger } from './logger';
+import { NextRequest } from 'next/server';
 
-/**
- * Tipos de ação permitidos no sistema de auditoria
- */
-export type AuditAction =
-  // Document operations
-  | 'document.upload'
-  | 'document.sign'
-  | 'document.validate'
-  | 'document.delete'
-  | 'document.download'
-  | 'document.view'
-  | 'document.update'
-  // Authentication/Authorization
-  | 'auth.login'
-  | 'auth.logout'
-  | 'auth.denied'
-  | 'auth.failed'
-  // Rate limiting
-  | 'rate_limit.exceeded'
-  | 'rate_limit.violation'
-  // Security
-  | 'security.scan'
-  | 'security.violation'
-  | 'security.suspicious_activity'
-  // System
-  | 'system.error'
-  | 'system.cleanup'
-  | 'system.maintenance';
-
-/**
- * Status de uma operação auditada
- */
-export type AuditStatus = 'success' | 'failure' | 'denied' | 'error';
-
-/**
- * Tipo de recurso afetado
- */
-export type ResourceType = 
-  | 'document'
-  | 'signature'
-  | 'validation'
-  | 'user'
-  | 'system'
-  | 'storage';
-
-/**
- * Parâmetros para registro de auditoria
- */
-export interface AuditLogParams {
-  /** Ação executada */
-  action: AuditAction;
-  
-  /** Tipo de recurso afetado */
-  resourceType: ResourceType;
-  
-  /** ID do recurso (opcional) */
-  resourceId?: string;
-  
-  /** Status da operação */
-  status: AuditStatus;
-  
-  /** ID do usuário (opcional para ações anônimas) */
-  userId?: string | null;
-  
-  /** Endereço IP do cliente (será hasheado) */
-  ip?: string;
-  
-  /** Detalhes adicionais sobre o evento */
-  details?: Record<string, any>;
-  
-  /** User agent do cliente */
-  userAgent?: string;
-  
-  /** ID da requisição (para correlação) */
-  requestId?: string;
-}
-
-/**
- * Gera hash SHA-256 de uma string
- */
-function hashString(input: string): string {
-  return createHash('sha256').update(input, 'utf8').digest('hex');
+export interface AuditLogEntry {
+  action: string; // Ex: 'document.upload', 'document.sign', 'user.login'
+  resourceType: string; // Ex: 'document', 'user', 'signature'
+  resourceId?: string; // ID do recurso afetado
+  userId?: string | null; // ID do usuário que executou a ação
+  status: 'success' | 'error' | 'pending'; // Resultado da ação
+  ip?: string; // IP do cliente
+  userAgent?: string; // User agent do navegador
+  requestId?: string; // ID único da requisição
+  details?: Record<string, any>; // Detalhes adicionais
 }
 
 /**
  * Registra um evento de auditoria no banco de dados
- * 
- * Esta função é assíncrona mas não lança erros - falhas são logadas
- * no console para não interromper o fluxo principal da aplicação.
- * 
- * @param params Parâmetros do evento de auditoria
- * @returns Promise<boolean> - true se o log foi registrado com sucesso
- * 
- * @example
- * ```typescript
- * await logAudit({
- *   action: 'document.upload',
- *   resourceType: 'document',
- *   resourceId: documentId,
- *   status: 'success',
- *   userId: user?.id,
- *   ip: clientIp,
- *   details: { fileName: 'contract.pdf', size: 1024000 }
- * });
- * ```
  */
-export async function logAudit(params: AuditLogParams): Promise<boolean> {
+export async function logAudit(entry: AuditLogEntry): Promise<void> {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
+    const supabase = getSupabaseAdmin();
     
-    // Hash do IP para privacidade
-    const ipHash = params.ip ? hashString(params.ip) : null;
-    
-    // Preparar payload
-    const payload = {
-      action: params.action,
-      resource_type: params.resourceType,
-      resource_id: params.resourceId || null,
-      status: params.status,
-      user_id: params.userId || null,
-      ip_hash: ipHash,
-      details: params.details || {},
-      user_agent: params.userAgent || null,
-      request_id: params.requestId || null,
+    const auditRecord = {
+      action: entry.action,
+      resource_type: entry.resourceType,
+      resource_id: entry.resourceId || null,
+      user_id: entry.userId || null,
+      status: entry.status,
+      ip_address: entry.ip || null,
+      user_agent: entry.userAgent || null,
+      request_id: entry.requestId || null,
+      details: entry.details || null,
+      created_at: new Date().toISOString(),
     };
-    
-    // Inserir log no banco
-    const { error } = await supabaseAdmin
+
+    const { error } = await supabase
       .from('audit_logs')
-      .insert(payload);
-    
+      .insert(auditRecord);
+
     if (error) {
-      console.error('[Audit] Erro ao registrar log de auditoria:', {
-        error: error.message,
-        action: params.action,
-        resourceType: params.resourceType,
-        status: params.status,
-      });
-      return false;
+      logger.error('Failed to write audit log', error, { entry });
+    } else {
+      logger.debug('Audit log written', { action: entry.action, resourceId: entry.resourceId });
     }
-    
-    return true;
   } catch (error) {
-    // Nunca lançar erro - apenas logar
-    console.error('[Audit] Exceção ao registrar log de auditoria:', {
-      error: error instanceof Error ? error.message : String(error),
-      action: params.action,
-      resourceType: params.resourceType,
-      status: params.status,
+    logger.error('Exception in logAudit', error as Error, { entry });
+  }
+}
+
+/**
+ * Helper: extrai IP da requisição
+ */
+export function extractIpFromRequest(req: NextRequest): string {
+  const forwarded = req.headers.get('x-forwarded-for');
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp) {
+    return realIp;
+  }
+  
+  return 'unknown';
+}
+
+/**
+ * Helper: extrai User-Agent da requisição
+ */
+export function extractUserAgentFromRequest(req: NextRequest): string {
+  return req.headers.get('user-agent') || 'unknown';
+}
+
+/**
+ * Helpers pré-configurados para eventos comuns
+ */
+export const AuditHelpers = {
+  documentUpload: (documentId: string, userId: string | null, ip: string, success: boolean, details?: Record<string, any>) => {
+    return logAudit({
+      action: 'document.upload',
+      resourceType: 'document',
+      resourceId: documentId,
+      userId,
+      status: success ? 'success' : 'error',
+      ip,
+      details,
     });
-    return false;
-  }
-}
+  },
 
-/**
- * Registra múltiplos eventos de auditoria de uma vez
- * 
- * @param events Array de eventos de auditoria
- * @returns Promise<number> - número de eventos registrados com sucesso
- */
-export async function logAuditBatch(events: AuditLogParams[]): Promise<number> {
-  if (events.length === 0) return 0;
-  
-  try {
-    const supabaseAdmin = getSupabaseAdmin();
-    
-    // Preparar todos os payloads
-    const payloads = events.map(params => ({
-      action: params.action,
-      resource_type: params.resourceType,
-      resource_id: params.resourceId || null,
-      status: params.status,
-      user_id: params.userId || null,
-      ip_hash: params.ip ? hashString(params.ip) : null,
-      details: params.details || {},
-      user_agent: params.userAgent || null,
-      request_id: params.requestId || null,
-    }));
-    
-    // Inserir todos de uma vez
-    const { error } = await supabaseAdmin
-      .from('audit_logs')
-      .insert(payloads);
-    
-    if (error) {
-      console.error('[Audit] Erro ao registrar lote de logs:', error.message);
-      return 0;
-    }
-    
-    return payloads.length;
-  } catch (error) {
-    console.error('[Audit] Exceção ao registrar lote de logs:', 
-      error instanceof Error ? error.message : String(error)
-    );
-    return 0;
-  }
-}
+  documentSign: (documentId: string, userId: string | null, ip: string, success: boolean, details?: Record<string, any>) => {
+    return logAudit({
+      action: 'document.sign',
+      resourceType: 'document',
+      resourceId: documentId,
+      userId,
+      status: success ? 'success' : 'error',
+      ip,
+      details,
+    });
+  },
 
-/**
- * Helper para extrair IP de uma requisição Next.js
- */
-export function extractIpFromRequest(request: Request): string {
-  const headers = new Headers(request.headers);
-  
-  // Tentar vários headers comuns
-  const forwardedFor = headers.get('x-forwarded-for');
-  const realIp = headers.get('x-real-ip');
-  const cfConnectingIp = headers.get('cf-connecting-ip'); // Cloudflare
-  
-  // x-forwarded-for pode ser uma lista separada por vírgulas
-  if (forwardedFor) {
-    const ips = forwardedFor.split(',').map(ip => ip.trim());
-    return ips[0]; // Primeiro IP é o cliente
-  }
-  
-  if (realIp) return realIp;
-  if (cfConnectingIp) return cfConnectingIp;
-  
-  // Fallback
-  return '0.0.0.0';
-}
+  documentDelete: (documentId: string, userId: string | null, ip: string, success: boolean) => {
+    return logAudit({
+      action: 'document.delete',
+      resourceType: 'document',
+      resourceId: documentId,
+      userId,
+      status: success ? 'success' : 'error',
+      ip,
+    });
+  },
+
+  documentValidation: (documentId: string, ip: string, success: boolean, accessCodeProvided: boolean) => {
+    return logAudit({
+      action: 'document.validation',
+      resourceType: 'document',
+      resourceId: documentId,
+      status: success ? 'success' : 'error',
+      ip,
+      details: { accessCodeProvided },
+    });
+  },
+
+  userLogin: (userId: string, ip: string, userAgent: string, success: boolean) => {
+    return logAudit({
+      action: 'user.login',
+      resourceType: 'user',
+      resourceId: userId,
+      userId,
+      status: success ? 'success' : 'error',
+      ip,
+      userAgent,
+    });
+  },
+
+  securityEvent: (eventType: string, ip: string, details: Record<string, any>) => {
+    return logAudit({
+      action: `security.${eventType}`,
+      resourceType: 'security',
+      status: 'error',
+      ip,
+      details,
+    });
+  },
+};
+
+export default logAudit;
