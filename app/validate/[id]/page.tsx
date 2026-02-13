@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useParams } from 'next/navigation'
-import { ShieldCheck, Download } from 'lucide-react'
+import { ShieldCheck, Download, FileText } from 'lucide-react'
 
 type Doc = {
   id: string
@@ -61,6 +61,9 @@ export default function ValidatePage() {
   const [requiresCode, setRequiresCode] = useState(false)
   const [accessCode, setAccessCode] = useState('')
   const [accessError, setAccessError] = useState<string | null>(null)
+  const [generatingReport, setGeneratingReport] = useState(false)
+  const [icpImageError, setIcpImageError] = useState(false)
+  const [itiImageError, setItiImageError] = useState(false)
 
   useEffect(() => {
     (async () => {
@@ -225,6 +228,37 @@ export default function ValidatePage() {
       : 'Data não informada'
   }, [doc?.created_at])
 
+  const handleGenerateReport = async () => {
+    if (!doc) return
+    
+    setGeneratingReport(true)
+    try {
+      const response = await fetch(`/api/validate/${id}/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      
+      if (!response.ok) {
+        throw new Error('Erro ao gerar relatório')
+      }
+      
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `relatorio-autenticidade-${id}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('[Validate] Erro ao gerar relatório:', error)
+      alert('Não foi possível gerar o relatório. Por favor, tente novamente.')
+    } finally {
+      setGeneratingReport(false)
+    }
+  }
+
   if (errorMsg) return <p style={{ padding:16 }}>Erro: {errorMsg}</p>
   if (eventsLoading) return <p style={{ padding:16 }}>Carregando…</p>
 
@@ -359,16 +393,30 @@ export default function ValidatePage() {
               Selos oficiais
             </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-              <img
-                src="/seals/icp-brasil.png"
-                alt="Selo ICP-Brasil"
-                style={{ height: 48, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#fff', objectFit: 'contain', padding: 4 }}
-              />
-              <img
-                src="/seals/iti.png"
-                alt="Selo ITI - Instituto Nacional de Tecnologia da Informação"
-                style={{ height: 48, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#fff', objectFit: 'contain', padding: 4 }}
-              />
+              {!icpImageError ? (
+                <img
+                  src="/seals/icp-brasil.png"
+                  alt="Selo ICP-Brasil"
+                  style={{ height: 48, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#fff', objectFit: 'contain', padding: 4 }}
+                  onError={() => setIcpImageError(true)}
+                />
+              ) : (
+                <div style={{ height: 48, width: 48, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#6b7280' }}>
+                  ICP-BR
+                </div>
+              )}
+              {!itiImageError ? (
+                <img
+                  src="/seals/iti.png"
+                  alt="Selo ITI - Instituto Nacional de Tecnologia da Informação"
+                  style={{ height: 48, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#fff', objectFit: 'contain', padding: 4 }}
+                  onError={() => setItiImageError(true)}
+                />
+              ) : (
+                <div style={{ height: 48, width: 48, borderRadius: 8, border: `1px solid ${headerPalette.border}`, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#6b7280' }}>
+                  ITI
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -414,7 +462,7 @@ export default function ValidatePage() {
           </div>
         </div>
 
-        <div style={{ marginTop:16 }}>
+        <div style={{ marginTop:16, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {doc.signed_pdf_url ? (
             <button
               type="button"
@@ -440,6 +488,30 @@ export default function ValidatePage() {
           ) : (
             <div style={{ color:'#6b7280', fontSize:14 }}>PDF assinado ainda não gerado.</div>
           )}
+          
+          <button
+            type="button"
+            onClick={handleGenerateReport}
+            disabled={generatingReport}
+            aria-label="Gerar relatório de autenticidade"
+            style={{
+              display:'inline-flex',
+              alignItems:'center',
+              gap:8,
+              backgroundColor: '#10b981',
+              color:'#fff',
+              border:'none',
+              borderRadius:9999,
+              padding:'10px 18px',
+              fontWeight:600,
+              cursor: generatingReport ? 'not-allowed' : 'pointer',
+              boxShadow:'0 10px 25px rgba(16,185,129,0.15)',
+              opacity: generatingReport ? 0.7 : 1
+            }}
+          >
+            <FileText size={18} />
+            {generatingReport ? 'Gerando relatório...' : 'Gerar relatório de autenticidade'}
+          </button>
         </div>
       </div>
 
