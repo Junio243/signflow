@@ -216,18 +216,17 @@ export default function CreateDocumentPage() {
         validationUrl: data.document.validationUrl,
         signedPdfUrl: data.document.signedPdfUrl,
         qrCodeUrl: data.document.qrCodeUrl,
-        fileName: formData.document.file.name
+        fileName: formData.document.file.name,
+        signedAt: data.document.signedAt
       }
 
       console.log('🎉 [FRONTEND] Setting result and moving to step 8')
       setResult(resultData)
       goToNextStep({})
-
-      // Clear saved data after successful submission
-      setTimeout(() => {
-        console.log('🧹 [FRONTEND] Clearing saved form data')
-        reset()
-      }, 100)
+      
+      // ⚠️ NÃO RESETAR AUTOMATICAMENTE! Deixar o usuário ver o resultado
+      // O reset só deve acontecer quando o usuário clicar em "Assinar Outro Documento"
+      console.log('✅ [FRONTEND] Result displayed, data preserved for user review')
       
     } catch (err) {
       console.error('\n❌❌❌ [FRONTEND] ERROR SUBMITTING DOCUMENT')
@@ -240,8 +239,18 @@ export default function CreateDocumentPage() {
       alert(`❌ ERRO AO ASSINAR DOCUMENTO\n\n${errorMessage}\n\nVerifique o console (F12) para mais detalhes.`)
     } finally {
       setLoading(false)
-      console.log('🏁 [FRONTEND] Submission process finished, loading:', false)
+      console.log('🏁 [FRONTEND] Submission process finished')
     }
+  }
+
+  // Função para resetar e criar novo documento
+  const handleCreateNew = () => {
+    console.log('🔄 [FRONTEND] User requested to create new document')
+    reset()
+    setResult(null)
+    setError('')
+    // Reload page to ensure clean state
+    window.location.href = '/create-document'
   }
 
   if (loading) {
@@ -356,7 +365,10 @@ export default function CreateDocumentPage() {
           )}
 
           {currentStep === 8 && result && (
-            <ResultStep result={result} />
+            <ResultStep 
+              result={result}
+              onCreateNew={handleCreateNew}
+            />
           )}
         </MultiStepContainer>
       </div>
