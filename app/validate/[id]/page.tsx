@@ -233,29 +233,15 @@ export default function ValidatePage() {
     
     setGeneratingReport(true)
     try {
-      const response = await fetch(`/api/validate/${id}/report`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      
-      if (!response.ok) {
-        throw new Error('Erro ao gerar relatório')
-      }
-      
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `relatorio-autenticidade-${id}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      // Abre o relatório em uma nova janela
+      const reportUrl = `/api/validate/${id}/report`
+      window.open(reportUrl, '_blank', 'noopener,noreferrer')
     } catch (error) {
       console.error('[Validate] Erro ao gerar relatório:', error)
       alert('Não foi possível gerar o relatório. Por favor, tente novamente.')
     } finally {
-      setGeneratingReport(false)
+      // Aguarda um pouco para dar tempo de abrir a janela
+      setTimeout(() => setGeneratingReport(false), 500)
     }
   }
 
