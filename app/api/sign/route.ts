@@ -508,4 +508,181 @@ export async function POST(req: NextRequest) {
     const validationLines = wrapText(fullValidationText, font, 9, lastPageWidth - (marginPage * 2));
     
     for (const line of validationLines) {
-      lastPage.drawText(line, {\n        x: marginPage,\n        y: currentY,\n        size: 9,\n        font: font,\n        color: rgb(0, 0, 0),\n      });\n      currentY -= 14;\n    }\n\n    let finalPdfBytes = await pdfDoc.save();\n    \n    // ✨ Aplicar assinatura digital PKI (se disponível)\n    let hasCertificate = false;\n    try {\n      hasCertificate = await isCertificateConfigured();\n      \n      if (hasCertificate) {\n        console.log('🔐 Aplicando assinatura digital PKI...');\n        finalPdfBytes = await signPdfComplete(Buffer.from(finalPdfBytes), {\n          reason: 'Documento assinado digitalmente via SignFlow',\n          contactInfo: 'suporte@signflow.com',\n          name: firstSigner.name || 'SignFlow Digital Signature',\n          location: 'SignFlow Platform',\n        });\n        console.log('✅ Assinatura digital PKI aplicada com sucesso!');\n      } else {\n        console.log('ℹ️ Certificado digital não configurado. PDF assinado apenas com assinatura visual.');\n      }\n    } catch (certError) {\n      console.warn('⚠️ Erro ao aplicar assinatura digital PKI:', certError);\n      console.warn('📝 Continuando sem assinatura PKI (apenas visual + QR Code)');\n      hasCertificate = false;\n    }\n\n    // ⚠️ CORREÇÃO CRÍTICA: O hash deve ser calculado SOBRE O ARQUIVO FINAL\n    // Se houver assinatura PKI, o hash muda. O banco precisa ter o hash do arquivo final.\n    const documentHash = crypto.createHash('sha256').update(finalPdfBytes).digest('hex');\n    console.log('✅ Hash final do documento calculado:', documentHash);\n\n    const upSigned = await supabaseAdmin.storage\n      .from('signflow')\n      .upload(`${id}/signed.pdf`, finalPdfBytes, {\n        contentType: 'application/pdf',\n        upsert: true,\n      });\n    if (upSigned.error) {\n      return NextResponse.json({ error: upSigned.error.message }, { status: 500 });\n    }\n\n    const upQr = await supabaseAdmin.storage\n      .from('signflow')\n      .upload(`${id}/qr.png`, qrPng, {\n        contentType: 'image/png',\n        upsert: true,\n      });\n    if (upQr.error) {\n      return NextResponse.json({ error: upQr.error.message }, { status: 500 });\n    }\n\n    const pubSigned = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/signed.pdf`);\n    if (!pubSigned.data?.publicUrl) {\n      console.error('Erro ao gerar URL pública do PDF assinado: URL não disponível');\n      return NextResponse.json(\n        { error: 'Falha ao gerar URL pública do PDF assinado.' },\n        { status: 500 },\n      );\n    }\n\n    const pubQr = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/qr.png`);\n    if (!pubQr.data?.publicUrl) {\n      console.error('Erro ao gerar URL pública do QR code: URL não disponível');\n      return NextResponse.json(\n        { error: 'Falha ao gerar URL pública do QR code.' },\n        { status: 500 },\n      );\n    }\n\n    const upd = await supabaseAdmin\n      .from('documents')\n      .update({\n        signed_pdf_url: pubSigned.data.publicUrl,\n        qr_code_url: pubQr.data.publicUrl,\n        status: 'signed',\n      })\n      .eq('id', id);\n\n    if (upd.error) {\n      return NextResponse.json({ error: upd.error.message }, { status: 500 });\n    }\n\n    const nowIso = new Date().toISOString();\n    \n    // Salvar assinatura na tabela signatures\n    const signatureData = {\n      document_id: id,\n      document_hash: documentHash,\n      signer_name: firstSigner.name,\n      signer_email: firstSigner.email,\n      signature_type: hasCertificate ? 'digital_pki' : 'visual',\n      signature_data: {\n        signerName: firstSigner.name,\n        signerReg: firstSigner.reg,\n        signerEmail: firstSigner.email,\n        certificateType: firstSigner.certificate_type,\n        certificateIssuer: firstSigner.certificate_issuer || 'SignFlow',\n        signatureAlgorithm: hasCertificate ? 'RSA-SHA256' : 'Visual',\n        documentHash: documentHash,\n      },\n      signed_at: nowIso,\n      status: 'completed',\n    };\n\n    // Tentar atualizar se já existir (upsert) ou inserir novo\n    // Primeiro verificamos se já existe para evitar duplicação\n    const { data: existingSig } = await supabaseAdmin\n      .from('signatures')\n      .select('id')\n      .eq('document_id', id)\n      .maybeSingle();\n\n    let insSignature;\n    if (existingSig) {\n      insSignature = await supabaseAdmin\n        .from('signatures')\n        .update(signatureData)\n        .eq('id', existingSig.id);\n    } else {\n      insSignature = await supabaseAdmin\n        .from('signatures')\n        .insert(signatureData);\n    }\n\n    if (insSignature.error) {\n      console.warn('⚠️ Erro ao salvar assinatura:', insSignature.error);\n    }\n\n    if (signers.length) {\n      // Remover eventos anteriores para evitar duplicação em caso de re-assinatura\n      await supabaseAdmin.from('document_signing_events').delete().eq('document_id', id);\n\n      const payload = signers.map(signer => ({\n        document_id: id,\n        signer_name: signer.name,\n        signer_reg: signer.reg,\n        certificate_type: signer.certificate_type,\n        certificate_issuer: signer.certificate_issuer,\n        signer_email: signer.email,\n        signed_at: nowIso,\n        certificate_valid_until: toIsoOrNull(signer.certificate_valid_until),\n        logo_url: signer.logo_url,\n        metadata: signer.metadata,\n      }));\n\n      const insEvents = await supabaseAdmin\n        .from('document_signing_events')\n        .insert(payload);\n\n      if (insEvents.error) {\n        return NextResponse.json({ error: insEvents.error.message }, { status: 500 });\n      }\n    }\n\n    const response = NextResponse.json({\n      ok: true,\n      id,\n      signed_pdf_url: pubSigned.data.publicUrl,\n      qr_code_url: pubQr.data.publicUrl,\n      validate_url: validateUrl,\n      digital_signature_applied: hasCertificate,\n      document_hash: documentHash,\n    });\n    return addRateLimitHeaders(response, rateLimitResult.headers);\n  } catch (e: any) {\n    console.error('❌ Erro ao assinar documento:', e);\n    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });\n  }\n}\n
+      lastPage.drawText(line, {
+        x: marginPage,
+        y: currentY,
+        size: 9,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+      currentY -= 14;
+    }
+
+    let finalPdfBytes = await pdfDoc.save();
+    
+    // ✨ Aplicar assinatura digital PKI (se disponível)
+    let hasCertificate = false;
+    try {
+      hasCertificate = await isCertificateConfigured();
+      
+      if (hasCertificate) {
+        console.log('🔐 Aplicando assinatura digital PKI...');
+        finalPdfBytes = await signPdfComplete(Buffer.from(finalPdfBytes), {
+          reason: 'Documento assinado digitalmente via SignFlow',
+          contactInfo: 'suporte@signflow.com',
+          name: firstSigner.name || 'SignFlow Digital Signature',
+          location: 'SignFlow Platform',
+        });
+        console.log('✅ Assinatura digital PKI aplicada com sucesso!');
+      } else {
+        console.log('ℹ️ Certificado digital não configurado. PDF assinado apenas com assinatura visual.');
+      }
+    } catch (certError) {
+      console.warn('⚠️ Erro ao aplicar assinatura digital PKI:', certError);
+      console.warn('📝 Continuando sem assinatura PKI (apenas visual + QR Code)');
+      hasCertificate = false;
+    }
+
+    // ⚠️ CORREÇÃO CRÍTICA: O hash deve ser calculado SOBRE O ARQUIVO FINAL
+    // Se houver assinatura PKI, o hash muda. O banco precisa ter o hash do arquivo final.
+    const documentHash = crypto.createHash('sha256').update(finalPdfBytes).digest('hex');
+    console.log('✅ Hash final do documento calculado:', documentHash);
+
+    const upSigned = await supabaseAdmin.storage
+      .from('signflow')
+      .upload(`${id}/signed.pdf`, finalPdfBytes, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+    if (upSigned.error) {
+      return NextResponse.json({ error: upSigned.error.message }, { status: 500 });
+    }
+
+    const upQr = await supabaseAdmin.storage
+      .from('signflow')
+      .upload(`${id}/qr.png`, qrPng, {
+        contentType: 'image/png',
+        upsert: true,
+      });
+    if (upQr.error) {
+      return NextResponse.json({ error: upQr.error.message }, { status: 500 });
+    }
+
+    const pubSigned = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/signed.pdf`);
+    if (!pubSigned.data?.publicUrl) {
+      console.error('Erro ao gerar URL pública do PDF assinado: URL não disponível');
+      return NextResponse.json(
+        { error: 'Falha ao gerar URL pública do PDF assinado.' },
+        { status: 500 },
+      );
+    }
+
+    const pubQr = supabaseAdmin.storage.from('signflow').getPublicUrl(`${id}/qr.png`);
+    if (!pubQr.data?.publicUrl) {
+      console.error('Erro ao gerar URL pública do QR code: URL não disponível');
+      return NextResponse.json(
+        { error: 'Falha ao gerar URL pública do QR code.' },
+        { status: 500 },
+      );
+    }
+
+    const upd = await supabaseAdmin
+      .from('documents')
+      .update({
+        signed_pdf_url: pubSigned.data.publicUrl,
+        qr_code_url: pubQr.data.publicUrl,
+        status: 'signed',
+      })
+      .eq('id', id);
+
+    if (upd.error) {
+      return NextResponse.json({ error: upd.error.message }, { status: 500 });
+    }
+
+    const nowIso = new Date().toISOString();
+    
+    // Salvar assinatura na tabela signatures
+    const signatureData = {
+      document_id: id,
+      document_hash: documentHash,
+      signer_name: firstSigner.name,
+      signer_email: firstSigner.email,
+      signature_type: hasCertificate ? 'digital_pki' : 'visual',
+      signature_data: {
+        signerName: firstSigner.name,
+        signerReg: firstSigner.reg,
+        signerEmail: firstSigner.email,
+        certificateType: firstSigner.certificate_type,
+        certificateIssuer: firstSigner.certificate_issuer || 'SignFlow',
+        signatureAlgorithm: hasCertificate ? 'RSA-SHA256' : 'Visual',
+        documentHash: documentHash,
+      },
+      signed_at: nowIso,
+      status: 'completed',
+    };
+
+    // Tentar atualizar se já existir (upsert) ou inserir novo
+    // Primeiro verificamos se já existe para evitar duplicação
+    const { data: existingSig } = await supabaseAdmin
+      .from('signatures')
+      .select('id')
+      .eq('document_id', id)
+      .maybeSingle();
+
+    let insSignature;
+    if (existingSig) {
+      insSignature = await supabaseAdmin
+        .from('signatures')
+        .update(signatureData)
+        .eq('id', existingSig.id);
+    } else {
+      insSignature = await supabaseAdmin
+        .from('signatures')
+        .insert(signatureData);
+    }
+
+    if (insSignature.error) {
+      console.warn('⚠️ Erro ao salvar assinatura:', insSignature.error);
+    }
+
+    if (signers.length) {
+      // Remover eventos anteriores para evitar duplicação em caso de re-assinatura
+      await supabaseAdmin.from('document_signing_events').delete().eq('document_id', id);
+
+      const payload = signers.map(signer => ({
+        document_id: id,
+        signer_name: signer.name,
+        signer_reg: signer.reg,
+        certificate_type: signer.certificate_type,
+        certificate_issuer: signer.certificate_issuer,
+        signer_email: signer.email,
+        signed_at: nowIso,
+        certificate_valid_until: toIsoOrNull(signer.certificate_valid_until),
+        logo_url: signer.logo_url,
+        metadata: signer.metadata,
+      }));
+
+      const insEvents = await supabaseAdmin
+        .from('document_signing_events')
+        .insert(payload);
+
+      if (insEvents.error) {
+        return NextResponse.json({ error: insEvents.error.message }, { status: 500 });
+      }
+    }
+
+    const response = NextResponse.json({
+      ok: true,
+      id,
+      signed_pdf_url: pubSigned.data.publicUrl,
+      qr_code_url: pubQr.data.publicUrl,
+      validate_url: validateUrl,
+      digital_signature_applied: hasCertificate,
+      document_hash: documentHash,
+    });
+    return addRateLimitHeaders(response, rateLimitResult.headers);
+  } catch (e: any) {
+    console.error('❌ Erro ao assinar documento:', e);
+    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+  }
+}
