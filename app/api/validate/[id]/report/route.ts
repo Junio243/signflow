@@ -1,54 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+async function generateReport(
+  id: string
+) {
+  const supabase = await createClient()
+
+  // Buscar documento
+  const { data: doc, error: docError } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (docError || !doc) {
+    return NextResponse.json(
+      { error: 'Documento não encontrado' },
+      { status: 404 }
+    )
+  }
+
+  // Buscar eventos de assinatura
+  const { data: events, error: eventsError } = await supabase
+    .from('document_signing_events')
+    .select('*')
+    .eq('document_id', id)
+    .order('signed_at', { ascending: false })
+
+  if (eventsError) {
+    console.error('Erro ao buscar eventos:', eventsError)
+    return NextResponse.json(
+      { error: 'Erro ao buscar histórico de assinaturas' },
+      { status: 500 }
+    )
+  }
+
+  // Gerar HTML do relatório
+  const html = generateReportHTML(doc, events || [])
+
+  // Retornar HTML que pode ser impresso como PDF
+  return new NextResponse(html, {
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Disposition': `inline; filename="relatorio-autenticidade-${id}.html"`,
+    },
+  })
+}
+
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await context.params
-    const supabase = await createClient()
+    return await generateReport(id)
+  } catch (error) {
+    console.error('Erro ao gerar relatório:', error)
+    return NextResponse.json(
+      { error: 'Erro ao gerar relatório' },
+      { status: 500 }
+    )
+  }
+}
 
-    // Buscar documento
-    const { data: doc, error: docError } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('id', id)
-      .single()
-
-    if (docError || !doc) {
-      return NextResponse.json(
-        { error: 'Documento não encontrado' },
-        { status: 404 }
-      )
-    }
-
-    // Buscar eventos de assinatura
-    const { data: events, error: eventsError } = await supabase
-      .from('document_signing_events')
-      .select('*')
-      .eq('document_id', id)
-      .order('signed_at', { ascending: false })
-
-    if (eventsError) {
-      console.error('Erro ao buscar eventos:', eventsError)
-      return NextResponse.json(
-        { error: 'Erro ao buscar histórico de assinaturas' },
-        { status: 500 }
-      )
-    }
-
-    // Gerar HTML do relatório
-    const html = generateReportHTML(doc, events || [])
-
-    // Retornar HTML como PDF (simplificado - em produção, usar biblioteca como puppeteer ou jsPDF)
-    // Por enquanto, vamos retornar um HTML estático que pode ser impresso como PDF
-    return new NextResponse(html, {
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': `inline; filename="relatorio-autenticidade-${id}.html"`,
-      },
-    })
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await context.params
+    return await generateReport(id)
   } catch (error) {
     console.error('Erro ao gerar relatório:', error)
     return NextResponse.json(
