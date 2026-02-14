@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type ReactNode, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { AlertCircle, ArrowLeft, ArrowRight, Check, Loader2, MapPin, Shield, User, Briefcase } from 'lucide-react'
+import { formatErrorForDisplay } from '@/lib/errorMessages'
+import { AlertCircle, ArrowLeft, ArrowRight, Check, Loader2, User, Briefcase, Shield, Info } from 'lucide-react'
 
 function Wrapper({ children }: { children: ReactNode }) {
   return (
@@ -17,27 +18,18 @@ function Wrapper({ children }: { children: ReactNode }) {
 }
 
 type FormData = {
-  // Etapa 1 - Dados Pessoais
+  // Etapa 1 - Dados Básicos (obrigatórios)
   fullName: string
   email: string
   phone: string
-  cpf: string
+  
+  // Etapa 2 - Dados Complementares (opcionais)
+  cpf: string // OPCIONAL - será solicitado apenas para planos pagos
   birthDate: string
-  
-  // Etapa 2 - Endereço
-  cep: string
-  street: string
-  number: string
-  complement: string
-  neighborhood: string
-  city: string
-  state: string
-  
-  // Etapa 3 - Profissional (opcional)
   company: string
   position: string
   
-  // Etapa 4 - Segurança
+  // Etapa 3 - Segurança
   password: string
   confirmPassword: string
   acceptTerms: boolean
@@ -49,13 +41,6 @@ const INITIAL_DATA: FormData = {
   phone: '',
   cpf: '',
   birthDate: '',
-  cep: '',
-  street: '',
-  number: '',
-  complement: '',
-  neighborhood: '',
-  city: '',
-  state: '',
   company: '',
   position: '',
   password: '',
@@ -64,10 +49,9 @@ const INITIAL_DATA: FormData = {
 }
 
 const STEPS = [
-  { id: 1, name: 'Dados Pessoais', icon: User },
-  { id: 2, name: 'Endereço', icon: MapPin },
-  { id: 3, name: 'Profissional', icon: Briefcase },
-  { id: 4, name: 'Segurança', icon: Shield },
+  { id: 1, name: 'Dados Básicos', icon: User },
+  { id: 2, name: 'Complementares', icon: Briefcase },
+  { id: 3, name: 'Segurança', icon: Shield },
 ]
 
 export default function SignupPage() {
@@ -76,7 +60,6 @@ export default function SignupPage() {
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<FormData>(INITIAL_DATA)
   const [loading, setLoading] = useState(false)
-  const [loadingCep, setLoadingCep] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
 
@@ -96,13 +79,6 @@ export default function SignupPage() {
       .replace(/^(\d{2})(\d)/, '($1) $2')
       .replace(/(\d{5})(\d)/, '$1-$2')
       .slice(0, 15)
-  }
-
-  const maskCEP = (value: string) => {
-    return value
-      .replace(/\D/g, '')
-      .replace(/(\d{5})(\d)/, '$1-$2')
-      .slice(0, 9)
   }
 
   // Validações
@@ -140,43 +116,18 @@ export default function SignupPage() {
     if (formData.phone.replace(/\D/g, '').length < 11) {
       return 'Por favor, informe um telefone válido com DDD'
     }
-    if (!validateCPF(formData.cpf)) {
-      return 'CPF inválido'
-    }
-    if (!formData.birthDate) {
-      return 'Por favor, informe sua data de nascimento'
-    }
     return null
   }
 
   const validateStep2 = (): string | null => {
-    if (formData.cep.replace(/\D/g, '').length !== 8) {
-      return 'CEP inválido'
-    }
-    if (!formData.street.trim()) {
-      return 'Por favor, informe o endereço'
-    }
-    if (!formData.number.trim()) {
-      return 'Por favor, informe o número'
-    }
-    if (!formData.neighborhood.trim()) {
-      return 'Por favor, informe o bairro'
-    }
-    if (!formData.city.trim()) {
-      return 'Por favor, informe a cidade'
-    }
-    if (!formData.state.trim()) {
-      return 'Por favor, informe o estado'
+    // CPF é opcional, mas se preenchido deve ser válido
+    if (formData.cpf && !validateCPF(formData.cpf)) {
+      return 'CPF inválido. Deixe em branco se preferir preencher depois.'
     }
     return null
   }
 
   const validateStep3 = (): string | null => {
-    // Etapa 3 é opcional
-    return null
-  }
-
-  const validateStep4 = (): string | null => {
     if (formData.password.length < 6) {
       return 'A senha deve ter pelo menos 6 caracteres'
     }
@@ -184,7 +135,7 @@ export default function SignupPage() {
       return 'As senhas não coincidem'
     }
     if (!formData.acceptTerms) {
-      return 'Você precisa aceitar os Termos de Uso'
+      return 'Você precisa aceitar os Termos de Uso e a Política de Privacidade'
     }
     return null
   }
@@ -194,34 +145,7 @@ export default function SignupPage() {
       case 1: return validateStep1()
       case 2: return validateStep2()
       case 3: return validateStep3()
-      case 4: return validateStep4()
       default: return null
-    }
-  }
-
-  // Buscar CEP
-  const fetchCEP = async (cep: string) => {
-    const cleanCEP = cep.replace(/\D/g, '')
-    if (cleanCEP.length !== 8) return
-
-    setLoadingCep(true)
-    try {
-      const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`)
-      const data = await response.json()
-      
-      if (!data.erro) {
-        setFormData(prev => ({
-          ...prev,
-          street: data.logradouro || '',
-          neighborhood: data.bairro || '',
-          city: data.localidade || '',
-          state: data.uf || '',
-        }))
-      }
-    } catch (err) {
-      console.error('Erro ao buscar CEP:', err)
-    } finally {
-      setLoadingCep(false)
     }
   }
 
@@ -232,7 +156,7 @@ export default function SignupPage() {
       setError(validationError)
       return
     }
-    if (currentStep < 4) {
+    if (currentStep < 3) {
       setCurrentStep(prev => prev + 1)
     }
   }
@@ -248,7 +172,7 @@ export default function SignupPage() {
     setError(null)
     setInfo(null)
     
-    const validationError = validateStep4()
+    const validationError = validateStep3()
     if (validationError) {
       setError(validationError)
       return
@@ -257,7 +181,7 @@ export default function SignupPage() {
     setLoading(true)
 
     if (!supabaseClient) {
-      setError('Serviço de autenticação indisponível.')
+      setError('Serviço de autenticação indisponível. Por favor, tente novamente mais tarde.')
       setLoading(false)
       return
     }
@@ -276,44 +200,42 @@ export default function SignupPage() {
       })
 
       if (signupError) {
-        setError(signupError.message)
+        setError(formatErrorForDisplay(signupError))
         setLoading(false)
         return
       }
 
-      // Criar perfil completo
+      // Criar perfil completo (apenas campos preenchidos)
       if (data.user) {
+        const profileData: any = {
+          id: data.user.id,
+          full_name: formData.fullName.trim(),
+          phone: formData.phone,
+        }
+
+        // Adicionar campos opcionais apenas se preenchidos
+        if (formData.cpf) profileData.cpf = formData.cpf.replace(/\D/g, '')
+        if (formData.birthDate) profileData.birth_date = formData.birthDate
+        if (formData.company) profileData.company = formData.company
+        if (formData.position) profileData.position = formData.position
+
         const { error: profileError } = await supabaseClient
           .from('user_profiles')
-          .insert({
-            id: data.user.id,
-            full_name: formData.fullName.trim(),
-            phone: formData.phone,
-            cpf: formData.cpf.replace(/\D/g, ''),
-            birth_date: formData.birthDate,
-            cep: formData.cep.replace(/\D/g, ''),
-            street: formData.street,
-            number: formData.number,
-            complement: formData.complement || null,
-            neighborhood: formData.neighborhood,
-            city: formData.city,
-            state: formData.state,
-            company: formData.company || null,
-            position: formData.position || null,
-          })
+          .insert(profileData)
 
         if (profileError) {
           console.error('Erro ao criar perfil:', profileError)
+          // Não bloquear cadastro por erro no perfil
         }
       }
 
-      setInfo('✅ Cadastro realizado com sucesso! Verifique seu e-mail para confirmar.')
+      setInfo('✅ Conta criada com sucesso! Verifique seu e-mail para confirmar o cadastro.')
       
       setTimeout(() => {
         router.push('/login')
       }, 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar conta')
+      setError(formatErrorForDisplay(err))
     } finally {
       setLoading(false)
     }
@@ -325,7 +247,7 @@ export default function SignupPage() {
         <div className="space-y-4 text-center">
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Cadastre-se</h1>
           <p className="text-sm text-slate-600">
-            Serviço de autenticação indisponível. Configure as variáveis de ambiente.
+            ⚠️ Serviço temporáriamente indisponível. Por favor, tente novamente em alguns minutos.
           </p>
         </div>
       </Wrapper>
@@ -337,8 +259,12 @@ export default function SignupPage() {
       <div className="space-y-6">
         {/* Header */}
         <header className="space-y-2 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Crie sua conta</h1>
-          <p className="text-sm text-slate-600">Preencha seus dados para começar</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+            Crie sua conta grátis
+          </h1>
+          <p className="text-sm text-slate-600">
+            Comece a assinar documentos digitalmente em menos de 2 minutos
+          </p>
         </header>
 
         {/* Progress Bar */}
@@ -370,16 +296,28 @@ export default function SignupPage() {
           <div className="h-2 overflow-hidden rounded-full bg-slate-200">
             <div 
               className="h-full bg-gradient-to-r from-brand-600 to-brand-700 transition-all duration-300"
-              style={{ width: `${(currentStep / 4) * 100}%` }}
+              style={{ width: `${(currentStep / 3) * 100}%` }}
             />
           </div>
         </div>
 
         {/* Forms */}
-        <div className="min-h-[400px]">
-          {/* Etapa 1 - Dados Pessoais */}
+        <div className="min-h-[420px]">
+          {/* Etapa 1 - Dados Básicos */}
           {currentStep === 1 && (
             <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
+                <div className="flex gap-2">
+                  <Info className="h-4 w-4 flex-shrink-0 text-blue-600 mt-0.5" />
+                  <div className="text-blue-700">
+                    <p className="font-semibold">🚀 Cadastro simplificado</p>
+                    <p className="mt-1 text-blue-600">
+                      Precisamos apenas de informações básicas para começar. Dados adicionais podem ser preenchidos depois.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-1">
                 <label htmlFor="fullName" className="block text-sm font-medium text-slate-700">
                   Nome Completo *
@@ -393,6 +331,9 @@ export default function SignupPage() {
                   onChange={e => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
                   className="input"
                 />
+                <p className="text-xs text-slate-500">
+                  Usado para identificar suas assinaturas digitais
+                </p>
               </div>
 
               <div className="space-y-1">
@@ -403,195 +344,86 @@ export default function SignupPage() {
                   id="email"
                   type="email"
                   required
+                  autoComplete="email"
                   placeholder="joao@exemplo.com"
                   value={formData.email}
                   onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
                   className="input"
                 />
+                <p className="text-xs text-slate-500">
+                  Para login e notificações de documentos
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <label htmlFor="phone" className="block text-sm font-medium text-slate-700">
-                    Telefone *
-                  </label>
-                  <input
-                    id="phone"
-                    type="tel"
-                    required
-                    placeholder="(11) 99999-9999"
-                    value={formData.phone}
-                    onChange={e => setFormData(prev => ({ ...prev, phone: maskPhone(e.target.value) }))}
-                    className="input"
-                  />
-                </div>
+              <div className="space-y-1">
+                <label htmlFor="phone" className="block text-sm font-medium text-slate-700">
+                  Telefone *
+                </label>
+                <input
+                  id="phone"
+                  type="tel"
+                  required
+                  autoComplete="tel"
+                  placeholder="(11) 99999-9999"
+                  value={formData.phone}
+                  onChange={e => setFormData(prev => ({ ...prev, phone: maskPhone(e.target.value) }))}
+                  className="input"
+                />
+                <p className="text-xs text-slate-500">
+                  Para contato e verificação de segurança
+                </p>
+              </div>
+            </div>
+          )}
 
-                <div className="space-y-1">
-                  <label htmlFor="cpf" className="block text-sm font-medium text-slate-700">
-                    CPF *
-                  </label>
-                  <input
-                    id="cpf"
-                    type="text"
-                    required
-                    placeholder="000.000.000-00"
-                    value={formData.cpf}
-                    onChange={e => setFormData(prev => ({ ...prev, cpf: maskCPF(e.target.value) }))}
-                    className="input"
-                  />
+          {/* Etapa 2 - Dados Complementares (OPCIONAIS) */}
+          {currentStep === 2 && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+                <div className="flex gap-2">
+                  <Info className="h-4 w-4 flex-shrink-0 text-amber-600 mt-0.5" />
+                  <div className="text-amber-700">
+                    <p className="font-semibold">✨ Campos opcionais</p>
+                    <p className="mt-1 text-amber-600">
+                      Estas informações ajudam a personalizar sua experiência, mas podem ser preenchidas depois nas configurações.
+                    </p>
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-1">
+                <label htmlFor="cpf" className="block text-sm font-medium text-slate-700">
+                  CPF <span className="text-xs font-normal text-slate-500">(opcional)</span>
+                </label>
+                <input
+                  id="cpf"
+                  type="text"
+                  placeholder="000.000.000-00"
+                  value={formData.cpf}
+                  onChange={e => setFormData(prev => ({ ...prev, cpf: maskCPF(e.target.value) }))}
+                  className="input"
+                />
+                <p className="text-xs text-slate-500">
+                  🔒 Necessário apenas para emitir certificados ICP-Brasil e planos pagos
+                </p>
+              </div>
+
+              <div className="space-y-1">
                 <label htmlFor="birthDate" className="block text-sm font-medium text-slate-700">
-                  Data de Nascimento *
+                  Data de Nascimento <span className="text-xs font-normal text-slate-500">(opcional)</span>
                 </label>
                 <input
                   id="birthDate"
                   type="date"
-                  required
                   value={formData.birthDate}
                   onChange={e => setFormData(prev => ({ ...prev, birthDate: e.target.value }))}
                   className="input"
                 />
               </div>
-            </div>
-          )}
 
-          {/* Etapa 2 - Endereço */}
-          {currentStep === 2 && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-              <div className="space-y-1">
-                <label htmlFor="cep" className="block text-sm font-medium text-slate-700">
-                  CEP *
-                </label>
-                <div className="relative">
-                  <input
-                    id="cep"
-                    type="text"
-                    required
-                    placeholder="00000-000"
-                    value={formData.cep}
-                    onChange={e => {
-                      const masked = maskCEP(e.target.value)
-                      setFormData(prev => ({ ...prev, cep: masked }))
-                      if (masked.replace(/\D/g, '').length === 8) {
-                        fetchCEP(masked)
-                      }
-                    }}
-                    className="input"
-                  />
-                  {loadingCep && (
-                    <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-brand-600" />
-                  )}
-                </div>
-                <p className="text-xs text-slate-500">Digite o CEP para preencher automaticamente</p>
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="street" className="block text-sm font-medium text-slate-700">
-                  Endereço *
-                </label>
-                <input
-                  id="street"
-                  type="text"
-                  required
-                  placeholder="Rua, Avenida, etc."
-                  value={formData.street}
-                  onChange={e => setFormData(prev => ({ ...prev, street: e.target.value }))}
-                  className="input"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label htmlFor="number" className="block text-sm font-medium text-slate-700">
-                    Número *
-                  </label>
-                  <input
-                    id="number"
-                    type="text"
-                    required
-                    placeholder="123"
-                    value={formData.number}
-                    onChange={e => setFormData(prev => ({ ...prev, number: e.target.value }))}
-                    className="input"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="complement" className="block text-sm font-medium text-slate-700">
-                    Complemento
-                  </label>
-                  <input
-                    id="complement"
-                    type="text"
-                    placeholder="Apt, Bloco, etc."
-                    value={formData.complement}
-                    onChange={e => setFormData(prev => ({ ...prev, complement: e.target.value }))}
-                    className="input"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="neighborhood" className="block text-sm font-medium text-slate-700">
-                  Bairro *
-                </label>
-                <input
-                  id="neighborhood"
-                  type="text"
-                  required
-                  placeholder="Centro"
-                  value={formData.neighborhood}
-                  onChange={e => setFormData(prev => ({ ...prev, neighborhood: e.target.value }))}
-                  className="input"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label htmlFor="city" className="block text-sm font-medium text-slate-700">
-                    Cidade *
-                  </label>
-                  <input
-                    id="city"
-                    type="text"
-                    required
-                    placeholder="São Paulo"
-                    value={formData.city}
-                    onChange={e => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                    className="input"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="state" className="block text-sm font-medium text-slate-700">
-                    Estado *
-                  </label>
-                  <input
-                    id="state"
-                    type="text"
-                    required
-                    placeholder="SP"
-                    maxLength={2}
-                    value={formData.state}
-                    onChange={e => setFormData(prev => ({ ...prev, state: e.target.value.toUpperCase() }))}
-                    className="input"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Etapa 3 - Profissional */}
-          {currentStep === 3 && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-              <p className="text-sm text-slate-600">Informações profissionais (opcional)</p>
-              
               <div className="space-y-1">
                 <label htmlFor="company" className="block text-sm font-medium text-slate-700">
-                  Empresa
+                  Empresa <span className="text-xs font-normal text-slate-500">(opcional)</span>
                 </label>
                 <input
                   id="company"
@@ -605,7 +437,7 @@ export default function SignupPage() {
 
               <div className="space-y-1">
                 <label htmlFor="position" className="block text-sm font-medium text-slate-700">
-                  Cargo
+                  Cargo <span className="text-xs font-normal text-slate-500">(opcional)</span>
                 </label>
                 <input
                   id="position"
@@ -616,18 +448,11 @@ export default function SignupPage() {
                   className="input"
                 />
               </div>
-
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-700">
-                <p className="font-semibold">💡 Por que pedimos isso?</p>
-                <p className="mt-1 text-blue-600">
-                  Essas informações nos ajudam a personalizar sua experiência e oferecer recursos mais adequados ao seu perfil profissional.
-                </p>
-              </div>
             </div>
           )}
 
-          {/* Etapa 4 - Segurança */}
-          {currentStep === 4 && (
+          {/* Etapa 3 - Segurança */}
+          {currentStep === 3 && (
             <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="space-y-1">
                 <label htmlFor="password" className="block text-sm font-medium text-slate-700">
@@ -637,6 +462,7 @@ export default function SignupPage() {
                   id="password"
                   type="password"
                   required
+                  autoComplete="new-password"
                   placeholder="Mínimo 6 caracteres"
                   value={formData.password}
                   onChange={e => setFormData(prev => ({ ...prev, password: e.target.value }))}
@@ -652,6 +478,7 @@ export default function SignupPage() {
                   id="confirmPassword"
                   type="password"
                   required
+                  autoComplete="new-password"
                   placeholder="Digite a senha novamente"
                   value={formData.confirmPassword}
                   onChange={e => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
@@ -659,7 +486,7 @@ export default function SignupPage() {
                 />
               </div>
 
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <input
                   id="acceptTerms"
                   type="checkbox"
@@ -667,23 +494,45 @@ export default function SignupPage() {
                   onChange={e => setFormData(prev => ({ ...prev, acceptTerms: e.target.checked }))}
                   className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
                 />
-                <label htmlFor="acceptTerms" className="text-sm text-slate-600">
-                  Eu li e aceito os{' '}
-                  <Link href="/terms" target="_blank" className="font-semibold text-brand-600 hover:text-brand-700">
+                <label htmlFor="acceptTerms" className="text-sm text-slate-700">
+                  Li e aceito os{' '}
+                  <Link 
+                    href="/terms" 
+                    target="_blank" 
+                    className="font-semibold text-brand-600 underline hover:text-brand-700"
+                  >
                     Termos de Uso
                   </Link>
                   {' '}e a{' '}
-                  <Link href="/privacy" target="_blank" className="font-semibold text-brand-600 hover:text-brand-700">
+                  <Link 
+                    href="/privacy" 
+                    target="_blank" 
+                    className="font-semibold text-brand-600 underline hover:text-brand-700"
+                  >
                     Política de Privacidade
                   </Link>
+                  {' '}*
                 </label>
               </div>
 
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-                <p className="font-semibold">🔒 Seus dados estão seguros</p>
-                <p className="mt-1 text-emerald-600">
-                  Utilizamos criptografia de ponta a ponta para proteger suas informações pessoais.
-                </p>
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                <div className="flex gap-2">
+                  <Shield className="h-4 w-4 flex-shrink-0 text-emerald-600 mt-0.5" />
+                  <div className="text-emerald-700">
+                    <p className="font-semibold">🔒 Seus dados estão seguros</p>
+                    <p className="mt-1 text-emerald-600">
+                      Utilizamos criptografia de ponta para proteger suas informações. 
+                      Seus dados pessoais nunca são compartilhados sem seu consentimento.
+                    </p>
+                    <Link 
+                      href="/privacy" 
+                      target="_blank"
+                      className="mt-2 inline-block text-emerald-700 underline hover:text-emerald-800"
+                    >
+                      Leia nossa política completa →
+                    </Link>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -691,21 +540,21 @@ export default function SignupPage() {
 
         {/* Error/Info Messages */}
         {error && (
-          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-            <div>
-              <p className="font-semibold">Erro</p>
-              <p>{error}</p>
+          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-600" />
+            <div className="text-red-700">
+              <p className="font-semibold">⚠️ Erro</p>
+              <p className="mt-1">{error}</p>
             </div>
           </div>
         )}
 
         {info && (
-          <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-            <Check className="mt-0.5 h-4 w-4 flex-shrink-0" />
-            <div>
-              <p className="font-semibold">Sucesso</p>
-              <p>{info}</p>
+          <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
+            <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+            <div className="text-emerald-700">
+              <p className="font-semibold">✅ Sucesso!</p>
+              <p className="mt-1">{info}</p>
             </div>
           </div>
         )}
@@ -716,14 +565,15 @@ export default function SignupPage() {
             <button
               type="button"
               onClick={handleBack}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <ArrowLeft className="h-4 w-4" />
               Voltar
             </button>
           )}
           
-          {currentStep < 4 ? (
+          {currentStep < 3 ? (
             <button
               type="button"
               onClick={handleNext}
@@ -747,7 +597,7 @@ export default function SignupPage() {
               ) : (
                 <>
                   <Check className="h-4 w-4" />
-                  Criar conta
+                  Criar conta gratuita
                 </>
               )}
             </button>
