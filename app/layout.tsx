@@ -2,6 +2,7 @@
 import './globals.css';
 import Link from 'next/link';
 import HeaderClient from '@/components/HeaderClient';
+import { Providers } from './providers';
 import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
@@ -47,17 +48,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR">
       <body className="min-h-screen bg-gradient-to-b from-slate-50 to-white text-slate-900 antialiased">
-        <a
-          href="#conteudo-principal"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-white"
-        >
-          Ir para o conteúdo
-        </a>
-        <HeaderClient />
-        <main id="conteudo-principal" className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-          {children}
-        </main>
-        <Footer />
+        <Providers>
+          <a
+            href="#conteudo-principal"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-white"
+          >
+            Ir para o conteúdo
+          </a>
+          <HeaderClient />
+          <main id="conteudo-principal" className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+            {children}
+          </main>
+          <Footer />
+        </Providers>
       </body>
     </html>
   );
