@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 
 // Rotas que NÃO precisam de autenticação
 const PUBLIC_ROUTES = [
@@ -48,30 +47,63 @@ const PROTECTED_API_ROUTES = [
 ]
 
 function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.some(route => pathname.startsWith(route))
+  return PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'))
 }
 
 function isProtectedRoute(pathname: string): boolean {
-  return PROTECTED_ROUTES.some(route => pathname.startsWith(route))
+  return PROTECTED_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'))
 }
 
 function isProtectedApiRoute(pathname: string): boolean {
   return PROTECTED_API_ROUTES.some(route => pathname.startsWith(route))
 }
 
-export async function middleware(request: NextRequest) {
-  const pathname = request.nextUrl.pathname
-  const res = NextResponse.next()
+function hasSupabaseSession(request: NextRequest): boolean {
+  // Supabase armazena cookies com padrão: sb-<project-ref>-auth-token
+  // Vamos procurar por qualquer cookie que siga esse padrão
+  const cookies = request.cookies.getAll()
+  
+  // Debug: listar todos os cookies (apenas em dev)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Middleware] All cookies:', cookies.map(c => c.name))
+  }
+  
+  // Procurar por cookies de auth do Supabase
+  const hasAuthToken = cookies.some(cookie => {
+    const name = cookie.name
+    // Supabase usa padrões como:
+    // - sb-<ref>-auth-token
+    // - sb-<ref>-auth-token-code-verifier
+    return (
+      name.includes('sb-') && 
+      name.includes('-auth-token') &&
+      !name.includes('code-verifier') &&
+      cookie.value &&
+      cookie.value.length > 0
+    )
+  })
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Middleware] Has Supabase auth token:', hasAuthToken)
+  }
+  
+  return hasAuthToken
+}
 
-  // Criar cliente Supabase para middleware
-  const supabase = createMiddlewareClient({ req: request, res })
+export function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Middleware] Pathname:', pathname)
+  }
 
   // 1. Verificar autenticação para rotas protegidas
   if (isProtectedRoute(pathname) || isProtectedApiRoute(pathname)) {
-    // Verificar sessão usando Supabase
-    const { data: { session } } = await supabase.auth.getSession()
+    const hasAuth = hasSupabaseSession(request)
 
-    if (!session) {
+    if (!hasAuth) {
+      console.log('[Middleware] No auth, redirecting to login')
+      
       // Se for API, retornar 401
       if (isProtectedApiRoute(pathname)) {
         return NextResponse.json(
@@ -89,6 +121,10 @@ export async function middleware(request: NextRequest) {
       loginUrl.searchParams.set('redirect', pathname)
       return NextResponse.redirect(loginUrl)
     }
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Middleware] Auth OK, allowing access')
+    }
   }
 
   // 2. Forçar HTTPS em produção
@@ -102,7 +138,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308)
   }
 
-  // 3. Adicionar security headers
+  // 3. Criar resposta com security headers
   const response = NextResponse.next()
 
   // Content Security Policy
