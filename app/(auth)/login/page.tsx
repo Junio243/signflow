@@ -1,13 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { type ReactNode, useState } from 'react'
-
+import { useRouter, useSearchParams } from 'next/navigation'
+import { type ReactNode, useState, Suspense } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import { formatErrorForDisplay } from '@/lib/errorMessages'
 
 // Mover Wrapper para fora do componente principal
-// Isso evita recriação a cada render (problema no iOS Safari)
 function Wrapper({ children }: { children: ReactNode }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
@@ -18,8 +17,11 @@ function Wrapper({ children }: { children: ReactNode }) {
   )
 }
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams?.get('redirect') || '/dashboard'
+  
   const supabaseClient = supabase
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -34,21 +36,26 @@ export default function LoginPage() {
     setLoading(true)
 
     if (!supabaseClient) {
-      setError('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+      setError('Serviço de autenticação indisponível. Por favor, tente novamente mais tarde.')
       setLoading(false)
       return
     }
 
-    const { error } = await supabaseClient.auth.signInWithPassword({ email, password })
+    try {
+      const { error: authError } = await supabaseClient.auth.signInWithPassword({ email, password })
 
-    setLoading(false)
+      if (authError) {
+        setError(formatErrorForDisplay(authError))
+        setLoading(false)
+        return
+      }
 
-    if (error) {
-      setError(error.message)
-      return
+      // Sucesso - redirecionar
+      router.replace(redirectTo)
+    } catch (err) {
+      setError(formatErrorForDisplay(err))
+      setLoading(false)
     }
-
-    router.replace('/dashboard')
   }
 
   const loginComLink = async () => {
@@ -57,24 +64,37 @@ export default function LoginPage() {
     setLoading(true)
 
     if (!supabaseClient) {
-      setError('Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+      setError('Serviço de autenticação indisponível. Por favor, tente novamente mais tarde.')
       setLoading(false)
       return
     }
 
-    const { error } = await supabaseClient.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    })
-
-    setLoading(false)
-
-    if (error) {
-      setError(error.message)
+    if (!email || !email.includes('@')) {
+      setError('Por favor, digite um e-mail válido.')
+      setLoading(false)
       return
     }
 
-    setInfo('Enviamos um link de acesso para o seu e-mail. Abra em até 10–60 minutos.')
+    try {
+      const { error: authError } = await supabaseClient.auth.signInWithOtp({
+        email,
+        options: { 
+          emailRedirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}` 
+        },
+      })
+
+      if (authError) {
+        setError(formatErrorForDisplay(authError))
+        setLoading(false)
+        return
+      }
+
+      setInfo('✅ Link de acesso enviado! Verifique sua caixa de entrada e spam. O link é válido por 1 hora.')
+      setLoading(false)
+    } catch (err) {
+      setError(formatErrorForDisplay(err))
+      setLoading(false)
+    }
   }
 
   if (!supabaseClient) {
@@ -84,7 +104,7 @@ export default function LoginPage() {
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Entrar</h1>
             <p className="text-sm text-slate-600">
-              Serviço de autenticação indisponível. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.
+              ⚠️ Serviço temporáriamente indisponível. Por favor, tente novamente em alguns minutos.
             </p>
           </div>
         </div>
@@ -96,8 +116,12 @@ export default function LoginPage() {
     <Wrapper>
       <div className="space-y-8">
         <header className="space-y-2 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Acesse sua conta</h1>
-          <p className="text-sm text-slate-600">Entre para gerenciar seus documentos e acompanhar seus envios.</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+            Acesse sua conta
+          </h1>
+          <p className="text-sm text-slate-600">
+            Entre para gerenciar seus documentos e acompanhar suas assinaturas.
+          </p>
         </header>
 
         <form className="space-y-4" onSubmit={loginComSenha} noValidate>
@@ -152,19 +176,21 @@ export default function LoginPage() {
             disabled={loading || !email}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand-600 bg-white px-4 py-2 text-sm font-semibold text-brand-600 shadow-sm transition hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? 'Enviando…' : 'Receber link mágico por e-mail'}
+            {loading ? 'Enviando…' : '🚀 Receber link mágico por e-mail'}
           </button>
 
           {error && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600" role="alert" aria-live="assertive">
-              Erro: {error}
-            </p>
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm" role="alert" aria-live="assertive">
+              <p className="font-semibold text-red-900">⚠️ Erro ao fazer login</p>
+              <p className="mt-1 text-red-700">{error}</p>
+            </div>
           )}
 
           {info && (
-            <p className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-700" role="status" aria-live="polite">
-              {info}
-            </p>
+            <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm" role="status" aria-live="polite">
+              <p className="font-semibold text-green-900">✅ E-mail enviado!</p>
+              <p className="mt-1 text-green-700">{info}</p>
+            </div>
           )}
 
           <p className="text-center text-sm text-slate-600">
@@ -173,11 +199,37 @@ export default function LoginPage() {
               href="/signup"
               className="font-semibold text-brand-600 transition hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
             >
-              Cadastre-se
+              Cadastre-se gratuitamente
+            </Link>
+          </p>
+
+          <p className="text-center text-xs text-slate-500">
+            Ao continuar, você concorda com nossos{' '}
+            <Link href="/terms" className="underline hover:text-slate-700">
+              Termos de Uso
+            </Link>
+            {' '}e{' '}
+            <Link href="/privacy" className="underline hover:text-slate-700">
+              Política de Privacidade
             </Link>
           </p>
         </div>
       </div>
     </Wrapper>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <Wrapper>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600 mx-auto"></div>
+          <p className="mt-4 text-sm text-slate-600">Carregando...</p>
+        </div>
+      </Wrapper>
+    }>
+      <LoginContent />
+    </Suspense>
   )
 }
