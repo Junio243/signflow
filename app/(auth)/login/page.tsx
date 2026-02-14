@@ -42,19 +42,35 @@ function LoginContent() {
     }
 
     try {
-      const { error: authError } = await supabaseClient.auth.signInWithPassword({ email, password })
+      const { data, error: authError } = await supabaseClient.auth.signInWithPassword({ 
+        email, 
+        password 
+      })
 
       if (authError) {
+        console.error('Auth error:', authError)
         setError(formatErrorForDisplay(authError))
-        setLoading(false)
         return
       }
 
-      // Sucesso - redirecionar
-      router.replace(redirectTo)
+      if (data.session) {
+        // Login bem-sucedido!
+        console.log('Login successful, redirecting to:', redirectTo)
+        
+        // Pequeno delay para garantir que a sessão foi salva
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // Forçar reload da página para atualizar autenticação
+        window.location.href = redirectTo
+      } else {
+        setError('Login realizado, mas sessão não foi criada. Tente novamente.')
+      }
     } catch (err) {
+      console.error('Login error:', err)
       setError(formatErrorForDisplay(err))
-      setLoading(false)
+    } finally {
+      // Garantir que loading seja resetado
+      setTimeout(() => setLoading(false), 1000)
     }
   }
 
@@ -85,14 +101,13 @@ function LoginContent() {
 
       if (authError) {
         setError(formatErrorForDisplay(authError))
-        setLoading(false)
         return
       }
 
       setInfo('✅ Link de acesso enviado! Verifique sua caixa de entrada e spam. O link é válido por 1 hora.')
-      setLoading(false)
     } catch (err) {
       setError(formatErrorForDisplay(err))
+    } finally {
       setLoading(false)
     }
   }
@@ -139,7 +154,8 @@ function LoginContent() {
               placeholder="seu@email.com"
               value={email}
               onChange={event => setEmail(event.target.value)}
-              className="input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+              disabled={loading}
+              className="input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -156,16 +172,27 @@ function LoginContent() {
               placeholder="Sua senha"
               value={password}
               onChange={event => setPassword(event.target.value)}
-              className="input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+              disabled={loading}
+              className="input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !email || !password}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? 'Entrando…' : 'Entrar com senha'}
+            {loading ? (
+              <>
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Entrando…
+              </>
+            ) : (
+              'Entrar com senha'
+            )}
           </button>
         </form>
 
