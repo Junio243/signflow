@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 
 // Rotas que NÃO precisam de autenticação
 const PUBLIC_ROUTES = [
@@ -12,10 +13,12 @@ const PUBLIC_ROUTES = [
   '/about',
   '/faq',
   '/contato',
+  '/contact',
   '/privacy',
   '/terms',
   '/status',
   '/docs',
+  '/pricing',
   '/api/validate',
   '/api/webhooks',
 ]
@@ -56,25 +59,19 @@ function isProtectedApiRoute(pathname: string): boolean {
   return PROTECTED_API_ROUTES.some(route => pathname.startsWith(route))
 }
 
-function hasAuthToken(request: NextRequest): boolean {
-  // Verificar se existe token de autenticação do Supabase nos cookies
-  const authCookie = request.cookies.get('sb-access-token') ||
-                      request.cookies.get('sb-refresh-token') ||
-                      request.cookies.getAll().find(cookie => 
-                        cookie.name.startsWith('sb-') && cookie.name.includes('auth-token')
-                      )
-  
-  return !!authCookie
-}
-
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
+  const res = NextResponse.next()
+
+  // Criar cliente Supabase para middleware
+  const supabase = createMiddlewareClient({ req: request, res })
 
   // 1. Verificar autenticação para rotas protegidas
   if (isProtectedRoute(pathname) || isProtectedApiRoute(pathname)) {
-    const hasAuth = hasAuthToken(request)
+    // Verificar sessão usando Supabase
+    const { data: { session } } = await supabase.auth.getSession()
 
-    if (!hasAuth) {
+    if (!session) {
       // Se for API, retornar 401
       if (isProtectedApiRoute(pathname)) {
         return NextResponse.json(
@@ -105,7 +102,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308)
   }
 
-  // 3. Criar resposta com security headers
+  // 3. Adicionar security headers
   const response = NextResponse.next()
 
   // Content Security Policy
