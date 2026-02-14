@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 
 // Rotas que NÃO precisam de autenticação
 const PUBLIC_ROUTES = [
@@ -19,8 +18,6 @@ const PUBLIC_ROUTES = [
   '/docs',
   '/api/validate',
   '/api/webhooks',
-  '/_next',
-  '/favicon.ico',
 ]
 
 // Rotas que EXIGEM autenticação
@@ -59,47 +56,38 @@ function isProtectedApiRoute(pathname: string): boolean {
   return PROTECTED_API_ROUTES.some(route => pathname.startsWith(route))
 }
 
-export async function middleware(request: NextRequest) {
+function hasAuthToken(request: NextRequest): boolean {
+  // Verificar se existe token de autenticação do Supabase nos cookies
+  const authCookie = request.cookies.get('sb-access-token') ||
+                      request.cookies.get('sb-refresh-token') ||
+                      request.cookies.getAll().find(cookie => 
+                        cookie.name.startsWith('sb-') && cookie.name.includes('auth-token')
+                      )
+  
+  return !!authCookie
+}
+
+export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // 1. Verificar autenticação para rotas protegidas
   if (isProtectedRoute(pathname) || isProtectedApiRoute(pathname)) {
-    try {
-      const supabase = createMiddlewareClient({ req: request, res: NextResponse.next() })
-      const { data: { session } } = await supabase.auth.getSession()
+    const hasAuth = hasAuthToken(request)
 
-      if (!session) {
-        // Se for API, retornar 401
-        if (isProtectedApiRoute(pathname)) {
-          return NextResponse.json(
-            { 
-              error: 'Por favor, faça login para acessar este recurso.',
-              code: 'UNAUTHORIZED',
-              redirectTo: '/login'
-            },
-            { status: 401 }
-          )
-        }
-
-        // Se for página, redirecionar para login
-        const loginUrl = new URL('/login', request.url)
-        loginUrl.searchParams.set('redirect', pathname)
-        return NextResponse.redirect(loginUrl)
-      }
-    } catch (error) {
-      console.error('Erro ao verificar autenticação:', error)
-      
-      // Em caso de erro, redirecionar para login
+    if (!hasAuth) {
+      // Se for API, retornar 401
       if (isProtectedApiRoute(pathname)) {
         return NextResponse.json(
           { 
-            error: 'Erro ao verificar autenticação. Por favor, faça login novamente.',
-            code: 'AUTH_ERROR'
+            error: 'Por favor, faça login para acessar este recurso.',
+            code: 'UNAUTHORIZED',
+            redirectTo: '/login'
           },
           { status: 401 }
         )
       }
 
+      // Se for página, redirecionar para login com parâmetro de retorno
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
       return NextResponse.redirect(loginUrl)
