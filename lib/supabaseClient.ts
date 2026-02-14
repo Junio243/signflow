@@ -11,7 +11,32 @@ if (!url || !anon) {
   )
 } else {
   try {
-    client = createClient(url, anon)
+    client = createClient(url, anon, {
+      auth: {
+        // Usar cookies para persistência (compatível com SSR)
+        storage: typeof window !== 'undefined' ? {
+          getItem: (key) => {
+            const cookies = document.cookie.split('; ')
+            const cookie = cookies.find(c => c.startsWith(`${key}=`))
+            return cookie ? decodeURIComponent(cookie.split('=')[1]) : null
+          },
+          setItem: (key, value) => {
+            // Configurar cookie com atributos seguros
+            const maxAge = 60 * 60 * 24 * 7 // 7 dias
+            document.cookie = `${key}=${encodeURIComponent(value)}; max-age=${maxAge}; path=/; samesite=lax; secure`
+          },
+          removeItem: (key) => {
+            document.cookie = `${key}=; max-age=0; path=/`
+          },
+        } : undefined,
+        // Auto refresh tokens
+        autoRefreshToken: true,
+        // Persist session
+        persistSession: true,
+        // Detect session in URL
+        detectSessionInUrl: true,
+      },
+    })
   } catch (error) {
     console.error('[Supabase] Não foi possível criar o cliente.', error)
     client = null
