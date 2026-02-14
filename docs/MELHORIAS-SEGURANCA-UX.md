@@ -58,53 +58,84 @@ O middleware também adiciona headers de segurança:
 
 ---
 
-## 💬 Mensagens de Erro Amigáveis
+## 🌍 Mensagens de Erro Amigáveis e Multilíngues
 
-### 2. Helper de Tradução de Erros
+### 2. Helper de Tradução de Erros (i18n)
 
 **Arquivo:** `lib/errorMessages.ts`
 
-Traduz erros técnicos do Supabase/banco de dados em mensagens claras e em português.
+Traduz erros técnicos do Supabase/banco de dados em mensagens claras em **3 idiomas: Português, Inglês e Espanhol**.
 
-#### Uso:
+#### 🇺🇸 Detecção Automática de Idioma:
+
+1. **LocalStorage**: Verifica `localStorage.getItem('locale')`
+2. **Navegador**: Detecta `navigator.language`
+3. **Fallback**: Português (PT) como padrão
+
+#### Uso Básico:
 
 ```typescript
 import { formatErrorForDisplay, getFriendlyErrorMessage } from '@/lib/errorMessages'
 
-// Formatar erro completo (mensagem + sugestão)
+// Formatar erro completo no idioma do usuário (detecta automaticamente)
 const message = formatErrorForDisplay(error)
-// "E-mail ou senha incorretos. Verifique seus dados ou use o link mágico para acessar."
+// PT: "E-mail ou senha incorretos. Verifique seus dados ou use o link mágico."
+// EN: "Incorrect email or password. Check your credentials or use the magic link."
+// ES: "Correo o contraseña incorrectos. Verifica tus datos o usa el enlace mágico."
+
+// Especificar idioma manualmente
+const messageEN = formatErrorForDisplay(error, 'en')
+const messageES = formatErrorForDisplay(error, 'es')
 
 // Ou separadamente:
-const friendly = getFriendlyErrorMessage(error)
+const friendly = getFriendlyErrorMessage(error, 'pt')
 console.log(friendly.message)    // "E-mail ou senha incorretos."
-console.log(friendly.suggestion) // "Verifique seus dados ou use o link mágico para acessar."
+console.log(friendly.suggestion) // "Verifique seus dados..."
 console.log(friendly.code)       // "AUTH_INVALID_CREDENTIALS"
 ```
 
-#### Erros Cobertos:
+#### Erros Cobertos (Multilíngues):
 
-| Erro Técnico | Mensagem Amigável | Sugestão |
-|--------------|-------------------|------------|
-| `Invalid login credentials` | E-mail ou senha incorretos | Verifique seus dados ou use o link mágico |
-| `Email not confirmed` | Esta conta ainda não foi confirmada | Verifique seu e-mail e clique no link de confirmação |
-| `User already registered` | Este e-mail já está cadastrado | Tente fazer login ou use "Esqueci minha senha" |
-| `Email rate limit exceeded` | Muitas tentativas em pouco tempo | Aguarde alguns minutos e tente novamente |
-| `session_not_found` | Sua sessão expirou | Por favor, faça login novamente |
-| `payload too large` | Arquivo muito grande | O arquivo deve ter no máximo 10MB |
-| `network error` | Erro de conexão | Verifique sua internet e tente novamente |
-| `403 / forbidden` | Você não tem permissão | Entre em contato com o administrador |
-| `500` | Erro interno do servidor | Tente novamente em alguns minutos |
+| Código | Português (PT) | Inglês (EN) | Espanhol (ES) |
+|--------|-----------------|--------------|---------------|
+| `AUTH_INVALID_CREDENTIALS` | E-mail ou senha incorretos | Incorrect email or password | Correo o contraseña incorrectos |
+| `AUTH_EMAIL_NOT_CONFIRMED` | Conta não confirmada | Account not confirmed | Cuenta no confirmada |
+| `AUTH_USER_EXISTS` | E-mail já cadastrado | Email already registered | Correo ya registrado |
+| `RATE_LIMIT_EXCEEDED` | Muitas tentativas | Too many attempts | Demasiados intentos |
+| `SESSION_EXPIRED` | Sessão expirou | Session expired | Sesión expirada |
+| `FILE_TOO_LARGE` | Arquivo muito grande | File too large | Archivo demasiado grande |
+| `NETWORK_ERROR` | Erro de conexão | Connection error | Error de conexión |
+| `PERMISSION_DENIED` | Sem permissão | No permission | Sin permiso |
+| `SERVER_ERROR` | Erro do servidor | Server error | Error del servidor |
+| `UNAUTHORIZED` | Faça login | Please log in | Inicia sesión |
 
 #### Categorias de Erros:
 
-1. **Autenticação** - Login, cadastro, sessão
-2. **Validação** - E-mail inválido, senha curta, campos obrigatórios
-3. **Arquivos** - Tamanho, tipo, upload
-4. **Banco de Dados** - Constraints, chaves estrangeiras
-5. **Rede** - Conexão, timeout
-6. **Permissões** - Acesso negado
-7. **Genéricos** - Erros inesperados
+1. **🔐 Autenticação** - Login, cadastro, sessão
+2. **✅ Validação** - E-mail inválido, senha curta, campos obrigatórios
+3. **📄 Arquivos** - Tamanho, tipo, upload
+4. **💾 Banco de Dados** - Constraints, chaves estrangeiras
+5. **🌐 Rede** - Conexão, timeout
+6. **🚫 Permissões** - Acesso negado
+7. **⁉️ Genéricos** - Erros inesperados
+
+#### Exemplo Prático com Context de Idioma:
+
+```typescript
+import { useLanguage } from '@/contexts/LanguageContext'
+import { formatErrorForDisplay } from '@/lib/errorMessages'
+
+function MyComponent() {
+  const { locale } = useLanguage() // 'pt', 'en', ou 'es'
+  
+  try {
+    await doSomething()
+  } catch (error) {
+    // Mensagem será exibida no idioma do usuário
+    setError(formatErrorForDisplay(error, locale))
+  }
+}
+```
 
 ---
 
@@ -173,9 +204,10 @@ console.log(friendly.code)       // "AUTH_INVALID_CREDENTIALS"
 
 #### Melhorias:
 
-1. **Mensagens de erro em português**
+1. **Mensagens de erro multilíngues**
    - Usa `formatErrorForDisplay()` para traduzir erros
    - Exibe mensagens claras e orientativas
+   - Suporta PT, EN, ES
 
 2. **Redirect automático**
    - Suporta parâmetro `?redirect=/rota`
@@ -208,13 +240,22 @@ console.log(friendly.code)       // "AUTH_INVALID_CREDENTIALS"
 
 ### Experiência do Usuário:
 
-- ✅ Mensagens de erro amigáveis e em português
+- ✅ Mensagens de erro amigáveis em **3 idiomas** (PT/EN/ES)
+- ✅ Detecção automática de idioma
 - ✅ Cadastro simplificado (3 etapas vs 4)
 - ✅ CPF opcional no cadastro inicial
 - ✅ Explicação clara do uso de cada dado
 - ✅ Links diretos para políticas de privacidade
 - ✅ Sugestões de ação em erros
 - ✅ Feedback visual melhorado
+
+### Internacionalização:
+
+- ✅ Sistema i18n completo (PT, EN, ES)
+- ✅ Mensagens de erro traduzidas
+- ✅ Interface multilíngue
+- ✅ Detecção automática de idioma
+- ✅ Persistência de preferência de idioma
 
 ### Conformidade:
 
@@ -237,19 +278,37 @@ const PROTECTED_ROUTES = [
 ]
 ```
 
-### Adicionar Nova Mensagem de Erro:
+### Adicionar Nova Mensagem de Erro (Multilíngue):
 
 ```typescript
 // Em lib/errorMessages.ts
-export function getFriendlyErrorMessage(error: any): FriendlyError {
+const ERROR_CATALOG: ErrorMessages = {
   // ...
   
-  if (errorMessage.includes('novo_erro')) {
-    return {
-      message: 'Mensagem amigável',
-      suggestion: 'Sugestão de ação',
-      code: 'CODIGO_ERRO'
+  MEU_NOVO_ERRO: {
+    pt: {
+      message: 'Mensagem em português',
+      suggestion: 'Sugestão em português'
+    },
+    en: {
+      message: 'Message in English',
+      suggestion: 'Suggestion in English'
+    },
+    es: {
+      message: 'Mensaje en español',
+      suggestion: 'Sugerencia en español'
     }
+  },
+  
+  // ...
+}
+
+// Adicionar detecção em identifyErrorCode()
+function identifyErrorCode(error: any): string {
+  // ...
+  
+  if (errorMessage.includes('meu_erro')) {
+    return 'MEU_NOVO_ERRO'
   }
   
   // ...
@@ -260,13 +319,49 @@ export function getFriendlyErrorMessage(error: any): FriendlyError {
 
 ```typescript
 import { formatErrorForDisplay } from '@/lib/errorMessages'
+import { useLanguage } from '@/contexts/LanguageContext'
 
-try {
-  // ... operação que pode falhar
-} catch (error) {
-  setError(formatErrorForDisplay(error))
+function MyComponent() {
+  const { locale } = useLanguage()
+  
+  try {
+    // ... operação que pode falhar
+  } catch (error) {
+    // Mensagem no idioma do usuário
+    setError(formatErrorForDisplay(error, locale))
+  }
 }
 ```
+
+---
+
+## 🔍 Detalhes Técnicos
+
+### Estrutura de Idiomas:
+
+```typescript
+type Locale = 'pt' | 'en' | 'es'
+
+interface FriendlyError {
+  message: string      // Mensagem principal
+  suggestion?: string  // Sugestão de ação (opcional)
+  code?: string        // Código do erro
+}
+```
+
+### Prioridade de Detecção de Idioma:
+
+1. **Parâmetro `locale` passado na função** (máxima prioridade)
+2. **LocalStorage** (`localStorage.getItem('locale')`)
+3. **Navegador** (`navigator.language`)
+4. **Padrão** (Português - 'pt')
+
+### Compatibilidade:
+
+- ✅ Retrocompatível com código existente
+- ✅ Funciona sem especificar idioma (detecta automaticamente)
+- ✅ Fallback para português se idioma não suportado
+- ✅ Funciona no servidor (SSR) com fallback
 
 ---
 
@@ -279,12 +374,17 @@ try {
 
 2. **Redirect Automático**: Todas as rotas protegidas redirecionam para login com parâmetro `?redirect`, garantindo retorno automático.
 
-3. **Mensagens Consistentes**: Use sempre `formatErrorForDisplay()` para garantir mensagens amigáveis em toda a aplicação.
+3. **Mensagens Consistentes**: Use sempre `formatErrorForDisplay()` com o idioma do usuário para garantir mensagens amigáveis e traduzidas.
 
 4. **Privacidade**: Links para termos e políticas estão presentes em:
    - Login
    - Cadastro
    - Rodapé (quando implementado)
+
+5. **Idiomas Suportados**: 
+   - 🇧🇷 Português (PT) - Padrão
+   - 🇺🇸 Inglês (EN)
+   - 🇪🇸 Espanhol (ES)
 
 ---
 
@@ -294,7 +394,8 @@ try {
 - [Security Headers](https://securityheaders.com/)
 - [LGPD - Lei Geral de Proteção de Dados](https://www.gov.br/cidadania/pt-br/acesso-a-informacao/lgpd)
 - [Supabase Auth](https://supabase.com/docs/guides/auth)
+- [i18n Best Practices](https://www.w3.org/International/questions/qa-i18n)
 
 ---
 
-**Última atualização:** 14/02/2026
+**Última atualização:** 14/02/2026 - Versão 2.0 com suporte multilíngue
