@@ -20,6 +20,10 @@ interface QRConfigStepProps {
       requireCode: boolean
       validationCode?: string
     }
+    pdfProtection?: {
+      enabled: boolean
+      password?: string
+    }
     signaturePositions?: Array<{
       page: number
       nx: number
@@ -66,6 +70,11 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl, sign
   const [qrSize, setQrSize] = useState(initialData?.qrCode?.size || 'medium')
   const [requireValidationCode, setRequireValidationCode] = useState(initialData?.validation?.requireCode || false)
   const [validationCode, setValidationCode] = useState(initialData?.validation?.validationCode || '')
+
+  // PDF protection states
+  const [protectPDF, setProtectPDF] = useState(initialData?.pdfProtection?.enabled || false)
+  const [pdfPassword, setPdfPassword] = useState(initialData?.pdfProtection?.password || '')
+  const [pdfPasswordConfirm, setPdfPasswordConfirm] = useState('')
 
   // PDF Editor states
   const [positions, setPositions] = useState<Pos[]>(initialData?.signaturePositions?.map((p: any) => ({
@@ -248,6 +257,21 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl, sign
       return
     }
 
+    if (protectPDF) {
+      if (!pdfPassword) {
+        alert('Senha do PDF é obrigatória quando a proteção está ativada')
+        return
+      }
+      if (pdfPassword.length < 6) {
+        alert('A senha do PDF deve ter no mínimo 6 caracteres')
+        return
+      }
+      if (pdfPassword !== pdfPasswordConfirm) {
+        alert('As senhas do PDF não coincidem')
+        return
+      }
+    }
+
     if (positions.length === 0) {
       alert('❌ Posicione a assinatura em pelo menos uma página do documento!\n\nClique em "Posicionar Assinatura no PDF" e depois clique no documento para adicionar a assinatura.')
       return
@@ -267,6 +291,10 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl, sign
       validation: {
         requireCode: requireValidationCode,
         validationCode: requireValidationCode ? validationCode : undefined
+      },
+      pdfProtection: {
+        enabled: protectPDF,
+        password: protectPDF ? pdfPassword : undefined
       },
       signaturePositions: computePositionsForApi()
     }
@@ -537,6 +565,74 @@ export default function QRConfigStep({ onNext, onBack, initialData, pdfUrl, sign
             <p className="text-xs text-purple-700 mt-2 flex items-center gap-1">
               <AlertCircle size={12} />
               Guarde este código em local seguro. Será necessário para validar o documento.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* PDF Protection Section */}
+      <div className="mb-8 p-6 bg-orange-50 border-2 border-orange-200 rounded-lg">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Lock className="h-5 w-5 text-orange-600" />
+            <h3 className="font-semibold text-gray-900">Proteção do PDF com Senha</h3>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3 mb-4">
+          <button
+            type="button"
+            onClick={() => setProtectPDF(!protectPDF)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+              protectPDF ? 'bg-orange-600' : 'bg-gray-300'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                protectPDF ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
+              Proteger PDF com senha (opcional)
+            </label>
+            <p className="text-xs text-gray-600">
+              Ao ativar, o PDF assinado será protegido e exigirá senha para ser aberto. Ideal para documentos confidenciais.
+            </p>
+          </div>
+        </div>
+
+        {protectPDF && (
+          <div className="mt-4 p-4 bg-white border border-orange-200 rounded-lg space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-1">
+                Senha do PDF *
+              </label>
+              <input
+                type="password"
+                value={pdfPassword}
+                onChange={(e) => setPdfPassword(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                placeholder="Mínimo 6 caracteres"
+                minLength={6}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-1">
+                Confirmar Senha *
+              </label>
+              <input
+                type="password"
+                value={pdfPasswordConfirm}
+                onChange={(e) => setPdfPasswordConfirm(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                placeholder="Digite novamente"
+              />
+            </div>
+            <p className="text-xs text-orange-700 flex items-center gap-1">
+              <AlertCircle size={12} />
+              Esta senha será necessária para abrir o PDF assinado. Guarde-a em local seguro.
             </p>
           </div>
         )}

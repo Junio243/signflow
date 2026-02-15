@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, CheckCircle, AlertCircle, ArrowLeft, FileKey, Trash2, Sparkles } from 'lucide-react'
+import { Upload, CheckCircle, AlertCircle, ArrowLeft, FileKey, Trash2, Sparkles, Download } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import Link from 'next/link'
 
@@ -208,6 +208,48 @@ export default function CertificatesPage() {
     }
   }
 
+  const handleDownload = async (certId: string, certName: string) => {
+    try {
+      if (!supabase) {
+        setError('Supabase não disponível')
+        return
+      }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setError('Sessão expirada')
+        return
+      }
+
+      const response = await fetch(`/api/certificates/${certId}/download`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const result = await response.json()
+        throw new Error(result.error || 'Erro ao baixar certificado')
+      }
+
+      // Download file
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${certName.replace(/[^a-zA-Z0-9]/g, '_')}.p12`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      setFeedback('✅ Certificado baixado com sucesso!')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao baixar')
+    }
+  }
+
   if (loading) {
     return (
       <div className="mx-auto flex max-w-4xl items-center justify-center py-20">
@@ -230,7 +272,7 @@ export default function CertificatesPage() {
         </div>
         <div className="flex items-center gap-3">
           <Link
-            href="/certificates/generate"
+            href="/certificates/new"
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-md hover:from-brand-700 hover:to-brand-800"
           >
             <Sparkles className="h-4 w-4" />
@@ -427,6 +469,16 @@ export default function CertificatesPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {cert.generation_method === 'auto_generated' && (
+                    <button
+                      onClick={() => handleDownload(cert.id, cert.certificate_name)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100"
+                      title="Baixar certificado .p12"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Baixar .p12
+                    </button>
+                  )}
                   {!cert.is_active && (
                     <button
                       onClick={() => handleSetActive(cert.id)}
