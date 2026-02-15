@@ -1,0 +1,29 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fundo circular -->
+  <circle cx="100" cy="100" r="95" fill="#003D7A" stroke="#0066CC" stroke-width="8"/>
+  
+  <!-- Círculo interno -->
+  <circle cx="100" cy="100" r="75" fill="white"/>
+  
+  <!-- Texto ITI -->
+  <text x="100" y="90" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#003D7A" text-anchor="middle">
+    ITI
+  </text>
+  
+  <!-- Subtexto -->
+  <text x="100" y="110" font-family="Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">
+    Instituto Nacional de
+  </text>
+  <text x="100" y="123" font-family="Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">
+    Tecnologia da Informação
+  </text>
+  
+  <!-- Escudo de segurança -->
+  <path d="M 100 35 L 85 40 L 85 55 Q 85 68 100 75 Q 115 68 115 55 L 115 40 Z" fill="#0066CC" stroke="#003D7A" stroke-width="2"/>
+  <path d="M 95 50 L 98 55 L 105 45" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/>
+  
+  <!-- Ano -->
+  <text x="100" y="143" font-family="Arial, sans-serif" font-size="10" fill="#777" text-anchor="middle">
+    Autoridade Certificadora Raiz
+  </text>
+</svg>
