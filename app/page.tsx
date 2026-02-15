@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight, Check, Shield, Zap, FileCheck, Users, Globe, Lock, Sparkles, Play, ChevronRight, Star, TrendingUp, Clock, Award } from 'lucide-react'
 
 export default function HomePage() {
@@ -124,17 +125,48 @@ export default function HomePage() {
       </section>
 
       {/* Trust Badges */}
-      <section className="py-12 bg-white border-y border-slate-200">
+      <section className="py-16 bg-white border-y border-slate-200">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-sm font-semibold text-slate-600 mb-8">
-            Empresas que confiam no SignFlow
+          <p className="text-center text-sm font-semibold text-slate-600 mb-10">
+            Empresas e instituições que confiam no SignFlow
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center justify-items-center opacity-60">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-12 w-32 bg-slate-200 rounded-lg flex items-center justify-center">
-                <span className="font-bold text-slate-400">Empresa {i}</span>
-              </div>
-            ))}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-12 items-center justify-items-center">
+            <div className="relative h-16 w-full flex items-center justify-center grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100">
+              <Image
+                src="/logos/banco-do-brasil.png"
+                alt="Banco do Brasil"
+                width={160}
+                height={64}
+                className="object-contain"
+              />
+            </div>
+            <div className="relative h-16 w-full flex items-center justify-center grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100">
+              <Image
+                src="/logos/magazine-luiza.png"
+                alt="Magazine Luiza"
+                width={160}
+                height={64}
+                className="object-contain"
+              />
+            </div>
+            <div className="relative h-16 w-full flex items-center justify-center grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100">
+              <Image
+                src="/logos/hospital-einstein.png"
+                alt="Hospital Israelita Albert Einstein"
+                width={160}
+                height={64}
+                className="object-contain"
+              />
+            </div>
+            <div className="relative h-16 w-full flex items-center justify-center grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100">
+              <Image
+                src="/logos/govbr.png"
+                alt="Gov.br"
+                width={160}
+                height={64}
+                className="object-contain"
+              />
+            </div>
           </div>
         </div>
       </section>
