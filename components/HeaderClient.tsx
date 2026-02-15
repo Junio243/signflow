@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabaseClient'
+import { abbreviateName } from '@/lib/formatName'
 
 type SessionUser = {
   email?: string
@@ -92,7 +93,18 @@ export default function HeaderClient() {
 
   const displayName = useMemo(() => {
     if (!user) return null
-    return user.user_metadata?.full_name || user.email || 'Usuário'
+    
+    // Usar abreviação para proteger privacidade
+    const fullName = user.user_metadata?.full_name
+    if (fullName) return abbreviateName(fullName)
+    
+    // Fallback: usar parte antes do @ do email
+    if (user.email) {
+      const emailPart = user.email.split('@')[0]
+      return emailPart.charAt(0).toUpperCase() + emailPart.slice(1)
+    }
+    
+    return 'Usuário'
   }, [user])
 
   const handleAuth = useCallback(async () => {
@@ -206,14 +218,27 @@ export default function HeaderClient() {
                   role="menu"
                   className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 text-sm shadow-xl"
                 >
-                  <HeaderMenuLink href="/dashboard" icon={<LayoutDashboard className="h-4 w-4" aria-hidden />}>Dashboard</HeaderMenuLink>
-                  <HeaderMenuLink href="/profile" icon={<User className="h-4 w-4" aria-hidden />}>Meu perfil</HeaderMenuLink>
-                  <HeaderMenuLink href="/certificates" icon={<Shield className="h-4 w-4" aria-hidden />}>Certificados</HeaderMenuLink>
-                  <HeaderMenuLink href="/sign" icon={<FileSignature className="h-4 w-4" aria-hidden />}>Assinar</HeaderMenuLink>
-                  <HeaderMenuLink href="/history" icon={<History className="h-4 w-4" aria-hidden />}>Histórico</HeaderMenuLink>
-                  <HeaderMenuLink href="/verify" icon={<ShieldCheck className="h-4 w-4" aria-hidden />}>Verificar</HeaderMenuLink>
-                  <HeaderMenuLink href="/orgs" icon={<Building2 className="h-4 w-4" aria-hidden />}>Organizações</HeaderMenuLink>
-                  <HeaderMenuLink href="/settings" icon={<Settings className="h-4 w-4" aria-hidden />}>Configurações</HeaderMenuLink>
+                  <HeaderMenuLink href="/dashboard" icon={<LayoutDashboard className="h-4 w-4" aria-hidden />}>
+                    Início
+                  </HeaderMenuLink>
+                  <HeaderMenuLink href="/settings" icon={<User className="h-4 w-4" aria-hidden />}>
+                    Perfil e Assinaturas
+                  </HeaderMenuLink>
+                  <HeaderMenuLink href="/sign" icon={<FileSignature className="h-4 w-4" aria-hidden />}>
+                    Assinar Documento
+                  </HeaderMenuLink>
+                  <HeaderMenuLink href="/verify" icon={<ShieldCheck className="h-4 w-4" aria-hidden />}>
+                    Verificar Assinatura
+                  </HeaderMenuLink>
+                  <HeaderMenuLink href="/history" icon={<History className="h-4 w-4" aria-hidden />}>
+                    Histórico
+                  </HeaderMenuLink>
+                  <HeaderMenuLink href="/certificates" icon={<Shield className="h-4 w-4" aria-hidden />}>
+                    Certificados
+                  </HeaderMenuLink>
+                  <HeaderMenuLink href="/orgs" icon={<Building2 className="h-4 w-4" aria-hidden />}>
+                    Organizações
+                  </HeaderMenuLink>
                   <div className="my-1 border-t border-slate-200" />
                   <button
                     type="button"
@@ -274,6 +299,18 @@ export default function HeaderClient() {
                 <>
                   <li>
                     <Link
+                      href="/settings"
+                      className={classNames(
+                        'flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
+                        pathname === '/settings' && 'bg-slate-100 text-slate-900 font-semibold'
+                      )}
+                    >
+                      <User className="h-4 w-4" aria-hidden />
+                      Perfil e Assinaturas
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
                       href="/certificates"
                       className={classNames(
                         'flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
@@ -293,7 +330,7 @@ export default function HeaderClient() {
                       )}
                     >
                       <FileSignature className="h-4 w-4" aria-hidden />
-                      Assinar
+                      Assinar Documento
                     </Link>
                   </li>
                   <li>
@@ -317,7 +354,7 @@ export default function HeaderClient() {
                       )}
                     >
                       <ShieldCheck className="h-4 w-4" aria-hidden />
-                      Verificar
+                      Verificar Assinatura
                     </Link>
                   </li>
                 </>
