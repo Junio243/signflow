@@ -29,6 +29,7 @@ import {
   History,
   ShieldCheck,
   PenTool,
+  Shield,
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -382,6 +383,14 @@ export default function DashboardPage() {
               >
                 <PenTool className="h-4 w-4" />
                 Assinar
+              </Link>
+
+              <Link
+                href="/sign/advanced"
+                className="inline-flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 shadow-sm hover:bg-purple-100"
+              >
+                <Shield className="h-4 w-4" />
+                Avançada
               </Link>
 
               <Link
