@@ -56,7 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Ir para o conteúdo
           </a>
           <HeaderClient />
-          <main id="conteudo-principal" className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+          <main id="conteudo-principal">
             {children}
           </main>
           <Footer />
@@ -79,8 +79,8 @@ function Footer() {
           </div>
           <nav aria-label="Rodapé" className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs sm:text-sm sm:gap-x-6 sm:gap-y-3 sm:justify-end">
             <Link className="transition hover:text-brand-600" href="/security">Segurança</Link>
-            <Link className="transition hover:text-brand-600" href="/docs/immutability">Imutabilidade</Link>
-            <Link className="transition hover:text-brand-600" href="/status">Status</Link>
+            <Link className="transition hover:text-brand-600" href="/docs">Documentação</Link>
+            <Link className="transition hover:text-brand-600" href="/pricing">Preços</Link>
             <Link className="transition hover:text-brand-600" href="/contato">Contato</Link>
           </nav>
         </div>
