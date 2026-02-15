@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowRight, Check, Shield, Zap, FileCheck, Users, Globe, Lock, Sparkles, Play, ChevronRight, Star, TrendingUp, Clock, Award } from 'lucide-react'
+import { ArrowRight, Check, Shield, Zap, FileCheck, Users, Globe, Lock, Sparkles, Play, ChevronRight, Star, TrendingUp, Award } from 'lucide-react'
 
 export default function HomePage() {
   return (
@@ -39,11 +39,11 @@ export default function HomePage() {
                   <ArrowRight className="h-5 w-5" />
                 </Link>
                 <Link
-                  href="/demo"
+                  href="/contato"
                   className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-300 bg-white px-8 py-4 text-lg font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-50 transition-all"
                 >
                   <Play className="h-5 w-5" />
-                  Ver Demonstração
+                  Falar com Vendas
                 </Link>
               </div>
               
@@ -137,6 +137,7 @@ export default function HomePage() {
                 alt="Banco do Brasil"
                 width={160}
                 height={64}
+                loading="lazy"
                 className="object-contain"
               />
             </div>
@@ -146,6 +147,7 @@ export default function HomePage() {
                 alt="Magazine Luiza"
                 width={160}
                 height={64}
+                loading="lazy"
                 className="object-contain"
               />
             </div>
@@ -155,6 +157,7 @@ export default function HomePage() {
                 alt="Hospital Israelita Albert Einstein"
                 width={160}
                 height={64}
+                loading="lazy"
                 className="object-contain"
               />
             </div>
@@ -164,6 +167,7 @@ export default function HomePage() {
                 alt="Gov.br"
                 width={160}
                 height={64}
+                loading="lazy"
                 className="object-contain"
               />
             </div>
@@ -172,7 +176,7 @@ export default function HomePage() {
       </section>
 
       {/* Features Grid */}
-      <section className="py-24 bg-gradient-to-b from-white to-slate-50">
+      <section id="como-funciona" className="py-24 bg-gradient-to-b from-white to-slate-50 scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl sm:text-5xl font-bold text-slate-900 mb-4">
@@ -242,7 +246,7 @@ export default function HomePage() {
       </section>
 
       {/* How It Works */}
-      <section className="py-24 bg-white">
+      <section id="seguranca" className="py-24 bg-white scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl sm:text-5xl font-bold text-slate-900 mb-4">
@@ -330,7 +334,7 @@ export default function HomePage() {
       </section>
 
       {/* Pricing Teaser */}
-      <section className="py-24 bg-gradient-to-b from-slate-50 to-white">
+      <section id="precos" className="py-24 bg-gradient-to-b from-slate-50 to-white scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl sm:text-5xl font-bold text-slate-900 mb-4">
@@ -410,10 +414,65 @@ export default function HomePage() {
           </div>
 
           <div className="text-center mt-12">
-            <Link href="/pricing" className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold">
-              Ver todos os planos
+            <Link href="/pricing" className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold text-lg">
+              Ver todos os planos e recursos
               <ChevronRight className="h-5 w-5" />
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Support/Help Section */}
+      <section id="suporte" className="py-24 bg-white scroll-mt-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl sm:text-5xl font-bold text-slate-900 mb-4">
+              Precisa de Ajuda?
+            </h2>
+            <p className="text-xl text-slate-600">
+              Estamos aqui para ajudar você a começar
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div className="text-center p-8 rounded-2xl border border-slate-200 hover:shadow-lg transition-all">
+              <div className="inline-flex rounded-xl bg-blue-100 p-4 mb-4">
+                <svg className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Documentação</h3>
+              <p className="text-slate-600 mb-4">Guias completos e referências da API</p>
+              <Link href="/docs" className="text-blue-600 hover:text-blue-700 font-semibold">
+                Acessar Docs →
+              </Link>
+            </div>
+
+            <div className="text-center p-8 rounded-2xl border border-slate-200 hover:shadow-lg transition-all">
+              <div className="inline-flex rounded-xl bg-purple-100 p-4 mb-4">
+                <svg className="h-8 w-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Suporte</h3>
+              <p className="text-slate-600 mb-4">Fale com nossa equipe de suporte</p>
+              <Link href="/contato" className="text-purple-600 hover:text-purple-700 font-semibold">
+                Abrir Ticket →
+              </Link>
+            </div>
+
+            <div className="text-center p-8 rounded-2xl border border-slate-200 hover:shadow-lg transition-all">
+              <div className="inline-flex rounded-xl bg-emerald-100 p-4 mb-4">
+                <svg className="h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Comunidade</h3>
+              <p className="text-slate-600 mb-4">Conecte-se com outros usuários</p>
+              <Link href="/contato" className="text-emerald-600 hover:text-emerald-700 font-semibold">
+                Participar →
+              </Link>
+            </div>
           </div>
         </div>
       </section>
