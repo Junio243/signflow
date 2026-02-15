@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
+import { generateSignatureName, getSignatureDisplay } from '@/lib/formatName';
 
 type SignatureRow = {
   id: string;
@@ -37,7 +38,12 @@ export default function SettingsPage() {
   const [signatures, setSignatures] = useState<SignatureRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
-  const [formErrors, setFormErrors] = useState<{ phone?: string; email?: string; cep?: string }>({});
+  const [formErrors, setFormErrors] = useState<{ 
+    displayName?: string; 
+    phone?: string; 
+    email?: string; 
+    cep?: string 
+  }>({});
 
   const cityOptions = useMemo(() => {
     const baseOptions = [
@@ -104,6 +110,24 @@ export default function SettingsPage() {
     return `${digits.slice(0, 5)}-${digits.slice(5)}`;
   }
 
+  function validateDisplayName(value: string): boolean {
+    const trimmed = value.trim();
+    let message = '';
+    
+    if (!trimmed) {
+      message = 'Informe seu nome.';
+    } else if (trimmed.length < 2) {
+      message = 'Nome muito curto (mínimo 2 caracteres).';
+    } else if (trimmed.length > 100) {
+      message = 'Nome muito longo (máximo 100 caracteres).';
+    } else if (!/^[a-zA-ZÀ-ÿ\s]+$/.test(trimmed)) {
+      message = 'Use apenas letras e espaços.';
+    }
+    
+    setFormErrors(prev => ({ ...prev, displayName: message }));
+    return message === '';
+  }
+
   function validatePhone(value: string) {
     const digits = value.replace(/\D/g, '');
     let message = '';
@@ -163,8 +187,15 @@ export default function SettingsPage() {
     validateEmail(normalized);
   }
 
+  function handleDisplayNameInput(value: string) {
+    setDisplayName(value);
+    if (value.trim()) {
+      validateDisplayName(value);
+    }
+  }
+
   const hasErrors = Object.values(formErrors).some((msg) => Boolean(msg));
-  const isSaveDisabled = busy || hasErrors || !phone || !email || !cep;
+  const isSaveDisabled = busy || hasErrors || !displayName.trim() || !phone || !email || !cep;
 
   // drawing canvas
   const signCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -244,6 +275,7 @@ export default function SettingsPage() {
     const normalizedEmail = email.replace(/\s+/g, '').toLowerCase();
     const normalizedDisplayName = displayName.trim();
 
+    const nameValid = validateDisplayName(normalizedDisplayName);
     const phoneValid = validatePhone(normalizedPhone);
     const emailValid = validateEmail(normalizedEmail);
     const cepValid = validateCep(normalizedCep);
@@ -253,7 +285,7 @@ export default function SettingsPage() {
     setEmail(normalizedEmail);
     setDisplayName(normalizedDisplayName);
 
-    if (!phoneValid || !emailValid || !cepValid) {
+    if (!nameValid || !phoneValid || !emailValid || !cepValid) {
       setInfo('Corrija os campos destacados antes de salvar.');
       return;
     }
@@ -368,8 +400,8 @@ export default function SettingsPage() {
   // robust uploadSignatureFile: obtains session just before upload to satisfy RLS
   async function uploadSignatureFile(
     file: File,
-    name = 'assinatura',
-    type: 'draw' | 'upload' | 'certified' = 'upload'
+    type: 'draw' | 'upload' | 'certified' = 'upload',
+    customName?: string
   ) {
     // ensure current session
     if (!supabaseClient) {
@@ -386,7 +418,9 @@ export default function SettingsPage() {
     setBusy(true);
     setInfo(null);
     try {
-      const safeName = name.replace(/\s+/g, '-').toLowerCase();
+      // Gerar nome automático se não fornecido
+      const signatureName = customName || generateSignatureName(type, type === 'upload' ? file.name : undefined);
+      const safeName = signatureName.replace(/\s+/g, '-').toLowerCase();
       const path = `${uid}/${Date.now()}-${safeName}`;
 
       // upload to storage
@@ -404,7 +438,7 @@ export default function SettingsPage() {
         .from('signatures')
         .insert({
           user_id: uid,
-          name,
+          name: signatureName,
           storage_path: path,
           file_url: fileUrl,
           type,
@@ -432,17 +466,18 @@ export default function SettingsPage() {
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    await uploadSignatureFile(f, f.name, 'upload');
+    await uploadSignatureFile(f, 'upload');
     (e.target as HTMLInputElement).value = '';
   }
 
   // save canvas as signature
-  async function saveCanvasSignature(name = 'Desenho') {
+  async function saveCanvasSignature() {
     if (!signCanvasRef.current) return;
     const cvs = signCanvasRef.current;
     const dataUrl = cvs.toDataURL('image/png');
     const blob = await (await fetch(dataUrl)).blob();
-    await uploadSignatureFile(new File([blob], `${name}.png`, { type: 'image/png' }), name, 'draw');
+    const name = generateSignatureName('draw');
+    await uploadSignatureFile(new File([blob], `${name}.png`, { type: 'image/png' }), 'draw', name);
     clearCanvas();
   }
 
@@ -551,22 +586,39 @@ export default function SettingsPage() {
 
   return (
     <div style={{ maxWidth: 980, margin: '24px auto', padding: 16 }}>
-      <h1 style={{ fontSize: 22, marginBottom: 8 }}>Minhas configurações</h1>
+      <h1 style={{ fontSize: 22, marginBottom: 8 }}>Perfil e Assinaturas</h1>
 
       <section style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 16, marginBottom: 8 }}>Perfil</h2>
+        <h2 style={{ fontSize: 16, marginBottom: 8 }}>Dados do perfil</h2>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
-            <label>Nome</label>
+            <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
+              Nome completo
+              <span style={{ color: '#dc2626', marginLeft: 4 }} aria-label="campo obrigatório">*</span>
+            </label>
             <input
               value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              onBlur={() => setDisplayName((prev) => prev.trim())}
-              style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8 }}
+              onChange={(e) => handleDisplayNameInput(e.target.value)}
+              onBlur={() => validateDisplayName(displayName)}
+              placeholder="Seu nome completo"
+              aria-invalid={Boolean(formErrors.displayName)}
+              aria-required="true"
+              style={{ 
+                width: '100%', 
+                padding: 8, 
+                border: `1px solid ${formErrors.displayName ? '#dc2626' : '#e5e7eb'}`, 
+                borderRadius: 8 
+              }}
             />
+            {formErrors.displayName && (
+              <p style={{ color: '#dc2626', fontSize: 12, marginTop: 4 }}>{formErrors.displayName}</p>
+            )}
           </div>
           <div>
-            <label>Telefone</label>
+            <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
+              Telefone
+              <span style={{ color: '#dc2626', marginLeft: 4 }} aria-label="campo obrigatório">*</span>
+            </label>
             <input
               type="tel"
               inputMode="tel"
@@ -576,6 +628,7 @@ export default function SettingsPage() {
               maxLength={16}
               placeholder="(11) 98888-7777"
               aria-invalid={Boolean(formErrors.phone)}
+              aria-required="true"
               style={{
                 width: '100%',
                 padding: 8,
@@ -588,7 +641,10 @@ export default function SettingsPage() {
             )}
           </div>
           <div>
-            <label>E-mail</label>
+            <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
+              E-mail
+              <span style={{ color: '#dc2626', marginLeft: 4 }} aria-label="campo obrigatório">*</span>
+            </label>
             <input
               type="email"
               inputMode="email"
@@ -597,6 +653,7 @@ export default function SettingsPage() {
               onBlur={() => validateEmail(email)}
               placeholder="nome@exemplo.com"
               aria-invalid={Boolean(formErrors.email)}
+              aria-required="true"
               style={{
                 width: '100%',
                 padding: 8,
@@ -609,7 +666,10 @@ export default function SettingsPage() {
             )}
           </div>
           <div>
-            <label>CEP</label>
+            <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
+              CEP
+              <span style={{ color: '#dc2626', marginLeft: 4 }} aria-label="campo obrigatório">*</span>
+            </label>
             <input
               value={cep}
               inputMode="numeric"
@@ -618,6 +678,7 @@ export default function SettingsPage() {
               onBlur={() => validateCep(cep)}
               placeholder="00000-000"
               aria-invalid={Boolean(formErrors.cep)}
+              aria-required="true"
               style={{
                 width: '100%',
                 padding: 8,
@@ -630,7 +691,7 @@ export default function SettingsPage() {
             )}
           </div>
           <div>
-            <label>Cidade</label>
+            <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>Cidade</label>
             <select
               value={city}
               onChange={(e) => setCity(e.target.value)}
@@ -644,7 +705,7 @@ export default function SettingsPage() {
             </select>
           </div>
           <div>
-            <label>Fuso horário</label>
+            <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>Fuso horário</label>
             <select
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
@@ -677,7 +738,7 @@ export default function SettingsPage() {
       </section>
 
       <section style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 16, marginBottom: 8 }}>Assinaturas</h2>
+        <h2 style={{ fontSize: 16, marginBottom: 8 }}>Gerenciar assinaturas</h2>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
@@ -693,10 +754,18 @@ export default function SettingsPage() {
               style={{ width: '100%', height: 160, border: '1px dashed #94a3b8', borderRadius: 8, background: '#fff', touchAction: 'none' }}
             />
             <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-              <button onClick={() => saveCanvasSignature('Desenho')} disabled={busy} style={{ padding: '8px 12px', borderRadius: 8, background: '#2563eb', color: '#fff' }}>
+              <button 
+                onClick={saveCanvasSignature} 
+                disabled={busy} 
+                style={{ padding: '8px 12px', borderRadius: 8, background: '#2563eb', color: '#fff', cursor: busy ? 'not-allowed' : 'pointer' }}
+              >
                 Salvar desenho
               </button>
-              <button onClick={clearCanvas} disabled={busy} style={{ padding: '8px 12px', borderRadius: 8, background: '#fff', border: '1px solid #e5e7eb' }}>
+              <button 
+                onClick={clearCanvas} 
+                disabled={busy} 
+                style={{ padding: '8px 12px', borderRadius: 8, background: '#fff', border: '1px solid #e5e7eb', cursor: busy ? 'not-allowed' : 'pointer' }}
+              >
                 Limpar
               </button>
             </div>
@@ -704,41 +773,135 @@ export default function SettingsPage() {
 
           <div>
             <div style={{ marginBottom: 8, fontWeight: 600 }}>Importar assinatura (PNG/JPG)</div>
-            <input type="file" accept="image/png,image/jpeg" onChange={handleFileUpload} />
-            <div style={{ marginTop: 10, color: '#6b7280', fontSize: 13 }}>
+            <input 
+              type="file" 
+              accept="image/png,image/jpeg" 
+              onChange={handleFileUpload} 
+              disabled={busy}
+              style={{ marginBottom: 8 }}
+            />
+            <div style={{ color: '#6b7280', fontSize: 13 }}>
               Faça upload de uma imagem PNG/JPG com a sua assinatura. Use preferencialmente fundo transparente.
             </div>
           </div>
         </div>
 
         <div style={{ marginTop: 18 }}>
-          <h3 style={{ marginBottom: 8 }}>Galeria</h3>
+          <h3 style={{ marginBottom: 8, fontSize: 14, fontWeight: 600 }}>Minhas assinaturas</h3>
           <div style={{ display: 'grid', gap: 10 }}>
-            {signatures.length === 0 && <div style={{ color: '#6b7280' }}>Nenhuma assinatura ainda.</div>}
-            {signatures.map((sig) => (
-              <div key={sig.id} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 8, border: '1px solid #eaeaea', borderRadius: 8 }}>
-                <div style={{ width: 120, height: 60, border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: '#fff' }}>
-                  {sig.file_url ? <img src={sig.file_url} alt={sig.name || 'assinatura'} style={{ maxHeight: '100%', maxWidth: '100%' }} /> : <div style={{ color: '#9ca3af' }}>Sem preview</div>}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600 }}>{sig.name || 'Sem nome'}</div>
-                  <div style={{ fontSize: 13, color: '#6b7280' }}>{sig.created_at ? new Date(sig.created_at).toLocaleString() : ''}</div>
-                </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <button onClick={() => setDefaultSignature(sig.id)} disabled={busy || sig.is_default} style={{ padding: '6px 10px', borderRadius: 8, background: sig.is_default ? '#10b981' : '#2563eb', color: '#fff' }}>
-                    {sig.is_default ? 'Padrão' : 'Definir padrão'}
-                  </button>
-                  <button onClick={() => handleDeleteSignature(sig)} disabled={busy} style={{ padding: '6px 10px', borderRadius: 8, background: '#fff', border: '1px solid #e5e7eb' }}>
-                    Remover
-                  </button>
-                </div>
+            {signatures.length === 0 && (
+              <div style={{ color: '#6b7280', padding: 16, textAlign: 'center', border: '1px dashed #e5e7eb', borderRadius: 8 }}>
+                Nenhuma assinatura cadastrada. Crie uma desenhando ou fazendo upload.
               </div>
-            ))}
+            )}
+            {signatures.map((sig) => {
+              const display = getSignatureDisplay(sig);
+              return (
+                <div 
+                  key={sig.id} 
+                  style={{ 
+                    display: 'flex', 
+                    gap: 12, 
+                    alignItems: 'center', 
+                    padding: 12, 
+                    border: sig.is_default ? '2px solid #10b981' : '1px solid #e5e7eb', 
+                    borderRadius: 8,
+                    background: sig.is_default ? '#f0fdf4' : '#fff'
+                  }}
+                >
+                  <div style={{ 
+                    width: 120, 
+                    height: 60, 
+                    border: '1px solid #e5e7eb', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    overflow: 'hidden', 
+                    background: '#fff',
+                    borderRadius: 4
+                  }}>
+                    {sig.file_url ? (
+                      <img 
+                        src={sig.file_url} 
+                        alt={display.name} 
+                        style={{ maxHeight: '100%', maxWidth: '100%' }} 
+                      />
+                    ) : (
+                      <div style={{ color: '#9ca3af', fontSize: 12 }}>Sem preview</div>
+                    )}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>{display.icon}</span>
+                      <span>{display.name}</span>
+                      {sig.is_default && (
+                        <span style={{ 
+                          fontSize: 11, 
+                          background: '#10b981', 
+                          color: '#fff', 
+                          padding: '2px 6px', 
+                          borderRadius: 4,
+                          fontWeight: 600
+                        }}>
+                          PADRÃO
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{display.description}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {!sig.is_default && (
+                      <button 
+                        onClick={() => setDefaultSignature(sig.id)} 
+                        disabled={busy} 
+                        style={{ 
+                          padding: '6px 10px', 
+                          borderRadius: 8, 
+                          background: '#2563eb', 
+                          color: '#fff',
+                          fontSize: 13,
+                          cursor: busy ? 'not-allowed' : 'pointer',
+                          border: 'none'
+                        }}
+                      >
+                        Definir como padrão
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => handleDeleteSignature(sig)} 
+                      disabled={busy} 
+                      style={{ 
+                        padding: '6px 10px', 
+                        borderRadius: 8, 
+                        background: '#fff', 
+                        border: '1px solid #e5e7eb',
+                        fontSize: 13,
+                        cursor: busy ? 'not-allowed' : 'pointer',
+                        color: '#dc2626'
+                      }}
+                    >
+                      Remover
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {info && <div style={{ marginTop: 8, color: '#111' }}>{info}</div>}
+      {info && (
+        <div style={{ 
+          marginTop: 8, 
+          padding: 12, 
+          background: info.includes('Erro') || info.includes('Falha') ? '#fee2e2' : '#dbeafe',
+          color: info.includes('Erro') || info.includes('Falha') ? '#dc2626' : '#1e40af',
+          borderRadius: 8,
+          fontSize: 14
+        }}>
+          {info}
+        </div>
+      )}
     </div>
   );
 }
