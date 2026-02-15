@@ -272,7 +272,7 @@ export default function CertificatesPage() {
         </div>
         <div className="flex items-center gap-3">
           <Link
-            href="/certificates/generate"
+            href="/certificates/new"
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-md hover:from-brand-700 hover:to-brand-800"
           >
             <Sparkles className="h-4 w-4" />
