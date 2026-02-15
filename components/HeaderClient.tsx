@@ -33,6 +33,7 @@ type SessionUser = {
 
 const NAV_LINKS = [
   { href: '/dashboard', label: 'Dashboard', requiresAuth: true },
+  { href: '/pricing', label: 'Preços', requiresAuth: false },
   { href: '/contato', label: 'Contato', requiresAuth: false },
 ]
 
@@ -40,8 +41,7 @@ const LANDING_LINKS = [
   { href: '/#como-funciona', label: 'Como Funciona' },
   { href: '/#seguranca', label: 'Segurança' },
   { href: '/#precos', label: 'Preços' },
-  { href: '/#suporte', label: 'Suporte/Ajuda' },
-  { href: '/contato', label: 'Contato' },
+  { href: '/#suporte', label: 'Suporte' },
 ]
 
 export default function HeaderClient() {
@@ -137,13 +137,13 @@ export default function HeaderClient() {
   }, [pathname])
 
   const navLinks = useMemo(() => {
-    const filteredNavLinks = user ? NAV_LINKS : NAV_LINKS.filter(link => !link.requiresAuth)
-
+    // Se estiver na homepage, mostrar links das seções
     if (pathname === '/') {
-      return [...LANDING_LINKS, ...filteredNavLinks]
+      return LANDING_LINKS
     }
 
-    return filteredNavLinks
+    // Caso contrário, mostrar links padrão
+    return user ? NAV_LINKS : NAV_LINKS.filter(link => !link.requiresAuth)
   }, [pathname, user])
 
   return (
