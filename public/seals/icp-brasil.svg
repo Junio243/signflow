@@ -1,0 +1,28 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fundo circular -->
+  <circle cx="100" cy="100" r="95" fill="#009B3A" stroke="#FFD700" stroke-width="8"/>
+  
+  <!-- Círculo interno -->
+  <circle cx="100" cy="100" r="75" fill="white"/>
+  
+  <!-- Texto ICP-Brasil -->
+  <text x="100" y="85" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#009B3A" text-anchor="middle">
+    ICP-Brasil
+  </text>
+  
+  <!-- Subtexto -->
+  <text x="100" y="110" font-family="Arial, sans-serif" font-size="12" fill="#555" text-anchor="middle">
+    Infraestrutura de
+  </text>
+  <text x="100" y="125" font-family="Arial, sans-serif" font-size="12" fill="#555" text-anchor="middle">
+    Chaves Públicas
+  </text>
+  
+  <!-- Selo de autenticidade -->
+  <path d="M 100 30 L 110 50 L 130 55 L 115 70 L 120 90 L 100 80 L 80 90 L 85 70 L 70 55 L 90 50 Z" fill="#FFD700" stroke="#009B3A" stroke-width="2"/>
+  
+  <!-- Ano de estabelecimento -->
+  <text x="100" y="145" font-family="Arial, sans-serif" font-size="10" fill="#777" text-anchor="middle">
+    Est. 2001
+  </text>
+</svg>
