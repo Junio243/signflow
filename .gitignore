@@ -14,7 +14,7 @@ public/workbox-*.js
 public/workbox-*.js.map
 
 # Certificados digitais (NUNCA commitar!)
-certificates/
+/certificates/
 *.p12
 *.pfx
 *.pem
