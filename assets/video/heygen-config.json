@@ -1,0 +1,288 @@
+{
+  "project": {
+    "name": "SignFlow Tutorial - 60 Segundos",
+    "description": "Tutorial vídeo demonstrando como criar perfis, adicionar signatários e configurar QR Code",
+    "created_at": "2026-02-16",
+    "status": "ready_for_production"
+  },
+  "video_settings": {
+    "duration_seconds": 60,
+    "template": "Presenter",
+    "aspect_ratio": "16:9",
+    "resolution": {
+      "width": 1920,
+      "height": 1080",
+      "framerate": 30
+    },
+    "format": "MP4",
+    "codec": "H.264",
+    "bitrate_mbps": 8,
+    "audio": {
+      "format": "AAC",
+      "bitrate_kbps": 128,
+      "sample_rate_khz": 44.1
+    }
+  },
+  "avatar": {
+    "recommended": "Lara",
+    "alternatives": ["Marcus", "Sofia"],
+    "specifications": {
+      "age_range": "30-35",
+      "gender": "female",
+      "outfit": "business_casual",
+      "expression": "friendly_confident",
+      "gestures": "natural_moderate"
+    }
+  },
+  "voice": {
+    "language": "pt-BR",
+    "speed": 1.0,
+    "pitch": 0,
+    "emphasis": "moderate",
+    "style": "professional",
+    "tone": "friendly_confident"
+  },
+  "background": {
+    "type": "gradient",
+    "gradient": {
+      "start_color": "#0066ff",
+      "end_color": "#7c3aed",
+      "angle_degrees": 45,
+      "type": "linear"
+    },
+    "effects": {
+      "particles_enabled": true,
+      "particle_type": "soft_dots",
+      "particle_opacity": 0.2,
+      "particle_color": "auto_match_gradient"
+    }
+  },
+  "elements": [
+    {
+      "id": "logo_signflow",
+      "type": "image",
+      "file": "assets/images/logo.png",
+      "position": {
+        "horizontal": "right",
+        "vertical": "top",
+        "offset_x_px": 30,
+        "offset_y_px": 20
+      },
+      "size": {
+        "width_px": 100,
+        "height_px": 50
+      },
+      "opacity": 1.0,
+      "timing": {
+        "start_second": 3,
+        "end_second": 60,
+        "fade_in_duration": 1.0
+      }
+    },
+    {
+      "id": "text_overlay_main",
+      "type": "text",
+      "content": "SignFlow",
+      "position": {
+        "horizontal": "center",
+        "vertical": "top",
+        "offset_y_px": 40
+      },
+      "styling": {
+        "font": "Inter",
+        "font_weight": "bold",
+        "size_px": 48,
+        "color": "#ffffff",
+        "text_shadow": true,
+        "shadow_color": "#0066ff",
+        "shadow_blur": 10,
+        "shadow_opacity": 0.5
+      },
+      "background": {
+        "enabled": false
+      },
+      "timing": {
+        "start_second": 0,
+        "end_second": 8
+      }
+    }
+  ],
+  "visual_timeline": [
+    {
+      "time_range": "0-8s",
+      "scene": "intro",
+      "description": "Logo appears, avatar introduces SignFlow",
+      "visual_elements": ["logo_signflow", "text_overlay_main"],
+      "avatar_expression": "greeting",
+      "actions": ["logo_fade_in", "avatar_gestures_welcome"]
+    },
+    {
+      "time_range": "8-18s",
+      "scene": "upload_demo",
+      "description": "Avatar explains document upload and signatories",
+      "visual_elements": ["upload_mockup", "signatories_avatars"],
+      "avatar_expression": "explaining",
+      "actions": ["mockup_slide_in", "avatars_appear_sequentially"]
+    },
+    {
+      "time_range": "18-30s",
+      "scene": "qrcode_feature",
+      "description": "QR Code validation explained with visual",
+      "visual_elements": ["qrcode_animated", "smartphone_scan", "checkmark_green"],
+      "avatar_expression": "confident",
+      "actions": ["qrcode_zoom_in", "scan_animation", "checkmark_pulse"]
+    },
+    {
+      "time_range": "30-42s",
+      "scene": "features_list",
+      "description": "Feature list appears with checkmarks",
+      "visual_elements": ["features_list_animated"],
+      "avatar_expression": "presenting",
+      "actions": ["features_appear_one_by_one", "checkmarks_animate"]
+    },
+    {
+      "time_range": "42-52s",
+      "scene": "pricing_cta",
+      "description": "Pricing card appears with free offer",
+      "visual_elements": ["pricing_card", "website_url"],
+      "avatar_expression": "encouraging",
+      "actions": ["card_slide_up", "url_highlight"]
+    },
+    {
+      "time_range": "52-60s",
+      "scene": "closing",
+      "description": "Logo zooms to center, tagline appears",
+      "visual_elements": ["logo_signflow_centered", "tagline_text", "url_final"],
+      "avatar_expression": "confident_closing",
+      "actions": ["logo_zoom_center", "fade_to_gradient", "text_appear"]
+    }
+  ],
+  "colors": {
+    "primary_blue": "#0066ff",
+    "secondary_purple": "#7c3aed",
+    "accent_green": "#10b981",
+    "accent_red": "#ff4444",
+    "text_dark": "#334155",
+    "text_light": "#ffffff",
+    "background_white": "#ffffff",
+    "background_light_gray": "#f1f5f9"
+  },
+  "typography": {
+    "font_display": "Inter",
+    "font_content": "Inter",
+    "sizes": {
+      "h1": 48,
+      "h2": 36,
+      "h3": 28,
+      "body_large": 18,
+      "body": 16,
+      "body_small": 14
+    },
+    "weights": {
+      "bold": 700,
+      "semibold": 600,
+      "normal": 400
+    }
+  },
+  "transitions": {
+    "fade": {
+      "duration_ms": 500,
+      "easing": "ease_in_out"
+    },
+    "slide": {
+      "duration_ms": 300,
+      "easing": "ease_out",
+      "direction": "right"
+    },
+    "zoom": {
+      "duration_ms": 400,
+      "easing": "ease_in_out",
+      "scale_start": 0.8,
+      "scale_end": 1.0
+    }
+  },
+  "export_settings": {
+    "quality": "high",
+    "include_subtitles": true,
+    "subtitle_language": "pt-BR",
+    "include_captions": true,
+    "watermark": false
+  },
+  "social_media_versions": {
+    "youtube": {
+      "aspect_ratio": "16:9",
+      "duration": 60,
+      "include_thumbnail_frame": 3,
+      "thumbnail_description": "Frame aos 3 segundos com avatar sorrindo"
+    },
+    "instagram_reels": {
+      "aspect_ratio": "9:16",
+      "duration": 45,
+      "script_version": "vertical_short"
+    },
+    "linkedin": {
+      "aspect_ratio": "16:9",
+      "duration": 60,
+      "include_subtitles": true,
+      "autoplay": "muted"
+    },
+    "facebook": {
+      "aspect_ratio": "16:9",
+      "duration": 60,
+      "include_captions": true
+    }
+  },
+  "production_checklist": {
+    "pre_production": [
+      "Script finalizado",
+      "Avatar selecionado (Lara)",
+      "Logo preparada (PNG transparente)",
+      "Screenshots mockups prontos",
+      "Gradient colors definidas"
+    ],
+    "production": [
+      "HeyGen conta criada",
+      "Novo projeto criado",
+      "Avatar importado e configurado",
+      "Script inserido e testado",
+      "Background gradient aplicado",
+      "Logo adicionado e posicionado",
+      "Preview audio realizada",
+      "Preview completo assistido"
+    ],
+    "post_production": [
+      "Vídeo gerado e baixado",
+      "Arquivo testado em múltiplos dispositivos",
+      "Legendas verificadas",
+      "Verções sociais criadas",
+      "Thunmbnails extratos",
+      "Armazenado em assets/video/output/"
+    ]
+  },
+  "file_structure": {
+    "script": "assets/video/heygen-script.md",
+    "guide": "assets/video/heygen-production-guide.md",
+    "config": "assets/video/heygen-config.json",
+    "logo": "assets/images/logo.png",
+    "screenshots": "assets/video/screenshots/",
+    "output": "assets/video/output/",
+    "output_file": "assets/video/output/signflow-tutorial-60s.mp4"
+  },
+  "metadata": {
+    "created_by": "SignFlow Development Team",
+    "created_date": "2026-02-16",
+    "updated_date": "2026-02-16",
+    "version": "1.0",
+    "language": "pt-BR",
+    "tags": ["tutorial", "how-to", "signature", "qrcode", "signatory"],
+    "target_audience": ["beginners", "startups", "smes"],
+    "use_cases": [
+      "Website hero section",
+      "YouTube marketing",
+      "LinkedIn social media",
+      "Email marketing",
+      "B2B sales presentations",
+      "Product onboarding"
+    ]
+  }
+}
