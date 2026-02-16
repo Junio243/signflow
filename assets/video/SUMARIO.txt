@@ -1,0 +1,328 @@
+================================================================================
+   SIGNFLOW - VIDEO TUTORIAL - HEYGEN (60 SEGUNDOS)
+   Tutorial Explicativo para Criar Perfis e QR Code
+================================================================================
+
+STATUS: ✅ PRONTO PARA PRODUÇÃO (16/02/2026)
+
+TEMPO TOTAL: 30-40 minutos
+RESULTADO: Vídeo MP4 profissional 1920x1080 Full HD
+
+================================================================================
+ ARQUIVOS CRIADOS
+================================================================================
+
+📝 1. heygen-script.md
+   └─ Script completo com narração segmentada por tempo
+   └─ Pronto para copiar e colar no HeyGen
+   └─ Contém: diálogos, timing, especificações de áudio
+   └─ Tamanho: ~4.6 KB
+
+📖 2. heygen-production-guide.md
+   └─ Guia passo a passo completo (30-40 minutos)
+   └─ Instruções detalhadas para cada etapa
+   └─ Inclui: troubleshooting, dicas, screenshots
+   └─ Tamanho: ~9.7 KB
+
+⚙️  3. heygen-config.json
+   └─ Arquivo de configuração técnica
+   └─ Todos os parâmetros e especificações
+   └─ Referência para cores, fonts, timing
+   └─ Tamanho: ~7.7 KB
+
+📄 4. README.md
+   └─ Visão geral do projeto de vídeo
+   └─ Timeline, especificações, distribuição
+   └─ Troubleshooting e métricas
+   └─ Tamanho: ~9.6 KB
+
+🚀 5. QUICK-START.md
+   └─ Início rápido em 5 minutos
+   └─ Versão condensada do production guide
+   └─ Passo a passo direto
+   └─ Tamanho: ~7.5 KB
+
+📋 6. SUMARIO.txt
+   └─ Este documento
+   └─ Resumo executivo
+   └─ Localização: Este arquivo
+
+================================================================================
+ INSTRUÇÕES RÁPIDAS (5 MINUTOS)
+================================================================================
+
+[1] COPIAR SCRIPT
+    ├─ Abra: assets/video/heygen-script.md
+    ├─ Copie: Seção "NARRATION SCRIPT"
+    └─ Ctrl+C para copiar
+
+[2] CRIAR CONTA
+    ├─ Acesse: https://www.heygen.com
+    ├─ Sign Up com email
+    └─ Confirme email
+
+[3] NOVO VÍDEO
+    ├─ Dashboard → "Create"
+    ├─ Template: "Presenter"
+    ├─ Duration: 60 seconds
+    └─ Resolution: 1920x1080
+
+[4] SELECIONAR AVATAR
+    ├─ Filter: Portuguese (Brazil)
+    ├─ Choose: "Lara" ⭐ RECOMENDADO
+    └─ Preview → Select
+
+[5] COLAR SCRIPT
+    ├─ Campo de texto aberto
+    ├─ Ctrl+V para colar
+    ├─ Speed: 1.0x (normal)
+    └─ Pitch: 0 (neutro)
+
+[6] BACKGROUND
+    ├─ Type: Gradient
+    ├─ Color 1: #0066ff (Azul)
+    ├─ Color 2: #7c3aed (Roxo)
+    └─ Angle: 45 graus
+
+[7] GERAR
+    ├─ Click "Generate"
+    ├─ Aguarde 2-3 minutos
+    └─ Download como MP4
+
+FIM! Seu vídeo está pronto! 🎉
+
+================================================================================
+ ESPECIFICAÇÕES TÉCNICAS
+================================================================================
+
+VIDEO:
+  • Duration: 60 seconds
+  • Resolution: 1920x1080 (Full HD)
+  • Aspect Ratio: 16:9
+  • Framerate: 30 fps
+  • Format: MP4 (H.264)
+  • Bitrate: 8 Mbps
+
+AUDIO:
+  • Codec: AAC
+  • Bitrate: 128 kbps
+  • Sample Rate: 44.1 kHz
+  • Language: Portuguese (Brazil)
+
+AVATAR:
+  • Name: Lara (RECOMENDADO)
+  • Language: Portuguese (Brazil)
+  • Age: ~32 years
+  • Style: Professional Tech
+  • Expression: Friendly, Confident
+
+CORES:
+  • Azul Primária:  #0066ff (0, 102, 255)
+  • Roxo Secundária: #7c3aed (124, 58, 237)
+  • Verde Sucesso:  #10b981 (16, 185, 129)
+  • Branco:         #ffffff (255, 255, 255)
+  • Cinza Texto:    #334155 (51, 65, 85)
+
+================================================================================
+ TIMELINE DO VÍDEO (60 SEGUNDOS)
+================================================================================
+
+  0-8s  │ INTRO
+        │ ✓ Logo SignFlow aparece
+        │ ✓ Avatar apresenta SignFlow
+        │
+  8-18s │ UPLOAD & SIGNATÁRIOS
+        │ ✓ Upload PDF
+        │ ✓ Adicionar signatários
+        │ ✓ 3 avatares aparecem sequencialmente
+        │
+  18-30s│ QR CODE (DESTAQUE)
+        │ ✓ QR Code animado
+        │ ✓ Smartphone escaneando
+        │ ✓ Checkmark verde de validação
+        │
+  30-42s│ FEATURES
+        │ ✓ Certificado ICP-Brasil
+        │ ✓ Múltiplos Signatários
+        │ ✓ Acompanhamento Real-time
+        │ ✓ Storage Seguro
+        │
+  42-52s│ PRICING & CTA
+        │ ✓ "Grátis para começar"
+        │ ✓ "3 assinaturas/mês"
+        │ ✓ "Sem cartão de crédito"
+        │ ✓ Website URL
+        │
+  52-60s│ CLOSING
+        │ ✓ Logo zoom center
+        │ ✓ Tagline: "Assinatura Digital Simplificada"
+        │ ✓ Fade gradient background
+
+================================================================================
+ VERSÕES ADICIONAIS
+================================================================================
+
+VERSÃO VERTICAL (Instagram/TikTok)
+  • Aspect Ratio: 9:16 (vertical)
+  • Duration: 45 segundos
+  • Script: Condensado
+  • Arquivo: signflow-tutorial-vertical-45s.mp4
+
+VERSÃO COM LEGENDAS
+  • Inclui: Subtítulos em Português
+  • Format: MP4 com subtítulos codificados
+  • Arquivo: signflow-tutorial-subtitled.mp4
+
+VERSÃO COM MÚSICA
+  • Audio: Narração + Background Music
+  • Mix: 100% narração, 30% música
+  • Estilo: Upbeat, professional
+
+================================================================================
+ ESTRUTURA DE ARQUIVOS
+================================================================================
+
+assets/
+├─ video/
+│  ├─ README.md .............................. Visão geral
+│  ├─ QUICK-START.md ........................ Início rápido
+│  ├─ heygen-script.md ....................... Script narração
+│  ├─ heygen-production-guide.md ............ Guia passo a passo
+│  ├─ heygen-config.json ................... Config técnica
+│  ├─ SUMARIO.txt .......................... Este arquivo
+│  ├─ screenshots/
+│  │  ├─ upload-screen.png
+│  │  ├─ signatories-screen.png
+│  │  ├─ qrcode-screen.png
+│  │  └─ validation-screen.png
+│  └─ output/
+│     └─ signflow-tutorial-60s.mp4 ........ VÍDEO FINAL (gerado depois)
+├─ images/
+│  └─ logo.png ............................. Logo (PNG transparente)
+└─ ...
+
+================================================================================
+ CHECKLIST PRÉ-PRODUÇÃO
+================================================================================
+
+✓ Script revisado e sem erros
+✓ Avatar selecionado (Lara)
+✓ Logo preparada (PNG transparente)
+✓ Screenshots mockups prontos (opcional)
+✓ Gradient colors definidas (#0066ff → #7c3aed)
+✓ Áudio preview realizada
+✓ Timing de elementos definido
+
+================================================================================
+ PRÓXIMOS PASSOS (APÓS GERAR O VÍDEO)
+================================================================================
+
+1️⃣  PUBLICAÇÃO
+    • Upload em YouTube
+    • Compartilhar em LinkedIn
+    • Adicionar ao website (hero section)
+    • Enviar em email marketing
+
+2️⃣  DISTRIBUIÇÃO SOCIAL
+    • Instagram Reels (versão 45s vertical)
+    • TikTok
+    • Facebook
+    • Twitter/X (com thumbnail)
+
+3️⃣  ANÁLISE & OTIMIZAÇÃO
+    • Acompanhar views e engagement
+    • Coletar feedback
+    • Testar diferentes CTAs
+    • Criar variações se necessário
+
+4️⃣  MÉTRICAS ESPERADAS
+    • Views: 1000+ no 1º mês
+    • Engagement: 10%+
+    • Click-through: 5%+
+    • Conversion: 2-5%
+
+================================================================================
+ DÚVIDAS FREQUENTES
+================================================================================
+
+P: Qual avatar escolher?
+R: Recomendo "Lara" - profissional, amigável, português nativo
+
+P: Qual a duração total da produção?
+R: ~30-40 minutos incluindo espera de processamento no HeyGen
+
+P: Preciso pagar para usar HeyGen?
+R: Não! Plano gratuito funciona bem. Apenas com limite de vídeos/mês
+
+P: Posso editar o vídeo depois?
+R: Sim! Use DaVinci Resolve, Adobe Premiere, ou Shotcut
+
+P: Como adicionar legendas depois?
+R: Use software de edição e importe subtítulos (SRT format)
+
+P: Posso adicionar música de fundo?
+R: Sim! Misture em software de edição (narra 100%, música 30%)
+
+P: Qual resolução exportar?
+R: Full HD (1920x1080) é ideal para maioria dos casos
+
+P: Posso usar este vídeo em comerciais?
+R: Sim! Você possui os direitos. Apenas respeite termos HeyGen
+
+================================================================================
+ SUPORTE & RECURSOS
+================================================================================
+
+PLATAFORMA:
+  • Website: https://www.heygen.com
+  • Docs: https://docs.heygen.com
+  • Community: https://community.heygen.com
+  • Support: https://support.heygen.com
+
+SIGNFLOW:
+  • Website: https://signflow-beta.vercel.app
+  • GitHub: https://github.com/Junio243/signflow
+  • Email: canutojunio72@gmail.com
+
+ARQUIVOS DESTE PROJETO:
+  • Script: assets/video/heygen-script.md
+  • Production Guide: assets/video/heygen-production-guide.md
+  • Quick Start: assets/video/QUICK-START.md
+  • Config: assets/video/heygen-config.json
+
+================================================================================
+ RESUMO EXECUTIVO
+================================================================================
+
+O QUÊ:    Vídeo tutorial de 60 segundos mostrando SignFlow em ação
+QUANDO:   Criado em 16/02/2026
+ONDE:    Gerado em HeyGen, publicado em múltiplos canais
+POR QUÊ:  Ajudar usuários iniciantes a entender recursos novos
+COMO:     Avatar Lara em Portuguese (Brazil) com script profissional
+CUSTAR:   Grátis (plano gratuito HeyGen funciona)
+TEMPO:    30-40 minutos da concepção ao vídeo final
+RESULT.:  Vídeo profissional MP4 1920x1080 pronto para publicar
+
+================================================================================
+ VERSÃO
+================================================================================
+
+Criado: 16/02/2026
+Status: ✅ PRONTO PARA PRODUÇÃO
+Versão: 1.0
+Última Atualização: 16/02/2026 às 18:45 BRT
+Autor: SignFlow Development Team
+
+================================================================================
+
+Quer começar agora? 🚀
+
+  1. Abra: https://www.heygen.com
+  2. Siga: assets/video/QUICK-START.md
+  3. Copie: assets/video/heygen-script.md
+  4. Gere o vídeo
+  5. Compartilhe com o mundo
+
+Você consegue! 💪
+
+================================================================================
