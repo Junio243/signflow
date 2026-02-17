@@ -117,7 +117,12 @@ export async function POST(req: NextRequest) {
     const signerDocument = subjectData.cpf || subjectData.cnpj || 'N/A';
     const signerEmail = subjectData.email || subjectData.businessEmail || subjectData.legalRepresentative?.email || 'N/A';
 
-    // 5. Carregar PDF
+    // 5. Gerar ID único para o documento
+    const documentId = crypto.randomUUID();
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://signflow-beta.vercel.app';
+    const validationUrl = `${baseUrl}/validate/${documentId}`;
+
+    // 6. Carregar PDF
     const pdfBytes = Buffer.from(document_base64, 'base64');
     const pdfDoc = await PDFDocument.load(pdfBytes);
     const pages = pdfDoc.getPages();
@@ -127,7 +132,7 @@ export async function POST(req: NextRequest) {
     const page = pages[sigPage];
     const { width: pageWidth, height: pageHeight } = page.getSize();
 
-    // 6. Adicionar assinatura visual
+    // 7. Adicionar assinatura visual
     const signatureText = [
       `Assinado digitalmente por:`,
       signerName,
@@ -154,19 +159,13 @@ export async function POST(req: NextRequest) {
       maxWidth: signature_position.width - 20,
     });
 
-    // 7. Adicionar QR Code se habilitado
+    // 8. Adicionar QR Code se habilitado (agora com URL de validação)
+    let qrCodeUrl: string | null = null;
     if (qr_code_config.enabled) {
-      const qrData = JSON.stringify({
-        signer: signerName,
-        document: signerDocument,
-        certificate_type: certificate.certificate_type,
-        signed_at: new Date().toISOString(),
-        certificate_id: certificate.id,
-      });
-
-      const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
-        width: qr_code_config.size * 2,
+      const qrCodeDataUrl = await QRCode.toDataURL(validationUrl, {
+        width: qr_code_config.size * 3,
         margin: 1,
+        errorCorrectionLevel: 'M',
       });
 
       const qrImageBytes = Buffer.from(qrCodeDataUrl.split(',')[1], 'base64');
@@ -182,9 +181,11 @@ export async function POST(req: NextRequest) {
         width: qr_code_config.size,
         height: qr_code_config.size,
       });
+
+      qrCodeUrl = qrCodeDataUrl;
     }
 
-    // 8. Proteger PDF com senha se habilitado
+    // 9. Proteger PDF com senha se habilitado
     if (pdf_protection.enabled && pdf_protection.password) {
       // PDFLib não suporta encryption diretamente
       // Adicionar metadados indicando proteção
@@ -192,7 +193,7 @@ export async function POST(req: NextRequest) {
       pdfDoc.setSubject('Documento assinado digitalmente e protegido');
     }
 
-    // 9. Adicionar metadados
+    // 10. Adicionar metadados
     pdfDoc.setProducer('SignFlow - Assinatura Digital Avançada');
     pdfDoc.setCreator('SignFlow');
     pdfDoc.setAuthor(signerName);
@@ -202,10 +203,10 @@ export async function POST(req: NextRequest) {
       signerDocument,
     ]);
 
-    // 10. Gerar PDF final
+    // 11. Gerar PDF final
     const signedPdfBytes = await pdfDoc.save();
 
-    // 11. Fazer upload do documento assinado
+    // 12. Fazer upload do documento assinado
     const timestamp = Date.now();
     const sanitizedName = document_name.replace(/[^a-zA-Z0-9.-]/g, '_');
     const fileName = `${timestamp}_${sanitizedName}`;
@@ -226,7 +227,44 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 12. Gerar URL de download
+    // 13. Gerar URL pública do documento
+    const { data: publicUrlData } = await supabase.storage
+      .from('documents')
+      .getPublicUrl(storagePath);
+
+    // 14. Criar registro do documento na tabela 'documents'
+    const { error: docInsertError } = await supabase.from('documents').insert({
+      id: documentId,
+      user_id: user.id,
+      original_pdf_name: document_name,
+      signed_pdf_path: storagePath,
+      signed_pdf_url: publicUrlData.publicUrl,
+      qr_code_url: qrCodeUrl,
+      status: 'signed',
+      created_at: new Date().toISOString(),
+    });
+
+    if (docInsertError) {
+      console.error('Error creating document record:', docInsertError);
+    }
+
+    // 15. Criar evento de assinatura
+    const { error: eventInsertError } = await supabase.from('document_signing_events').insert({
+      document_id: documentId,
+      signer_name: signerName,
+      signer_reg: signerDocument,
+      signer_email: signerEmail !== 'N/A' ? signerEmail : null,
+      certificate_type: certificate.certificate_type,
+      certificate_issuer: certificate.issuer,
+      certificate_valid_until: certificate.expires_at,
+      signed_at: new Date().toISOString(),
+    });
+
+    if (eventInsertError) {
+      console.error('Error creating signing event:', eventInsertError);
+    }
+
+    // 16. Gerar URL de download temporária
     const { data: urlData } = await supabase.storage
       .from('documents')
       .createSignedUrl(storagePath, 3600); // 1 hora
@@ -238,7 +276,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 13. Registrar assinatura no banco
+    // 17. Registrar na tabela de documentos assinados (histórico)
     const { error: insertError } = await supabase.from('signed_documents').insert({
       user_id: user.id,
       certificate_id: certificate.id,
@@ -255,6 +293,7 @@ export async function POST(req: NextRequest) {
         qr_code_config,
         pdf_protection: pdf_protection.enabled,
         signed_at: new Date().toISOString(),
+        validation_url: validationUrl,
       },
     });
 
@@ -264,6 +303,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      document_id: documentId,
+      validation_url: validationUrl,
       signed_document_url: urlData.signedUrl,
       signer_info: {
         name: signerName,
@@ -284,7 +325,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Função auxiliar para validar senha - CORRIGIDA
+// Função auxiliar para validar senha
 async function validateCertificatePassword(
   encryptedPassword: string,
   providedPassword: string
