@@ -227,25 +227,52 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 13. Gerar URL pública do documento
-    const { data: publicUrlData } = await supabase.storage
+    // 13. Gerar URL de download temporária (válida por 1 ano)
+    const { data: signedUrlData } = await supabase.storage
       .from('documents')
-      .getPublicUrl(storagePath);
+      .createSignedUrl(storagePath, 31536000); // 1 ano em segundos
 
-    // 14. Criar registro do documento na tabela 'documents'
+    if (!signedUrlData) {
+      return NextResponse.json(
+        { error: 'Erro ao gerar URL de download' },
+        { status: 500 }
+      );
+    }
+
+    // 14. Criar registro do documento na tabela 'documents' com TODOS os campos necessários
     const { error: docInsertError } = await supabase.from('documents').insert({
       id: documentId,
       user_id: user.id,
       original_pdf_name: document_name,
       signed_pdf_path: storagePath,
-      signed_pdf_url: publicUrlData.publicUrl,
+      signed_pdf_url: signedUrlData.signedUrl,
       qr_code_url: qrCodeUrl,
       status: 'signed',
       created_at: new Date().toISOString(),
+      // Campos obrigatórios adicionais
+      metadata: {
+        signature_position,
+        qr_code_config,
+        pdf_protection: pdf_protection.enabled,
+        certificate_type: certificate.certificate_type,
+        signed_by: signerName,
+        signed_at: new Date().toISOString(),
+      },
+      validation_theme_snapshot: {
+        color: '#6366f1',
+        issuer: signerName,
+        reg: signerDocument,
+        certificate_type: certificate.certificate_type || 'ICP-Brasil',
+        certificate_issuer: certificate.issuer,
+        certificate_valid_until: certificate.expires_at,
+        footer: 'Documento assinado digitalmente via SignFlow - Validade jurídica conforme MP 2.200-2/01 e Lei 14.063/20',
+      },
     });
 
     if (docInsertError) {
       console.error('Error creating document record:', docInsertError);
+      // Não retornar erro aqui, apenas logar
+      // O documento foi assinado com sucesso
     }
 
     // 15. Criar evento de assinatura
@@ -264,19 +291,7 @@ export async function POST(req: NextRequest) {
       console.error('Error creating signing event:', eventInsertError);
     }
 
-    // 16. Gerar URL de download temporária
-    const { data: urlData } = await supabase.storage
-      .from('documents')
-      .createSignedUrl(storagePath, 3600); // 1 hora
-
-    if (!urlData) {
-      return NextResponse.json(
-        { error: 'Erro ao gerar URL de download' },
-        { status: 500 }
-      );
-    }
-
-    // 17. Registrar na tabela de documentos assinados (histórico)
+    // 16. Registrar na tabela de documentos assinados (histórico)
     const { error: insertError } = await supabase.from('signed_documents').insert({
       user_id: user.id,
       certificate_id: certificate.id,
@@ -305,7 +320,7 @@ export async function POST(req: NextRequest) {
       success: true,
       document_id: documentId,
       validation_url: validationUrl,
-      signed_document_url: urlData.signedUrl,
+      signed_document_url: signedUrlData.signedUrl,
       signer_info: {
         name: signerName,
         document: signerDocument,
