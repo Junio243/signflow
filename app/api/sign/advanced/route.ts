@@ -284,24 +284,42 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Função auxiliar para validar senha
+// Função auxiliar para validar senha - CORRIGIDA
 async function validateCertificatePassword(
   encryptedPassword: string,
   providedPassword: string
 ): Promise<boolean> {
   try {
+    // Obter a chave de criptografia do ambiente (mesma usada na criação)
+    const encryptionKey = process.env.CERTIFICATE_ENCRYPTION_KEY;
+    if (!encryptionKey) {
+      console.error('CERTIFICATE_ENCRYPTION_KEY não configurada');
+      return false;
+    }
+
+    // Separar IV e senha criptografada
     const [ivHex, encryptedHex] = encryptedPassword.split(':');
+    if (!ivHex || !encryptedHex) {
+      console.error('Formato de senha criptografada inválido');
+      return false;
+    }
+
     const iv = Buffer.from(ivHex, 'hex');
     const encrypted = Buffer.from(encryptedHex, 'hex');
 
-    const key = crypto.scryptSync(providedPassword, 'salt', 32);
+    // Derivar a chave usando a CERTIFICATE_ENCRYPTION_KEY (não a senha do usuário!)
+    const key = crypto.scryptSync(encryptionKey, 'salt', 32);
+    
+    // Descriptografar
     const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-
     let decrypted = decipher.update(encrypted);
     decrypted = Buffer.concat([decrypted, decipher.final()]);
-
-    return decrypted.toString() === providedPassword;
-  } catch {
+    
+    // Comparar a senha descriptografada com a senha fornecida
+    const decryptedPassword = decrypted.toString('utf8');
+    return decryptedPassword === providedPassword;
+  } catch (error) {
+    console.error('Erro ao validar senha:', error);
     return false;
   }
 }
