@@ -65,7 +65,7 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://placehold.co https://via.placeholder.com https://ui-avatars.com",
+              "img-src 'self' 'unsafe-inline' data: blob: https: http:",
               "font-src 'self' data:",
               "connect-src 'self' data: blob: https://*.supabase.co wss://*.supabase.co",
               "frame-src 'self'",
