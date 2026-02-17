@@ -1,13 +1,11 @@
 // components/PdfEditor.tsx
 'use client';
-import { useEffect, useRef, useState } from 'react';
-// usar a build legacy evita diversos problemas com bundlers/Next.js
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 import type { PDFDocumentProxy, PDFDocumentLoadingTask } from 'pdfjs-dist';
 import 'pdfjs-dist/web/pdf_viewer.css';
 
 type Pos = { page: number; nx: number; ny: number; scale: number; rotation: number };
-
 type SignatureSize = { width: number; height: number } | null;
 
 type Props = {
@@ -23,11 +21,9 @@ type Props = {
 
 if (typeof window !== 'undefined') {
   try {
-    // usamos a versão legacy do worker que está disponível em public/pdf.worker.min.mjs
-    const workerSrc = '/pdf.worker.min.mjs';
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
   } catch (e) {
-    console.warn('Não foi possível configurar GlobalWorkerOptions.workerSrc automaticamente:', e);
+    console.warn('PdfEditor: não foi possível configurar workerSrc:', e);
   }
 }
 
@@ -39,97 +35,74 @@ export default function PdfEditor({
   onPositions,
   page: controlledPage,
   onPageChange,
-  onDocumentLoaded
+  onDocumentLoaded,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [page, setPage] = useState(1);
   const [sigDataUrl, setSigDataUrl] = useState<string | null>(null);
-  const [scale, setScale] = useState(1);
+  const [zoom, setZoom] = useState(1.2);
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [thumbnails, setThumbnails] = useState<string[]>([]);
+  const [showThumbs, setShowThumbs] = useState(false);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
 
-  // throttle refs
   const rafRef = useRef(false);
   const latestPosRef = useRef<{ nx: number; ny: number } | null>(null);
-  
-  // ref to track first load to avoid resetting page on re-renders
   const isFirstLoadRef = useRef(true);
+  const renderTaskRef = useRef<any>(null);
 
+  // ── Carrega PDF ──────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     let task: PDFDocumentLoadingTask | undefined;
     let blobUrl: string | null = null;
-
-    // Reset first load flag when file changes
     isFirstLoadRef.current = true;
 
     (async () => {
-      if (!file) {
-        setPdf(null);
-        setError(null);
-        return;
-      }
-
+      if (!file) { setPdf(null); setError(null); setThumbnails([]); return; }
       try {
         setLoading(true);
         setError(null);
-
-        // 1) tenta com Uint8Array (recomendado)
         try {
           const ab = await file.arrayBuffer();
           const uint8 = new Uint8Array(ab);
-
           const loadingTask = pdfjsLib.getDocument({ data: uint8 });
           task = loadingTask;
           const doc = await loadingTask.promise;
-          if (cancelled) { await doc?.destroy?.(); return; }
+          if (cancelled) { doc?.destroy?.(); return; }
           setPdf(doc);
-          
-          // Only reset page and call onPageChange on first load
           if (isFirstLoadRef.current) {
             isFirstLoadRef.current = false;
             if (controlledPage === undefined) setPage(1);
             onDocumentLoaded?.({ pages: doc.numPages || 1 });
             onPageChange?.(1);
           }
+          // gera miniaturas em background
+          generateThumbnails(doc);
           return;
-        } catch (firstErr) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('PdfEditor: getDocument usando Uint8Array falhou — tentando blob URL. Erro:', firstErr);
-          }
+        } catch {
+          // fallback blob
         }
-
-        // 2) fallback: blob URL
-        try {
-          blobUrl = URL.createObjectURL(file);
-          const loadingTask = pdfjsLib.getDocument({ url: blobUrl });
-          task = loadingTask;
-          const doc = await loadingTask.promise;
-          if (cancelled) { await doc?.destroy?.(); return; }
-          setPdf(doc);
-          
-          // Only reset page and call onPageChange on first load
-          if (isFirstLoadRef.current) {
-            isFirstLoadRef.current = false;
-            if (controlledPage === undefined) setPage(1);
-            onDocumentLoaded?.({ pages: doc.numPages || 1 });
-            onPageChange?.(1);
-          }
-          return;
-        } catch (secondErr) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('PdfEditor: getDocument via blob URL também falhou:', secondErr);
-          }
-          throw secondErr;
+        blobUrl = URL.createObjectURL(file);
+        const loadingTask = pdfjsLib.getDocument({ url: blobUrl });
+        task = loadingTask;
+        const doc = await loadingTask.promise;
+        if (cancelled) { doc?.destroy?.(); return; }
+        setPdf(doc);
+        if (isFirstLoadRef.current) {
+          isFirstLoadRef.current = false;
+          if (controlledPage === undefined) setPage(1);
+          onDocumentLoaded?.({ pages: doc.numPages || 1 });
+          onPageChange?.(1);
         }
+        generateThumbnails(doc);
       } catch (err: any) {
-        console.error('Falha ao carregar PDF para prévia:', err?.name, err?.message, err);
-        if (!cancelled) {
-          setPdf(null);
-          setError('Não foi possível carregar a prévia do PDF.');
-        }
+        console.error('PdfEditor: falha ao carregar PDF', err);
+        if (!cancelled) { setPdf(null); setError('Não foi possível carregar a prévia do PDF.'); }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -137,107 +110,139 @@ export default function PdfEditor({
 
     return () => {
       cancelled = true;
-      try {
-        task?.destroy?.();
-      } catch (cleanupErr) {
-        console.warn('PdfEditor: erro ao destruir task de carregamento', cleanupErr);
-      }
-      if (blobUrl) {
-        try {
-          URL.revokeObjectURL(blobUrl);
-        } catch (revokeErr) {
-          console.warn('PdfEditor: erro ao revogar blob URL', revokeErr);
-        }
-      }
+      try { task?.destroy?.(); } catch {}
+      if (blobUrl) { try { URL.revokeObjectURL(blobUrl); } catch {} }
     };
   }, [file]);
+
+  // ── Miniaturas ────────────────────────────────────────────────────────────────
+  const generateThumbnails = useCallback(async (doc: PDFDocumentProxy) => {
+    const thumbs: string[] = [];
+    for (let i = 1; i <= doc.numPages; i++) {
+      try {
+        const p = await doc.getPage(i);
+        const vp = p.getViewport({ scale: 0.18 });
+        const c = document.createElement('canvas');
+        c.width = vp.width; c.height = vp.height;
+        const ctx = c.getContext('2d')!;
+        await p.render({ canvasContext: ctx, viewport: vp }).promise;
+        thumbs.push(c.toDataURL('image/jpeg', 0.6));
+      } catch { thumbs.push(''); }
+    }
+    setThumbnails(thumbs);
+  }, []);
 
   useEffect(() => { setSigDataUrl(signatureUrl); }, [signatureUrl]);
   useEffect(() => { if (controlledPage !== undefined) setPage(controlledPage); }, [controlledPage]);
 
+  // ── Renderiza página ──────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-    
+
     async function renderPage() {
       const canvas = canvasRef.current;
       if (!canvas || !pdf || cancelled) return;
 
       try {
+        // cancela render anterior se houver
+        if (renderTaskRef.current) {
+          try { renderTaskRef.current.cancel(); } catch {}
+          renderTaskRef.current = null;
+        }
+
         const p = await pdf.getPage(page);
         if (cancelled) return;
-        
-        const viewport = p.getViewport({ scale });
-        canvas.width = viewport.width; 
+
+        const viewport = p.getViewport({ scale: zoom });
+        canvas.width = viewport.width;
         canvas.height = viewport.height;
-        // também atualiza estilo CSS para evitar que canvas fique com 0x0 visualmente
         canvas.style.width = `${viewport.width}px`;
         canvas.style.height = `${viewport.height}px`;
         const ctx = canvas.getContext('2d')!;
-        
-        await p.render({ canvasContext: ctx, viewport }).promise;
-        if (cancelled) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        const renderTask = p.render({ canvasContext: ctx, viewport });
+        renderTaskRef.current = renderTask;
+        await renderTask.promise;
+        if (cancelled) return;
+        renderTaskRef.current = null;
+
+        // desenha assinaturas na página atual
         const pos = positions.find(ps => ps.page === page);
         if (pos && sigDataUrl) {
-          const img = new Image(); 
-          img.src = sigDataUrl; 
+          const img = new Image();
+          img.src = sigDataUrl;
           await img.decode();
           if (cancelled) return;
-          
           const baseW = signatureSize?.width || img.naturalWidth || 240;
           const baseH = signatureSize?.height || img.naturalHeight || baseW * 0.35;
           const w = baseW * (pos.scale || 1);
           const h = baseH * (pos.scale || 1);
-          const cw = canvas.width, ch = canvas.height;
+          const cw = canvas.width; const ch = canvas.height;
           const x = (pos.nx || 0.5) * cw; const y = (pos.ny || 0.5) * ch;
           ctx.save();
           ctx.translate(x, y);
           ctx.rotate((pos.rotation || 0) * Math.PI / 180);
+          ctx.globalAlpha = 0.92;
           ctx.drawImage(img, -w / 2, -h / 2, w, h);
           ctx.restore();
+
+          // indicador de posição (cross-hair)
+          ctx.save();
+          ctx.strokeStyle = 'rgba(37,99,235,0.6)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 3]);
+          ctx.strokeRect(x - w / 2 - 2, y - h / 2 - 2, w + 4, h + 4);
+          ctx.restore();
         }
-        if (!cancelled) {
-          setError(null);
-        }
+
+        if (!cancelled) setError(null);
       } catch (err: any) {
-        if (!cancelled) {
-          console.error('Falha ao renderizar página do PDF:', err?.name, err?.message, err);
-          setError('Não foi possível renderizar esta página do PDF.');
-        }
+        if (cancelled || err?.name === 'RenderingCancelledException') return;
+        console.error('PdfEditor: erro ao renderizar página', err);
+        setError('Não foi possível renderizar esta página.');
       }
     }
-    
+
     renderPage();
-    
-    return () => {
-      cancelled = true;
+    return () => { cancelled = true; };
+  }, [pdf, page, zoom, positions, sigDataUrl, signatureSize]);
+
+  // ── Interações ────────────────────────────────────────────────────────────────
+  function getRelativePos(e: React.MouseEvent | React.PointerEvent) {
+    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      nx: (e.clientX - rect.left) / (rect.width || 1),
+      ny: (e.clientY - rect.top) / (rect.height || 1),
     };
-  }, [pdf, page, scale, positions, sigDataUrl, signatureSize]);
+  }
 
   function onClick(e: React.MouseEvent) {
-    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
-    const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+    if (drag) return; // não registra clique após drag
+    const { nx, ny } = getRelativePos(e);
     const existing = positions.filter(p => p.page !== page);
-    const cw = rect.width || 1; const ch = rect.height || 1;
-    const nx = x / cw; const ny = y / ch;
     onPositions([...existing, { page, nx, ny, scale: 1, rotation: 0 }]);
   }
 
-  function onWheel(e: React.WheelEvent) { setScale(s => Math.max(0.5, Math.min(3, s + (e.deltaY > 0 ? -0.1 : 0.1)))); }
+  function onWheel(e: React.WheelEvent) {
+    e.preventDefault();
+    setZoom(z => Math.max(0.5, Math.min(4, z + (e.deltaY > 0 ? -0.1 : 0.1))));
+  }
 
   function onPointerDown(e: React.PointerEvent) {
     if (!sigDataUrl) return;
-    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
-    setDrag({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    const { x, y } = getRelativePos(e);
+    setDrag({ x, y });
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
 
   function onPointerMove(e: React.PointerEvent) {
+    const { nx, ny } = getRelativePos(e);
+    setHoverPos({ x: e.clientX, y: e.clientY });
     if (!drag) return;
     if (!sigDataUrl) return;
-    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
-    const x = e.clientX - rect.left; const y = e.clientY - rect.top;
-    const cw = rect.width || 1; const ch = rect.height || 1;
-    const nx = x / cw; const ny = y / ch;
     latestPosRef.current = { nx, ny };
     if (!rafRef.current) {
       rafRef.current = true;
@@ -251,6 +256,7 @@ export default function PdfEditor({
   }
 
   function onPointerUp() { setDrag(null); }
+  function onPointerLeave() { setDrag(null); setHoverPos(null); }
 
   useEffect(() => {
     if (controlledPage === undefined) onPageChange?.(page);
@@ -265,71 +271,191 @@ export default function PdfEditor({
     onPageChange?.(clamped);
   }
 
+  const hasSignatureOnPage = !!currentPos;
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-        <button className="btn-secondary min-w-[44px] min-h-[44px] px-3 py-2" onClick={() => changePage(page - 1)} disabled={page <= 1}>◀</button>
-        <div className="text-sm whitespace-nowrap">p. {page} / {totalPages}</div>
-        <button className="btn-secondary min-w-[44px] min-h-[44px] px-3 py-2" onClick={() => changePage(page + 1)} disabled={page >= totalPages}>▶</button>
-        <div className="ml-auto hidden sm:flex items-center gap-2 text-xs sm:text-sm">
-          <label className="label m-0 whitespace-nowrap">Tamanho</label>
-          <input type="range" min={0.5} max={3} step={0.1} value={currentPos?.scale || 1} onChange={e => {
-            const v = Number(e.target.value);
-            if (!currentPos) return; onPositions([...positions.filter(p => p.page !== page), { ...currentPos, scale: v }]);
-          }} className="w-20" />
-          <label className="label m-0 whitespace-nowrap">Rotação</label>
-          <input type="range" min={-45} max={45} step={1} value={currentPos?.rotation || 0} onChange={e => {
-            const v = Number(e.target.value);
-            if (!currentPos) return; onPositions([...positions.filter(p => p.page !== page), { ...currentPos, rotation: v }]);
-          }} className="w-20" />
+      {/* ── Barra de controles ── */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Navegação de páginas */}
+        <div className="flex items-center gap-1">
+          <button
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+            onClick={() => changePage(1)}
+            disabled={page <= 1}
+            title="Primeira página"
+          >«</button>
+          <button
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+            onClick={() => changePage(page - 1)}
+            disabled={page <= 1}
+            title="Página anterior"
+          >‹</button>
+          <span className="min-w-[72px] text-center text-sm text-slate-700">
+            {page} / {totalPages}
+          </span>
+          <button
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+            onClick={() => changePage(page + 1)}
+            disabled={page >= totalPages}
+            title="Próxima página"
+          >›</button>
+          <button
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+            onClick={() => changePage(totalPages)}
+            disabled={page >= totalPages}
+            title="Última página"
+          >»</button>
         </div>
+
+        {/* Zoom */}
+        <div className="flex items-center gap-1 ml-auto">
+          <button
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 text-base font-bold"
+            onClick={() => setZoom(z => Math.max(0.5, +(z - 0.2).toFixed(1)))}
+            disabled={zoom <= 0.5}
+            title="Diminuir zoom"
+          >−</button>
+          <span className="min-w-[48px] text-center text-sm text-slate-600">{Math.round(zoom * 100)}%</span>
+          <button
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 text-base font-bold"
+            onClick={() => setZoom(z => Math.min(4, +(z + 0.2).toFixed(1)))}
+            disabled={zoom >= 4}
+            title="Aumentar zoom"
+          >+</button>
+          <button
+            className="inline-flex h-9 px-2 items-center justify-center rounded-lg border border-slate-200 bg-white text-xs text-slate-600 hover:bg-slate-50"
+            onClick={() => setZoom(1.2)}
+            title="Zoom padrão"
+          >⟳ 100%</button>
+        </div>
+
+        {/* Miniaturas toggle */}
+        {thumbnails.length > 1 && (
+          <button
+            className={`inline-flex h-9 px-3 items-center justify-center rounded-lg border text-xs font-medium transition ${
+              showThumbs ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+            onClick={() => setShowThumbs(s => !s)}
+          >
+            🗂 Páginas
+          </button>
+        )}
       </div>
+
+      {/* ── Sliders de escala/rotação (quando há assinatura posicionada) ── */}
       {currentPos && (
-        <div className="flex sm:hidden flex-col gap-2 text-xs">
-          <div className="flex items-center gap-2">
-            <label className="label m-0 w-16">Tamanho</label>
-            <input type="range" min={0.5} max={3} step={0.1} value={currentPos?.scale || 1} onChange={e => {
-              const v = Number(e.target.value);
-              if (!currentPos) return; onPositions([...positions.filter(p => p.page !== page), { ...currentPos, scale: v }]);
-            }} className="flex-1" />
-            <span className="w-12 text-right">{(currentPos?.scale || 1).toFixed(1)}×</span>
+        <div className="flex flex-col sm:flex-row gap-3 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm">
+          <div className="flex flex-1 items-center gap-2">
+            <span className="w-16 shrink-0 text-xs font-medium text-slate-600">Tamanho</span>
+            <input
+              type="range" min={0.3} max={3} step={0.05}
+              value={currentPos.scale || 1}
+              onChange={e => {
+                const v = Number(e.target.value);
+                onPositions([...positions.filter(p => p.page !== page), { ...currentPos, scale: v }]);
+              }}
+              className="flex-1 accent-blue-600"
+            />
+            <span className="w-10 text-right text-xs text-slate-500">{(currentPos.scale || 1).toFixed(2)}×</span>
           </div>
-          <div className="flex items-center gap-2">
-            <label className="label m-0 w-16">Rotação</label>
-            <input type="range" min={-45} max={45} step={1} value={currentPos?.rotation || 0} onChange={e => {
-              const v = Number(e.target.value);
-              if (!currentPos) return; onPositions([...positions.filter(p => p.page !== page), { ...currentPos, rotation: v }]);
-            }} className="flex-1" />
-            <span className="w-12 text-right">{(currentPos?.rotation || 0).toFixed(0)}°</span>
+          <div className="flex flex-1 items-center gap-2">
+            <span className="w-16 shrink-0 text-xs font-medium text-slate-600">Rotação</span>
+            <input
+              type="range" min={-180} max={180} step={1}
+              value={currentPos.rotation || 0}
+              onChange={e => {
+                const v = Number(e.target.value);
+                onPositions([...positions.filter(p => p.page !== page), { ...currentPos, rotation: v }]);
+              }}
+              className="flex-1 accent-blue-600"
+            />
+            <span className="w-10 text-right text-xs text-slate-500">{(currentPos.rotation || 0).toFixed(0)}°</span>
           </div>
+          <button
+            className="self-start sm:self-center text-xs text-red-500 hover:text-red-700 whitespace-nowrap"
+            onClick={() => onPositions(positions.filter(p => p.page !== page))}
+          >
+            ✕ Remover da página
+          </button>
         </div>
       )}
-      <div className="relative w-full overflow-auto">
+
+      {/* ── Miniaturas ── */}
+      {showThumbs && thumbnails.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {thumbnails.map((thumb, i) => {
+            const pageNum = i + 1;
+            const hasSig = positions.some(p => p.page === pageNum);
+            return (
+              <button
+                key={i}
+                onClick={() => changePage(pageNum)}
+                className={`relative shrink-0 rounded-lg border-2 overflow-hidden transition ${
+                  page === pageNum ? 'border-blue-500 shadow-md' : 'border-slate-200 hover:border-slate-400'
+                }`}
+                title={`Ir para página ${pageNum}`}
+              >
+                {thumb ? (
+                  <img src={thumb} alt={`Página ${pageNum}`} className="h-24 w-auto" />
+                ) : (
+                  <div className="h-24 w-16 bg-slate-100 flex items-center justify-center text-xs text-slate-400">{pageNum}</div>
+                )}
+                {hasSig && (
+                  <span className="absolute bottom-1 right-1 h-3 w-3 rounded-full bg-blue-500 border-2 border-white" title="Assinatura posicionada" />
+                )}
+                <span className="absolute bottom-0 left-0 right-0 bg-black/40 text-white text-[10px] text-center py-0.5">{pageNum}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Canvas principal ── */}
+      <div
+        ref={containerRef}
+        className="relative w-full overflow-auto rounded-xl border border-slate-200 bg-slate-100"
+        style={{ maxHeight: '70vh' }}
+      >
         <canvas
           ref={canvasRef}
-          className="rounded-lg border bg-white mx-auto"
+          className="rounded-lg bg-white mx-auto block shadow-sm"
           onClick={onClick}
           onWheel={onWheel}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
-          style={{ display: 'block', maxWidth: '100%', height: 'auto', touchAction: 'manipulation' }}
+          onPointerLeave={onPointerLeave}
+          style={{
+            display: 'block',
+            maxWidth: '100%',
+            cursor: sigDataUrl ? (drag ? 'grabbing' : 'crosshair') : 'default',
+            touchAction: 'manipulation',
+          }}
         />
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-lg border bg-white/80 text-sm text-slate-600">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-white/90 text-sm text-slate-600">
+            <svg className="h-6 w-6 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+            </svg>
             Carregando prévia...
           </div>
         )}
         {error && !loading && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-lg border bg-white/90 text-sm text-red-600 text-center px-6">
+          <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/90 text-sm text-red-600 text-center px-6">
             {error}
           </div>
         )}
       </div>
+
+      {/* ── Dica de uso ── */}
       <p className="text-xs text-slate-500">
         {sigDataUrl
-          ? 'Clique para posicionar. Arraste para mover. Use os sliders para ajustar tamanho e rotação.'
-          : 'Envie ou desenhe uma assinatura para visualizar aqui. Ainda é possível definir posições clicando nas páginas.'}
+          ? hasSignatureOnPage
+            ? '✓ Assinatura posicionada nesta página. Arraste para reposicionar ou use os sliders acima.'
+            : 'Clique na página para posicionar a assinatura. Use a roda do mouse para zoom.'
+          : 'Envie ou desenhe uma assinatura para posicioná-la nas páginas. Use a roda do mouse para zoom.'}
       </p>
     </div>
   );
