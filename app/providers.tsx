@@ -1,11 +1,13 @@
 'use client'
-
-import { LanguageProvider } from '@/lib/i18n/LanguageContext'
+import { ToastProvider } from '@/components/Toast'
+import { ConfirmProvider } from '@/components/ConfirmModal'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <LanguageProvider>
-      {children}
-    </LanguageProvider>
+    <ToastProvider>
+      <ConfirmProvider>
+        {children}
+      </ConfirmProvider>
+    </ToastProvider>
   )
 }
