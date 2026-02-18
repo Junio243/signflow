@@ -1,3 +1,9 @@
+import { DashboardSkeleton } from '@/components/ui/PageSkeleton';
+
 export default function Loading() {
-  return <p style={{ padding: 16 }}>Carregando o Dashboard…</p>
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <DashboardSkeleton />
+    </div>
+  );
 }
