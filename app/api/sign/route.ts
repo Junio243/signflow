@@ -11,6 +11,12 @@ import { randomUUID } from 'crypto'
 
 const limiter = signRateLimiter('/api/sign')
 
+// URL base sempre fixa — VERCEL_URL retorna o deploy atual (pode ser branch preview)
+const APP_BASE_URL = (
+  process.env.NEXT_PUBLIC_APP_URL ??
+  'https://signflow-beta.vercel.app'
+).replace(/\/$/, '')
+
 function jsonError(msg: string, status: number) {
   return NextResponse.json({ error: msg }, { status })
 }
@@ -24,11 +30,10 @@ async function downloadFile(
   return new Uint8Array(await data.arrayBuffer())
 }
 
-async function buildQrPng(url: string): Promise<Buffer> {
-  return QRCode.toBuffer(url, { type: 'png', width: 160, margin: 1, errorCorrectionLevel: 'M' })
+async function buildQrPng(url: string, sizePx: number): Promise<Buffer> {
+  return QRCode.toBuffer(url, { type: 'png', width: sizePx * 3, margin: 1, errorCorrectionLevel: 'M' })
 }
 
-/** Quebra texto em linhas respeitando largura máxima em caracteres */
 function wrapText(text: string, maxChars: number): string[] {
   const words = text.split(' ')
   const lines: string[] = []
@@ -54,11 +59,9 @@ export async function POST(req: NextRequest) {
   const supabase = getSupabaseAdmin()
 
   try {
-    // 1. Autenticação
     const authHeader = req.headers.get('authorization') ?? ''
     if (!authHeader.startsWith('Bearer ')) return jsonError('Não autenticado', 401)
 
-    // 2. Ler FormData
     let form: FormData
     try { form = await req.formData() }
     catch { return jsonError('Corpo da requisição inválido', 400) }
@@ -66,17 +69,13 @@ export async function POST(req: NextRequest) {
     const id = form.get('id')?.toString()?.trim()
     if (!id) return jsonError('Campo "id" é obrigatório', 400)
 
-    // 3. Buscar documento
     const { data: doc, error: docErr } = await supabase
       .from('documents').select('*').eq('id', id).maybeSingle()
     if (docErr || !doc) return jsonError('Documento não encontrado', 404)
 
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ??
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://signflow-beta.vercel.app')
-    const validateUrl = `${baseUrl.replace(/\/$/, '')}/validate/${id}`
+    // URL sempre correta e estável
+    const validateUrl = `${APP_BASE_URL}/validate/${id}`
 
-    // Se já foi assinado, devolve URLs existentes
     if (doc.status === 'signed' && doc.signed_pdf_url) {
       return addRateLimitHeaders(
         NextResponse.json({ id: doc.id, signed_pdf_url: doc.signed_pdf_url, qr_code_url: doc.qr_code_url ?? null, validate_url: validateUrl }),
@@ -85,31 +84,29 @@ export async function POST(req: NextRequest) {
     }
 
     const metadata: Record<string, any> = (doc.metadata as Record<string, any>) ?? {}
-    const positions: any[] = metadata.positions ?? []
-    const signatureMeta: { width: number; height: number } | null = metadata.signature_meta ?? null
-    const signers: any[] = metadata.signers ?? []
-    const qrPosition: string = metadata.qr_position ?? 'bottom-left'
-    const qrPage: string = metadata.qr_page ?? 'last'
+    const positions: any[]  = metadata.positions ?? []
+    const signatureMeta     = metadata.signature_meta ?? null
+    const signers: any[]    = metadata.signers ?? []
+    const qrPosition        = (metadata.qr_position as string) ?? 'bottom-left'
+    const qrPage            = (metadata.qr_page    as string) ?? 'last'
+    // Tamanho do QR em pontos PDF (40–120), default 72
+    const qrSize: number    = Math.min(120, Math.max(40, Number(metadata.qr_size) || 72))
     const validationRequiresCode: boolean = metadata.validation_requires_code ?? false
     const validationAccessCode: string | null = metadata.validation_access_code ?? null
 
-    // 4. Baixar PDF original
     const pdfBytes = await downloadFile(supabase, `${id}/original.pdf`)
     if (!pdfBytes) return jsonError('PDF original não encontrado no storage', 500)
 
-    // 5. Baixar assinatura
     const sigBytes = await downloadFile(supabase, `${id}/signature`)
 
-    // 6. Carregar PDF
     const pdfDoc = await PDFDocument.load(pdfBytes)
-    const pages = pdfDoc.getPages()
+    const pages  = pdfDoc.getPages()
     const totalPages = pages.length
 
-    // Fontes embutidas
     const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica)
     const fontBold    = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-    // 7. Embutir assinatura nas posições
+    // Embutir assinatura
     if (sigBytes && positions.length > 0) {
       let sigImage
       try {
@@ -121,9 +118,9 @@ export async function POST(req: NextRequest) {
         const naturalW = signatureMeta?.width ?? sigImage.width
         const naturalH = signatureMeta?.height ?? sigImage.height
         for (const pos of positions) {
-          const pageIndex = (pos.page ?? 1) - 1
-          if (pageIndex < 0 || pageIndex >= totalPages) continue
-          const page = pages[pageIndex]
+          const pi = (pos.page ?? 1) - 1
+          if (pi < 0 || pi >= totalPages) continue
+          const page = pages[pi]
           const { width: pw, height: ph } = page.getSize()
           const scale    = typeof pos.scale    === 'number' ? pos.scale    : 1
           const rotation = typeof pos.rotation === 'number' ? pos.rotation : 0
@@ -138,45 +135,35 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 8. Gerar QR Code PNG
-    const qrPng   = await buildQrPng(validateUrl)
+    // Gerar QR Code com resolução proporcional ao tamanho escolhido
+    const qrPng   = await buildQrPng(validateUrl, qrSize)
     const qrImage = await pdfDoc.embedPng(new Uint8Array(qrPng))
-    const qrSize  = 72  // tamanho do QR Code em pontos PDF
     const margin  = 10
 
-    // Determinar páginas que recebem o bloco
     const qrPageIndexes: number[] =
       qrPage === 'all'   ? Array.from({ length: totalPages }, (_, i) => i)
       : qrPage === 'first' ? [0]
       : [totalPages - 1]
 
-    // Montar texto do bloco de assinatura digital
-    const now = new Date()
-    const dateStr = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-
-    // Usar o primeiro signatário válido como referência do texto
+    // Texto dinâmico
+    const now      = new Date()
+    const dateStr  = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const mainSigner = signers.find((s: any) => s?.name?.trim()) ?? null
+    const signerName = mainSigner?.name?.trim()?.toUpperCase() ?? 'N/A'
+    const signerReg  = mainSigner?.reg?.trim()  ?? null
+    const certType   = mainSigner?.certificate_type?.trim() ?? null
 
-    const signerName   = mainSigner?.name?.trim()?.toUpperCase()             ?? 'N/A'
-    const signerReg    = mainSigner?.reg?.trim()                              ?? null
-    const certType     = mainSigner?.certificate_type?.trim()                 ?? null
-    const certSerial   = mainSigner?.certificate_serial?.trim()               ?? null
-
-    // Linha principal do texto
     let mainText = `Documento assinado digitalmente de acordo com a ICP-Brasil, MP 2.200-2/2001, no sistema SignFlow, por ${signerName}`
-    if (signerReg)  mainText += `, ${signerReg}`
-    if (certType)   mainText += `, certificado ${certType}`
-    if (certSerial) mainText += ` número de série ${certSerial}`
-    mainText += ` em ${dateStr}`
-    mainText += ` e pode ser validado em ${validateUrl}.`
+    if (signerReg) mainText += `, ${signerReg}`
+    if (certType)  mainText += `, certificado ${certType}`
+    mainText += ` em ${dateStr} e pode ser validado em ${validateUrl}.`
     if (validationRequiresCode && validationAccessCode) {
       mainText += ` Código de Acesso: ${validationAccessCode}`
     }
 
-    // Dimensões do bloco de texto
-    const fontSize     = 6.5
+    const fontSize     = Math.max(5.5, qrSize * 0.085)  // escala fonte com QR
     const lineHeight   = fontSize * 1.45
-    const textMaxW     = 220   // largura máxima do bloco de texto em pts
+    const textMaxW     = Math.max(160, qrSize * 3.2)     // texto ocupa ~3x o QR
     const charsPerLine = Math.floor(textMaxW / (fontSize * 0.52))
     const textLines    = wrapText(mainText, charsPerLine)
 
@@ -188,115 +175,72 @@ export async function POST(req: NextRequest) {
       const page = pages[pi]
       const { width: pw, height: ph } = page.getSize()
 
-      // Calcular canto do bloco
       let blockX: number, blockY: number
       switch (qrPosition) {
-        case 'top-left':
-          blockX = margin
-          blockY = ph - blockH - margin
-          break
-        case 'top-right':
-          blockX = pw - blockW - margin
-          blockY = ph - blockH - margin
-          break
-        case 'bottom-right':
-          blockX = pw - blockW - margin
-          blockY = margin
-          break
-        default: // bottom-left
-          blockX = margin
-          blockY = margin
+        case 'top-left':    blockX = margin;              blockY = ph - blockH - margin; break
+        case 'top-right':   blockX = pw - blockW - margin; blockY = ph - blockH - margin; break
+        case 'bottom-right': blockX = pw - blockW - margin; blockY = margin; break
+        default:             blockX = margin;              blockY = margin
       }
 
-      // Fundo branco do bloco inteiro
-      page.drawRectangle({
-        x: blockX,
-        y: blockY,
-        width: blockW,
-        height: blockH,
-        color: rgb(1, 1, 1),
-        opacity: 0.92,
-      })
+      // Garante que o bloco não ultrapassa a largura da página
+      if (blockX + blockW > pw) blockX = Math.max(0, pw - blockW - margin)
 
-      // Borda fina cinza
-      page.drawRectangle({
-        x: blockX,
-        y: blockY,
-        width: blockW,
-        height: blockH,
-        borderColor: rgb(0.75, 0.75, 0.75),
-        borderWidth: 0.5,
-        opacity: 0,
-      })
+      // Fundo branco
+      page.drawRectangle({ x: blockX, y: blockY, width: blockW, height: blockH, color: rgb(1, 1, 1), opacity: 0.95 })
+      // Borda cinza
+      page.drawRectangle({ x: blockX, y: blockY, width: blockW, height: blockH, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 0.5, opacity: 0 })
 
-      // QR Code dentro do bloco
+      // QR Code
       const qrX = blockX + blockPadding
       const qrY = blockY + (blockH - qrSize) / 2
       page.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize })
 
-      // Texto ao lado do QR Code
-      const textX = qrX + qrSize + blockPadding
-      const textStartY = blockY + blockH - blockPadding - fontSize
+      // Texto
+      const textX      = qrX + qrSize + blockPadding
+      const textStartY = blockY + blockH - blockPadding - (fontSize + 1)
 
-      // Título em negrito
       page.drawText('Assinado Digitalmente', {
-        x: textX,
-        y: textStartY,
-        size: fontSize + 1,
-        font: fontBold,
-        color: rgb(0.1, 0.1, 0.1),
-        maxWidth: textMaxW,
+        x: textX, y: textStartY,
+        size: fontSize + 1, font: fontBold,
+        color: rgb(0.05, 0.05, 0.05), maxWidth: textMaxW,
       })
 
-      // Linhas do texto dinâmico
-      let currentY = textStartY - lineHeight * 1.4
+      let curY = textStartY - lineHeight * 1.4
       for (const line of textLines) {
-        if (currentY < blockY + blockPadding) break
+        if (curY < blockY + blockPadding) break
         page.drawText(line, {
-          x: textX,
-          y: currentY,
-          size: fontSize,
-          font: fontRegular,
-          color: rgb(0.2, 0.2, 0.2),
-          maxWidth: textMaxW,
+          x: textX, y: curY,
+          size: fontSize, font: fontRegular,
+          color: rgb(0.2, 0.2, 0.2), maxWidth: textMaxW,
         })
-        currentY -= lineHeight
+        curY -= lineHeight
       }
     }
 
-    // 9. Salvar PDF final
     const signedBytes = await pdfDoc.save()
 
-    // 10. Upload do PDF assinado
     const signedPath = `${id}/signed.pdf`
     const { error: upErr } = await supabase.storage
       .from('signflow').upload(signedPath, signedBytes, { contentType: 'application/pdf', upsert: true })
     if (upErr) return jsonError('Falha ao salvar PDF assinado: ' + upErr.message, 500)
 
-    // 11. Upload do QR Code PNG
     const qrPath = `${id}/qrcode.png`
     await supabase.storage.from('signflow').upload(qrPath, qrPng, { contentType: 'image/png', upsert: true })
 
-    // 12. URLs públicas
     const { data: signedUrlData } = supabase.storage.from('signflow').getPublicUrl(signedPath)
     const { data: qrUrlData }     = supabase.storage.from('signflow').getPublicUrl(qrPath)
     const signedPdfUrl = signedUrlData?.publicUrl ?? null
     const qrCodeUrl    = qrUrlData?.publicUrl    ?? null
 
-    // 13. Atualizar documento no banco (apenas colunas válidas)
-    const updatePayload: Record<string, any> = {
-      status: 'signed',
-      signed_pdf_url: signedPdfUrl,
-      qr_code_url: qrCodeUrl,
-    }
+    const updatePayload: Record<string, any> = { status: 'signed', signed_pdf_url: signedPdfUrl, qr_code_url: qrCodeUrl }
     if (validationRequiresCode) {
       updatePayload.validation_requires_code = true
       if (validationAccessCode) updatePayload.validation_access_code = validationAccessCode
     }
     const { error: updateErr } = await supabase.from('documents').update(updatePayload).eq('id', id)
-    if (updateErr) console.error('[sign] Falha ao atualizar documento:', updateErr.message)
+    if (updateErr) console.error('[sign] update error:', updateErr.message)
 
-    // 14. Inserir eventos de assinatura
     if (signers.length > 0) {
       const nowIso = now.toISOString()
       const events = signers
@@ -314,14 +258,14 @@ export async function POST(req: NextRequest) {
         }))
       if (events.length > 0) {
         const { error: evErr } = await supabase.from('document_signing_events').insert(events)
-        if (evErr) console.error('[sign] Falha ao inserir signing events:', evErr.message)
+        if (evErr) console.error('[sign] signing_events error:', evErr.message)
       }
     }
 
     await logAudit({
       action: 'document.sign', resourceType: 'document', resourceId: id,
       status: 'success', ip, requestId: reqId,
-      details: { positions: positions.length, signers: signers.length, qrPosition, qrPage },
+      details: { positions: positions.length, signers: signers.length, qrPosition, qrPage, qrSize },
     })
 
     return addRateLimitHeaders(
@@ -329,7 +273,7 @@ export async function POST(req: NextRequest) {
       rl.headers,
     )
   } catch (e: any) {
-    console.error('[sign] Erro inesperado:', e)
+    console.error('[sign] erro:', e)
     await logAudit({
       action: 'document.sign', resourceType: 'document',
       status: 'error', ip, requestId: reqId,

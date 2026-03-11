@@ -57,6 +57,7 @@ export const signerSchema = signerBaseSchema.transform(signer => ({
 
 export const qrPositionSchema = z.enum(['bottom-left', 'bottom-right', 'top-left', 'top-right']).default('bottom-left');
 export const qrPageSchema = z.enum(['last', 'first', 'all']).default('last');
+export const qrSizeSchema = z.number().int().min(40).max(120).default(72);
 
 export const metadataSchema = z
   .object({
@@ -69,6 +70,7 @@ export const metadataSchema = z
     signers: z.array(signerSchema).optional(),
     qr_position: qrPositionSchema.optional(),
     qr_page: qrPageSchema.optional(),
+    qr_size: qrSizeSchema.optional(),
   })
   .passthrough();
 
@@ -84,3 +86,4 @@ export type Signer = z.infer<typeof signerSchema>;
 export type Metadata = z.infer<typeof metadataSchema>;
 export type QrPosition = z.infer<typeof qrPositionSchema>;
 export type QrPage = z.infer<typeof qrPageSchema>;
+export type QrSize = z.infer<typeof qrSizeSchema>;
