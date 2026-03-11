@@ -101,17 +101,22 @@ export default function ValidatePage() {
     )
   }
 
-  const status    = (doc.status || '').toLowerCase()
-  const isSigned  = status === 'signed'
+  const status     = (doc.status || '').toLowerCase()
+  const isSigned   = status === 'signed' || status === 'downloaded'
   const isCanceled = status === 'canceled'
+  // Só marca como expirado se vier explicitamente 'expired' — nunca por 'draft'
   const isExpired  = status === 'expired'
-  const isValid   = isSigned
+  const isDraft    = status === 'draft' || status === ''
 
-  const statusCfg = isValid
-    ? { icon: CheckCircle,   iconBg: 'bg-emerald-100',  iconColor: 'text-emerald-600', border: 'border-emerald-300', bg: 'bg-emerald-50',  title: 'Documento Válido',    sub: 'Assinatura digital verificada com sucesso.' }
+  const statusCfg = isSigned
+    ? { icon: CheckCircle,   iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', border: 'border-emerald-300', bg: 'bg-emerald-50',  title: 'Documento Válido',      sub: 'Assinatura digital verificada com sucesso.' }
     : isCanceled
-    ? { icon: XCircle,       iconBg: 'bg-red-100',      iconColor: 'text-red-600',     border: 'border-red-300',     bg: 'bg-red-50',      title: 'Documento Cancelado',  sub: 'Este documento foi cancelado.' }
-    : { icon: AlertTriangle, iconBg: 'bg-amber-100',    iconColor: 'text-amber-600',   border: 'border-amber-300',   bg: 'bg-amber-50',    title: 'Documento Expirado',   sub: 'A validade deste documento expirou.' }
+    ? { icon: XCircle,       iconBg: 'bg-red-100',     iconColor: 'text-red-600',     border: 'border-red-300',     bg: 'bg-red-50',      title: 'Documento Cancelado',   sub: 'Este documento foi cancelado.' }
+    : isExpired
+    ? { icon: AlertTriangle, iconBg: 'bg-amber-100',   iconColor: 'text-amber-600',   border: 'border-amber-300',   bg: 'bg-amber-50',    title: 'Documento Expirado',    sub: 'A validade deste documento expirou.' }
+    : isDraft
+    ? { icon: AlertTriangle, iconBg: 'bg-blue-100',    iconColor: 'text-blue-600',    border: 'border-blue-200',    bg: 'bg-blue-50',     title: 'Assinatura em Andamento', sub: 'Este documento ainda não foi assinado digitalmente.' }
+    : { icon: AlertTriangle, iconBg: 'bg-slate-100',   iconColor: 'text-slate-500',   border: 'border-slate-200',   bg: 'bg-slate-50',    title: 'Status Desconhecido',   sub: `Status atual: ${status}` }
 
   const StatusIcon = statusCfg.icon
 
@@ -186,7 +191,7 @@ export default function ValidatePage() {
                   {ev.certificate_valid_until && <p className="text-sm text-slate-500">Válido até: {formatDate(ev.certificate_valid_until)}</p>}
                   <p className="text-xs text-slate-400">Assinado em {formatDateTime(ev.signed_at)}</p>
                 </div>
-                {isValid && <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0 mt-1" />}
+                {isSigned && <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0 mt-1" />}
               </div>
             ))}
           </div>
@@ -224,7 +229,7 @@ export default function ValidatePage() {
           ))}
         </div>
 
-        {/* ID */}
+        {/* ID do documento */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">ID do Documento</h3>
           <code className="block break-all rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs font-mono text-slate-600">{doc.id}</code>
