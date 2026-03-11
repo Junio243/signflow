@@ -86,6 +86,10 @@ const ACCESS_CODE_LENGTH = 8
 const MAX_PDF_SIZE_MB = 20
 const MAX_SIGNATURE_SIZE_MB = 5
 
+const QR_SIZE_MIN = 40
+const QR_SIZE_MAX = 120
+const QR_SIZE_DEFAULT = 72
+
 const bytesToMB = (bytes: number): string => (bytes / (1024 * 1024)).toFixed(2)
 
 const createEmptySigner = (): Signer => ({
@@ -198,6 +202,7 @@ export default function EditorPage() {
 
   const [qrPosition, setQrPosition] = useState<QrPosition>('bottom-left')
   const [qrPage, setQrPage] = useState<QrPage>('last')
+  const [qrSize, setQrSize] = useState<number>(QR_SIZE_DEFAULT)
   const [validationRequiresCode, setValidationRequiresCode] = useState(false)
   const [validationAccessCode, setValidationAccessCode] = useState('')
 
@@ -275,7 +280,6 @@ export default function EditorPage() {
     }
     boot()
 
-    // Escuta mudanças de sessão para manter o token atualizado
     const { data: { subscription } } = supabaseClient!.auth.onAuthStateChange((_event, session) => {
       setSessionUserId(session?.user?.id ?? null)
       setSessionToken(session?.access_token ?? null)
@@ -295,7 +299,6 @@ export default function EditorPage() {
     return () => { try { URL.revokeObjectURL(objectUrl) } catch {} }
   }, [profileLogoFile, profileLogoExistingUrl])
 
-  // Lê dimensões de páginas do PDF
   useEffect(() => {
     if (!pdfFile) { setPdfPageCount(1); setPageSizes([]); return }
     let cancelled = false
@@ -348,7 +351,6 @@ export default function EditorPage() {
     return () => { cancelled = true }
   }, [sigPreviewUrl, sigMode])
 
-  // ── Drag & drop de PDF ───────────────────────────────────────────────────────
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setIsDraggingOver(false)
@@ -366,7 +368,6 @@ export default function EditorPage() {
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); setIsDraggingOver(true) }
   const handleDragLeave = () => setIsDraggingOver(false)
 
-  // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null
     setPdfFile(file)
@@ -590,7 +591,6 @@ export default function EditorPage() {
     const normalizedAccessCode = validationAccessCode.trim().toUpperCase()
     if (validationRequiresCode && !normalizedAccessCode) { setError('Defina um código de validação.'); return }
 
-    // Garante token atualizado antes de chamar a API
     const { data: { session: currentSession } } = await supabaseClient!.auth.getSession()
     const currentToken = currentSession?.access_token ?? null
     if (!currentToken) {
@@ -613,6 +613,7 @@ export default function EditorPage() {
       }
       form.append('qr_position', qrPosition)
       form.append('qr_page', qrPage)
+      form.append('qr_size', String(qrSize))
       form.append('validation_requires_code', String(validationRequiresCode))
       if (validationRequiresCode) form.append('validation_access_code', normalizedAccessCode)
       if (signatureBlob instanceof File) {
@@ -666,7 +667,6 @@ export default function EditorPage() {
 
   const disableAction = busy || !pdfFile || !sigPreviewUrl || positions.length === 0
 
-  // Badges de resumo para cada aba
   const tabBadge: Record<SideTab, number | null> = {
     assinatura: positions.length || null,
     texto: textAnnotations.length || null,
@@ -753,7 +753,6 @@ export default function EditorPage() {
 
               <input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileChange} />
 
-              {/* Drop zone */}
               {!pdfFile && (
                 <div
                   ref={dropZoneRef}
@@ -786,7 +785,6 @@ export default function EditorPage() {
                 </div>
               )}
 
-              {/* Viewer do PDF */}
               <div className="mt-6">
                 {pdfFile ? (
                   <PdfEditor
@@ -804,7 +802,6 @@ export default function EditorPage() {
                 )}
               </div>
 
-              {/* Lista de assinaturas posicionadas */}
               {positions.length > 0 && (
                 <div className="mt-4 space-y-2">
                   <div className="flex items-center justify-between">
@@ -833,7 +830,6 @@ export default function EditorPage() {
           {/* ── Coluna direita: painel de abas ── */}
           <div className="space-y-4">
 
-            {/* Tabs de navegação */}
             <div className="flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
               {SIDE_TABS.map(tab => (
                 <button
@@ -1005,7 +1001,39 @@ export default function EditorPage() {
               <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
                 <div>
                   <h2 className="text-base font-semibold text-slate-900">QR Code de Validação</h2>
-                  <p className="text-xs text-slate-500">Configure onde o QR Code será inserido no documento.</p>
+                  <p className="text-xs text-slate-500">Configure onde e como o QR Code será inserido no documento.</p>
+                </div>
+
+                {/* Tamanho do QR Code */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Tamanho do QR Code</label>
+                    <span className="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">{qrSize} pt</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={QR_SIZE_MIN}
+                    max={QR_SIZE_MAX}
+                    step={4}
+                    value={qrSize}
+                    onChange={e => setQrSize(Number(e.target.value))}
+                    disabled={busy}
+                    className="w-full accent-blue-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>Pequeno ({QR_SIZE_MIN}pt)</span>
+                    <span>Padrão ({QR_SIZE_DEFAULT}pt)</span>
+                    <span>Grande ({QR_SIZE_MAX}pt)</span>
+                  </div>
+                  {/* Preview proporcional */}
+                  <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 py-3">
+                    <div
+                      className="flex items-center justify-center rounded bg-slate-800 text-white text-[8px] font-bold"
+                      style={{ width: qrSize * 0.6, height: qrSize * 0.6, minWidth: 24, minHeight: 24 }}
+                    >
+                      QR
+                    </div>
+                  </div>
                 </div>
 
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
@@ -1077,7 +1105,8 @@ export default function EditorPage() {
                 </div>
 
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-500">
-                  O QR Code ficará no canto <strong>{qrPosition === 'bottom-left' ? 'inferior esquerdo' : qrPosition === 'bottom-right' ? 'inferior direito' : qrPosition === 'top-left' ? 'superior esquerdo' : 'superior direito'}</strong> da{' '}
+                  QR Code de <strong>{qrSize}pt</strong> no canto{' '}
+                  <strong>{qrPosition === 'bottom-left' ? 'inferior esquerdo' : qrPosition === 'bottom-right' ? 'inferior direito' : qrPosition === 'top-left' ? 'superior esquerdo' : 'superior direito'}</strong> da{' '}
                   <strong>{qrPage === 'last' ? 'última página' : qrPage === 'first' ? 'primeira página' : 'todas as páginas'}</strong>.
                 </div>
               </section>
