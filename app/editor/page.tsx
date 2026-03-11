@@ -157,6 +157,8 @@ export default function EditorPage() {
   const dropZoneRef = useRef<HTMLDivElement>(null)
 
   const [sessionUserId, setSessionUserId] = useState<string | null>(null)
+  const [sessionToken, setSessionToken] = useState<string | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [pdfPageCount, setPdfPageCount] = useState(1)
   const [pageSizes, setPageSizes] = useState<PageSize[]>([])
@@ -265,10 +267,21 @@ export default function EditorPage() {
       }
       const session = await supabaseClient.auth.getSession()
       const userId = session.data?.session?.user?.id ?? null
+      const token = session.data?.session?.access_token ?? null
       setSessionUserId(userId)
+      setSessionToken(token)
+      setIsAuthenticated(!!token)
       await loadProfiles()
     }
     boot()
+
+    // Escuta mudanças de sessão para manter o token atualizado
+    const { data: { subscription } } = supabaseClient!.auth.onAuthStateChange((_event, session) => {
+      setSessionUserId(session?.user?.id ?? null)
+      setSessionToken(session?.access_token ?? null)
+      setIsAuthenticated(!!session?.access_token)
+    })
+    return () => subscription.unsubscribe()
   }, [loadProfiles])
 
   useEffect(() => {
@@ -577,6 +590,14 @@ export default function EditorPage() {
     const normalizedAccessCode = validationAccessCode.trim().toUpperCase()
     if (validationRequiresCode && !normalizedAccessCode) { setError('Defina um código de validação.'); return }
 
+    // Garante token atualizado antes de chamar a API
+    const { data: { session: currentSession } } = await supabaseClient!.auth.getSession()
+    const currentToken = currentSession?.access_token ?? null
+    if (!currentToken) {
+      setError('Você precisa estar autenticado para assinar documentos. Faça login e tente novamente.')
+      return
+    }
+
     setBusy(true); setInfo('Enviando arquivo…')
     try {
       const form = new FormData()
@@ -599,12 +620,15 @@ export default function EditorPage() {
       } else {
         form.append('signature', signatureBlob, 'signature.png')
       }
-      // anotações de texto
       if (textAnnotations.length > 0) {
         form.append('text_annotations', JSON.stringify(textAnnotations))
       }
 
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: form })
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${currentToken}` },
+        body: form,
+      })
       const ct = uploadRes.headers.get('content-type')
       if (!ct?.includes('application/json')) {
         const text = await uploadRes.text()
@@ -617,7 +641,11 @@ export default function EditorPage() {
 
       const signForm = new FormData()
       signForm.append('id', id)
-      const signRes = await fetch('/api/sign', { method: 'POST', body: signForm })
+      const signRes = await fetch('/api/sign', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${currentToken}` },
+        body: signForm,
+      })
       const signCt = signRes.headers.get('content-type')
       if (!signCt?.includes('application/json')) {
         const text = await signRes.text()
@@ -681,6 +709,16 @@ export default function EditorPage() {
             Envie o PDF, adicione textos, posicione a assinatura e gere o documento assinado com QR Code.
           </p>
         </header>
+
+        {/* ── Banner de autenticação ── */}
+        {isAuthenticated === false && (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <span>⚠️ Não autenticado — você precisa estar logado para gerar documentos assinados.</span>
+            <Link href="/login?next=/editor" className="shrink-0 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50">
+              Fazer login
+            </Link>
+          </div>
+        )}
 
         {/* ── Banner de status ── */}
         {status && (
