@@ -1,4 +1,3 @@
-// components/HeaderClient.tsx
 'use client'
 
 import type { ReactNode } from 'react'
@@ -6,19 +5,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import classNames from 'classnames'
-import { 
-  Building2, 
-  ChevronDown, 
-  LayoutDashboard, 
-  LogIn, 
-  LogOut, 
-  Menu, 
-  Settings, 
-  User, 
-  Shield,
+import {
+  Building2,
+  ChevronDown,
   FileSignature,
   History,
-  ShieldCheck
+  LayoutDashboard,
+  LogIn,
+  LogOut,
+  Menu,
+  Shield,
+  ShieldCheck,
+  User,
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -33,15 +31,16 @@ type SessionUser = {
 
 const NAV_LINKS = [
   { href: '/dashboard', label: 'Dashboard', requiresAuth: true },
-  { href: '/pricing', label: 'Preços', requiresAuth: false },
+  { href: '/pricing', label: 'Precos', requiresAuth: false },
+  { href: '/security', label: 'Seguranca', requiresAuth: false },
   { href: '/contato', label: 'Contato', requiresAuth: false },
 ]
 
 const LANDING_LINKS = [
-  { href: '/#como-funciona', label: 'Como Funciona' },
-  { href: '/#seguranca', label: 'Segurança' },
-  { href: '/#precos', label: 'Preços' },
-  { href: '/#suporte', label: 'Suporte' },
+  { href: '/#beneficios', label: 'Beneficios' },
+  { href: '/#funcionalidades', label: 'Funcionalidades' },
+  { href: '/#seguranca', label: 'Seguranca' },
+  { href: '/pricing', label: 'Precos' },
 ]
 
 export default function HeaderClient() {
@@ -57,7 +56,7 @@ export default function HeaderClient() {
     if (!supabase) return
     const { data } = await supabase.auth.getSession()
     setUser(data?.session?.user ?? null)
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -84,7 +83,7 @@ export default function HeaderClient() {
       window.removeEventListener('click', handleClickOutside)
       authListener?.subscription?.unsubscribe()
     }
-  }, [fetchSession, supabase])
+  }, [fetchSession])
 
   useEffect(() => {
     setMenuOpen(false)
@@ -93,25 +92,24 @@ export default function HeaderClient() {
 
   const displayName = useMemo(() => {
     if (!user) return null
-    
-    // Usar abreviação para proteger privacidade
+
     const fullName = user.user_metadata?.full_name
     if (fullName) return abbreviateName(fullName)
-    
-    // Fallback: usar parte antes do @ do email
+
     if (user.email) {
       const emailPart = user.email.split('@')[0]
       return emailPart.charAt(0).toUpperCase() + emailPart.slice(1)
     }
-    
-    return 'Usuário'
+
+    return 'Usuario'
   }, [user])
 
   const handleAuth = useCallback(async () => {
     if (!supabase) {
-      alert('Serviço de autenticação indisponível.')
+      alert('Servico de autenticacao indisponivel.')
       return
     }
+
     if (user) {
       await supabase.auth.signOut()
       setMenuOpen(false)
@@ -122,59 +120,63 @@ export default function HeaderClient() {
 
     const next = encodeURIComponent('/dashboard')
     router.push(`/login?next=${next}`)
-  }, [router, supabase, user])
+  }, [router, user])
 
-  const handleAnchorClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    if (pathname === '/' && href.startsWith('/#')) {
-      e.preventDefault()
-      const id = href.replace('/#', '')
-      const element = document.getElementById(id)
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        setMobileOpen(false)
+  const handleAnchorClick = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+      if (pathname === '/' && href.startsWith('/#')) {
+        e.preventDefault()
+        const id = href.replace('/#', '')
+        const element = document.getElementById(id)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          setMobileOpen(false)
+        }
       }
-    }
-  }, [pathname])
+    },
+    [pathname]
+  )
 
   const navLinks = useMemo(() => {
-    // Se estiver na homepage, mostrar links das seções
-    if (pathname === '/') {
-      return LANDING_LINKS
-    }
-
-    // Caso contrário, mostrar links padrão
-    return user ? NAV_LINKS : NAV_LINKS.filter(link => !link.requiresAuth)
+    if (pathname === '/') return LANDING_LINKS
+    return user ? NAV_LINKS : NAV_LINKS.filter((link) => !link.requiresAuth)
   }, [pathname, user])
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 lg:px-6">
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/88 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 lg:px-8">
         <div className="flex items-center gap-3">
           <button
             type="button"
             className="inline-flex items-center justify-center rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:border-brand-500 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 md:hidden"
             aria-label="Abrir menu"
-            onClick={() => setMobileOpen(v => !v)}
+            onClick={() => setMobileOpen((value) => !value)}
           >
             <Menu className="h-5 w-5" aria-hidden />
           </button>
-          <Link href="/" className="flex items-center gap-2 text-base font-semibold tracking-tight text-slate-900" aria-label="SignFlow - página inicial">
-            <span className="rounded-md border border-slate-900 px-1.5 py-0.5 text-xs font-bold uppercase">Sign</span>
-            Flow
+
+          <Link href="/" className="flex items-center gap-3 text-slate-900" aria-label="SignFlow - pagina inicial">
+            <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-950 text-sm font-bold text-white shadow-sm">
+              SF
+            </span>
+            <span className="flex flex-col leading-none">
+              <span className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">SignFlow</span>
+              <span className="mt-1 text-xs font-medium text-slate-500">Assinatura digital institucional</span>
+            </span>
           </Link>
         </div>
 
-        <nav aria-label="Principal" className="hidden items-center gap-3 text-sm font-medium text-slate-700 md:flex">
-          {navLinks.map(link => {
-            const isActive =
-              !link.href.includes('#') && (pathname === link.href || pathname.startsWith(`${link.href}/`))
+        <nav aria-label="Principal" className="hidden items-center gap-1 text-sm font-medium text-slate-700 md:flex">
+          {navLinks.map((link) => {
+            const isActive = !link.href.includes('#') && (pathname === link.href || pathname.startsWith(`${link.href}/`))
+
             return (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={(e) => handleAnchorClick(e, link.href)}
                 className={classNames(
-                  'rounded-lg px-3 py-2 transition hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2',
+                  'rounded-xl px-3 py-2 transition hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2',
                   isActive && 'bg-slate-100 text-slate-900'
                 )}
               >
@@ -186,24 +188,33 @@ export default function HeaderClient() {
 
         <div className="flex items-center gap-3">
           {!user && pathname === '/' && (
-            <Link
-              href="/signup"
-              className="hidden items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 md:inline-flex"
-            >
-              Criar conta
-            </Link>
+            <>
+              <Link
+                href="/contato"
+                className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-brand-500 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 lg:inline-flex"
+              >
+                Falar com vendas
+              </Link>
+              <Link
+                href="/signup"
+                className="hidden items-center gap-2 rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 md:inline-flex"
+              >
+                Criar conta
+              </Link>
+            </>
           )}
+
           {!authConfigured && (
             <span className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-600">
-              Autenticação indisponível
+              Autenticacao indisponivel
             </span>
           )}
-          
+
           {user ? (
             <div className="relative" ref={dropdownRef}>
               <button
                 type="button"
-                onClick={() => setMenuOpen(v => !v)}
+                onClick={() => setMenuOpen((value) => !value)}
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-brand-500 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
@@ -214,30 +225,27 @@ export default function HeaderClient() {
               </button>
 
               {menuOpen && (
-                <div
-                  role="menu"
-                  className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 text-sm shadow-xl"
-                >
+                <div role="menu" className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 text-sm shadow-xl">
                   <HeaderMenuLink href="/dashboard" icon={<LayoutDashboard className="h-4 w-4" aria-hidden />}>
-                    Início
+                    Inicio
                   </HeaderMenuLink>
                   <HeaderMenuLink href="/settings" icon={<User className="h-4 w-4" aria-hidden />}>
-                    Perfil e Assinaturas
+                    Perfil e assinaturas
                   </HeaderMenuLink>
                   <HeaderMenuLink href="/sign" icon={<FileSignature className="h-4 w-4" aria-hidden />}>
-                    Assinar Documento
+                    Assinar documento
                   </HeaderMenuLink>
                   <HeaderMenuLink href="/verify" icon={<ShieldCheck className="h-4 w-4" aria-hidden />}>
-                    Verificar Assinatura
+                    Verificar assinatura
                   </HeaderMenuLink>
                   <HeaderMenuLink href="/history" icon={<History className="h-4 w-4" aria-hidden />}>
-                    Histórico
+                    Historico
                   </HeaderMenuLink>
                   <HeaderMenuLink href="/certificates" icon={<Shield className="h-4 w-4" aria-hidden />}>
                     Certificados
                   </HeaderMenuLink>
                   <HeaderMenuLink href="/orgs" icon={<Building2 className="h-4 w-4" aria-hidden />}>
-                    Organizações
+                    Organizacoes
                   </HeaderMenuLink>
                   <div className="my-1 border-t border-slate-200" />
                   <button
@@ -267,19 +275,15 @@ export default function HeaderClient() {
 
       {mobileOpen && (
         <>
-          <div 
-            className="mobile-overlay md:hidden" 
-            onClick={() => setMobileOpen(false)}
-            aria-hidden="true"
-          />
-          <nav 
-            className="fixed right-0 top-[65px] z-50 h-[calc(100vh-65px)] w-[280px] overflow-y-auto border-l border-slate-200 bg-white px-4 py-6 text-sm font-medium text-slate-700 shadow-2xl transition-transform duration-300 ease-in-out md:hidden"
-            aria-label="Menu móvel"
+          <div className="mobile-overlay md:hidden" onClick={() => setMobileOpen(false)} aria-hidden="true" />
+          <nav
+            className="fixed right-0 top-[65px] z-50 h-[calc(100vh-65px)] w-[300px] overflow-y-auto border-l border-slate-200 bg-white px-4 py-6 text-sm font-medium text-slate-700 shadow-2xl transition-transform duration-300 ease-in-out md:hidden"
+            aria-label="Menu movel"
           >
             <ul className="flex flex-col gap-1">
-              {navLinks.map(link => {
-                const isActive =
-                  !link.href.includes('#') && (pathname === link.href || pathname.startsWith(`${link.href}/`))
+              {navLinks.map((link) => {
+                const isActive = !link.href.includes('#') && (pathname === link.href || pathname.startsWith(`${link.href}/`))
+
                 return (
                   <li key={link.href}>
                     <Link
@@ -287,7 +291,7 @@ export default function HeaderClient() {
                       onClick={(e) => handleAnchorClick(e, link.href)}
                       className={classNames(
                         'flex min-h-[44px] items-center rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
-                        isActive && 'bg-slate-100 text-slate-900 font-semibold'
+                        isActive && 'bg-slate-100 font-semibold text-slate-900'
                       )}
                     >
                       {link.label}
@@ -295,6 +299,7 @@ export default function HeaderClient() {
                   </li>
                 )
               })}
+
               {user && (
                 <>
                   <li>
@@ -302,11 +307,11 @@ export default function HeaderClient() {
                       href="/settings"
                       className={classNames(
                         'flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
-                        pathname === '/settings' && 'bg-slate-100 text-slate-900 font-semibold'
+                        pathname === '/settings' && 'bg-slate-100 font-semibold text-slate-900'
                       )}
                     >
                       <User className="h-4 w-4" aria-hidden />
-                      Perfil e Assinaturas
+                      Perfil e assinaturas
                     </Link>
                   </li>
                   <li>
@@ -314,7 +319,7 @@ export default function HeaderClient() {
                       href="/certificates"
                       className={classNames(
                         'flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
-                        pathname === '/certificates' && 'bg-slate-100 text-slate-900 font-semibold'
+                        pathname === '/certificates' && 'bg-slate-100 font-semibold text-slate-900'
                       )}
                     >
                       <Shield className="h-4 w-4" aria-hidden />
@@ -326,11 +331,11 @@ export default function HeaderClient() {
                       href="/sign"
                       className={classNames(
                         'flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
-                        pathname === '/sign' && 'bg-slate-100 text-slate-900 font-semibold'
+                        pathname === '/sign' && 'bg-slate-100 font-semibold text-slate-900'
                       )}
                     >
                       <FileSignature className="h-4 w-4" aria-hidden />
-                      Assinar Documento
+                      Assinar documento
                     </Link>
                   </li>
                   <li>
@@ -338,11 +343,11 @@ export default function HeaderClient() {
                       href="/history"
                       className={classNames(
                         'flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
-                        pathname === '/history' && 'bg-slate-100 text-slate-900 font-semibold'
+                        pathname === '/history' && 'bg-slate-100 font-semibold text-slate-900'
                       )}
                     >
                       <History className="h-4 w-4" aria-hidden />
-                      Histórico
+                      Historico
                     </Link>
                   </li>
                   <li>
@@ -350,25 +355,35 @@ export default function HeaderClient() {
                       href="/verify"
                       className={classNames(
                         'flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-3 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600',
-                        pathname === '/verify' && 'bg-slate-100 text-slate-900 font-semibold'
+                        pathname === '/verify' && 'bg-slate-100 font-semibold text-slate-900'
                       )}
                     >
                       <ShieldCheck className="h-4 w-4" aria-hidden />
-                      Verificar Assinatura
+                      Verificar assinatura
                     </Link>
                   </li>
                 </>
               )}
+
               {!user && pathname === '/' && (
                 <li className="mt-4">
-                  <Link
-                    href="/signup"
-                    className="flex min-h-[44px] w-full items-center justify-center rounded-lg bg-brand-600 px-4 py-3 text-white transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
-                  >
-                    Criar conta
-                  </Link>
+                  <div className="grid gap-2">
+                    <Link
+                      href="/signup"
+                      className="flex min-h-[44px] w-full items-center justify-center rounded-lg bg-slate-950 px-4 py-3 text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+                    >
+                      Criar conta
+                    </Link>
+                    <Link
+                      href="/contato"
+                      className="flex min-h-[44px] w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-700 transition hover:border-brand-500 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+                    >
+                      Falar com vendas
+                    </Link>
+                  </div>
                 </li>
               )}
+
               <li className="mt-2">
                 <button
                   type="button"
