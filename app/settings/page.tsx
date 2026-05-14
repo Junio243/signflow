@@ -2,9 +2,10 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation';
 import { generateSignatureName, getSignatureDisplay } from '@/lib/formatName';
+const supabase = createClient()
 
 type SignatureRow = {
   id: string;

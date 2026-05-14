@@ -2,8 +2,9 @@
 
 import { Bell } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import NotificationCenter from './NotificationCenter'
+const supabase = createClient()
 
 export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false)

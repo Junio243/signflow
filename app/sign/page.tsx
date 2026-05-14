@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { PenTool, ArrowLeft, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import { DocumentUpload } from '@/components/sign/DocumentUpload'
 import { CertificateSelector } from '@/components/sign/CertificateSelector'
 import type { Certificate } from '@/types/certificates'
+const supabase = createClient()
 
 export default function SignPage() {
   const router = useRouter()

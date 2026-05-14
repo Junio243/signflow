@@ -2,9 +2,10 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import { AlertCircle, Briefcase, Check, Key, Loader2, MapPin, Save, User as UserIcon } from 'lucide-react'
 import Link from 'next/link'
+const supabase = createClient()
 
 type ProfileData = {
   full_name: string

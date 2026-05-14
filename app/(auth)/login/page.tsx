@@ -3,8 +3,9 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { type ReactNode, useState, Suspense } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import { formatErrorForDisplay } from '@/lib/errorMessages'
+const supabase = createClient()
 
 // Mover Wrapper para fora do componente principal
 function Wrapper({ children }: { children: ReactNode }) {

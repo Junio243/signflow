@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import { useMultiStep } from '@/hooks/useMultiStep'
 import MultiStepContainer from '@/components/multi-step/MultiStepContainer'
 import ProgressBar from '@/components/multi-step/ProgressBar'
@@ -14,6 +14,7 @@ import QRConfigStep from '@/components/multi-step/steps/QRConfigStep'
 import ReviewStep from '@/components/multi-step/steps/ReviewStep'
 import ConfirmationStep from '@/components/multi-step/steps/ConfirmationStep'
 import ResultStep from '@/components/multi-step/steps/ResultStep'
+const supabase = createClient()
 
 const STEPS = [
   'Documento',

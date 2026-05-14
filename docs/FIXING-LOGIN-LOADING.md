@@ -91,11 +91,12 @@ await new Promise(resolve => setTimeout(resolve, 500))
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code')
   const redirect = requestUrl.searchParams.get('redirect') || '/dashboard'
+  const supabase = await createClient()
   
   // Trocar o code por uma sessão
   const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)

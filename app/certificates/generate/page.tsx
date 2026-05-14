@@ -15,7 +15,7 @@ import {
   Briefcase,
   Shield
 } from 'lucide-react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useProfiles } from '@/hooks/useProfiles'
 import { 
@@ -25,6 +25,7 @@ import {
   type ProfileType,
   type KeyStrength 
 } from '@/types/certificates'
+const supabase = createClient()
 
 const PROFILE_ICONS = {
   professional: Briefcase,

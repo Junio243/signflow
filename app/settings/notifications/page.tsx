@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import { Bell, Mail, Smartphone, MessageSquare, Check } from 'lucide-react'
 import type { NotificationPreferences } from '@/lib/notifications/types'
+const supabase = createClient()
 
 export default function NotificationSettingsPage() {
   const [loading, setLoading] = useState(true)

@@ -10,8 +10,9 @@ import type {
 import Link from 'next/link'
 import PdfEditor from '@/components/PdfEditor'
 import PdfTextOverlay, { type TextAnnotation } from '@/components/PdfTextOverlay'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import type { QrPosition, QrPage } from '@/lib/validation/documentSchemas'
+const supabase = createClient()
 
 // -- tipos e constantes --
 type ProfileType = 'medico' | 'faculdade' | 'generico'

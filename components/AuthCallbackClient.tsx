@@ -3,7 +3,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client'
+const supabase = createClient()
 
 function parseHashParams() {
   const h = (typeof window !== 'undefined' ? window.location.hash : '') || '';

@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, ArrowLeft, CheckCircle, AlertCircle, Loader2, FileText, Lock, QrCode, MapPin } from 'lucide-react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client'
 import { DocumentUpload } from '@/components/sign/DocumentUpload';
 import type { Certificate } from '@/types/certificates';
+const supabase = createClient()
 
 type SignaturePosition = {
   page: number;

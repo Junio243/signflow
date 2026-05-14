@@ -205,7 +205,7 @@ signflow/
 ├── lib/                   # Utilitários e helpers
 │   ├── errorMessages.ts   # Mensagens de erro amigáveis
 │   ├── i18n/              # Sistema de internacionalização
-│   └── supabaseClient.ts  # Cliente Supabase
+│   └── supabase/          # Clientes Supabase (browser/server/admin)
 ├── middleware.ts          # Middleware de autenticação
 ├── docs/                  # Documentação
 └── public/                # Arquivos estáticos
