@@ -1,23 +1,29 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import { supabase as browserClient } from '@/lib/supabaseClient'
+// lib/supabase/server.ts
+// Cliente Supabase para uso em Server Components e Route Handlers
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-/**
- * Supabase client for server-side operations
- * (API routes, Server Components, etc)
- */
-export async function createClient() {
-  // Se já tem um client browser disponível, retorna ele
-  if (browserClient) {
-    return browserClient
-  }
-  
-  // Senão, cria um novo
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  
-  if (!url || !anon) {
-    throw new Error('Missing Supabase environment variables')
-  }
-  
-  return createSupabaseClient(url, anon)
+export async function createSupabaseServerClient() {
+  const cookieStore = await cookies()
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options),
+            )
+          } catch {
+            // setAll em Server Components somente-leitura é ignorado com segurança
+          }
+        },
+      },
+    },
+  )
 }

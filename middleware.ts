@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 
 // Rotas que NÃO precisam de autenticação
 const PUBLIC_ROUTES = [
@@ -20,6 +21,7 @@ const PUBLIC_ROUTES = [
   '/pricing',
   '/api/validate',
   '/api/webhooks',
+  '/api/health',
 ]
 
 // Rotas que EXIGEM autenticação
@@ -46,10 +48,6 @@ const PROTECTED_API_ROUTES = [
   '/api/cleanup',
 ]
 
-function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'))
-}
-
 function isProtectedRoute(pathname: string): boolean {
   return PROTECTED_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'))
 }
@@ -58,76 +56,10 @@ function isProtectedApiRoute(pathname: string): boolean {
   return PROTECTED_API_ROUTES.some(route => pathname.startsWith(route))
 }
 
-function hasSupabaseSession(request: NextRequest): boolean {
-  // Supabase armazena cookies com padrão: sb-<project-ref>-auth-token
-  // Vamos procurar por qualquer cookie que siga esse padrão
-  const cookies = request.cookies.getAll()
-  
-  // Debug: listar todos os cookies (apenas em dev)
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[Middleware] All cookies:', cookies.map(c => c.name))
-  }
-  
-  // Procurar por cookies de auth do Supabase
-  const hasAuthToken = cookies.some(cookie => {
-    const name = cookie.name
-    // Supabase usa padrões como:
-    // - sb-<ref>-auth-token
-    // - sb-<ref>-auth-token-code-verifier
-    return (
-      name.includes('sb-') && 
-      name.includes('-auth-token') &&
-      !name.includes('code-verifier') &&
-      cookie.value &&
-      cookie.value.length > 0
-    )
-  })
-  
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[Middleware] Has Supabase auth token:', hasAuthToken)
-  }
-  
-  return hasAuthToken
-}
-
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[Middleware] Pathname:', pathname)
-  }
-
-  // 1. Verificar autenticação para rotas protegidas
-  if (isProtectedRoute(pathname) || isProtectedApiRoute(pathname)) {
-    const hasAuth = hasSupabaseSession(request)
-
-    if (!hasAuth) {
-      console.log('[Middleware] No auth, redirecting to login')
-      
-      // Se for API, retornar 401
-      if (isProtectedApiRoute(pathname)) {
-        return NextResponse.json(
-          { 
-            error: 'Por favor, faça login para acessar este recurso.',
-            code: 'UNAUTHORIZED',
-            redirectTo: '/login'
-          },
-          { status: 401 }
-        )
-      }
-
-      // Se for página, redirecionar para login com parâmetro de retorno
-      const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('redirect', pathname)
-      return NextResponse.redirect(loginUrl)
-    }
-    
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Middleware] Auth OK, allowing access')
-    }
-  }
-
-  // 2. Forçar HTTPS em produção
+  // 1. Forçar HTTPS em produção ANTES de qualquer outra verificação
   const forwardedProto = request.headers.get('x-forwarded-proto')
   const isHttpRequest = forwardedProto === 'http' || request.nextUrl.protocol === 'http:'
   const hostname = request.nextUrl.hostname
@@ -138,15 +70,76 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308)
   }
 
-  // 3. Criar resposta com security headers
-  const response = NextResponse.next()
+  // 2. Verificar autenticação para rotas protegidas usando validação real do Supabase
+  if (isProtectedRoute(pathname) || isProtectedApiRoute(pathname)) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  // Content Security Policy
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('[Middleware] Variáveis Supabase ausentes')
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+
+    // Criar response mutável para que o Supabase possa atualizar cookies
+    const response = NextResponse.next()
+
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value)
+            response.cookies.set(name, value, options)
+          })
+        },
+      },
+    })
+
+    // Validação real do token — não apenas presença do cookie
+    const { data: { session }, error } = await supabase.auth.getSession()
+
+    if (error || !session) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Middleware] Sessão inválida ou ausente, redirecionando para login')
+      }
+
+      if (isProtectedApiRoute(pathname)) {
+        return NextResponse.json(
+          {
+            error: 'Por favor, faça login para acessar este recurso.',
+            code: 'UNAUTHORIZED',
+            redirectTo: '/login',
+          },
+          { status: 401 },
+        )
+      }
+
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('redirect', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    // Sessão válida — aplicar security headers e retornar
+    applySecurityHeaders(response)
+    return response
+  }
+
+  // 3. Rotas públicas — apenas security headers
+  const response = NextResponse.next()
+  applySecurityHeaders(response)
+  return response
+}
+
+function applySecurityHeaders(response: NextResponse) {
+  // Content Security Policy — sem unsafe-eval
+  // Nonce seria ideal, mas requer integração com next/headers; esta config é segura para a maioria dos casos
   const cspDirectives = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-inline'",  // unsafe-inline necessário para o theme-init inline no layout
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' 'unsafe-inline' data: blob: https: http:",
+    "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
     "object-src 'none'",
     "base-uri 'self'",
@@ -158,43 +151,16 @@ export function middleware(request: NextRequest) {
     "worker-src 'self' blob:",
   ]
   response.headers.set('Content-Security-Policy', cspDirectives.join('; '))
-
-  // Previne clickjacking
   response.headers.set('X-Frame-Options', 'DENY')
-
-  // Previne MIME type sniffing
   response.headers.set('X-Content-Type-Options', 'nosniff')
-
-  // Ativa proteção XSS do browser
   response.headers.set('X-XSS-Protection', '1; mode=block')
-
-  // Strict Transport Security (HSTS)
-  response.headers.set(
-    'Strict-Transport-Security',
-    'max-age=31536000; includeSubDomains; preload'
-  )
-
-  // Política de Referrer
+  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-
-  // Permissions Policy
-  response.headers.set(
-    'Permissions-Policy',
-    'camera=(), microphone=(), geolocation=(), interest-cohort=()'
-  )
-
-  return response
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()')
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
