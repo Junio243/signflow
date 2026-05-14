@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { History, ArrowLeft, Download, FileText, Calendar, Shield, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+const supabase = createClient()
 
 interface UnifiedSignature {
   id: string

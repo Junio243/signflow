@@ -1,7 +1,10 @@
 // hooks/useUserProfile.ts
+'use client'
+
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/types'
+const supabase = createClient()
 
 type UserProfile = Database['public']['Tables']['user_profiles']['Row']
 

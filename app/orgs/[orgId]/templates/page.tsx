@@ -2,8 +2,9 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation';
+const supabase = createClient()
 
 type TemplateRow = {
   id: string;
