@@ -2,8 +2,21 @@
 
 **Plataforma moderna de assinatura digital com segurança avançada e experiência multilíngue.**
 
+[![CI](https://github.com/Junio243/signflow/actions/workflows/ci.yml/badge.svg)](https://github.com/Junio243/signflow/actions/workflows/ci.yml)
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Junio243/signflow)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: GPL-2.0](https://img.shields.io/badge/License-GPL--2.0-blue.svg)](./LICENSE)
+[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://signflow-beta.vercel.app/)
+
+> **Demo:** https://signflow-beta.vercel.app/
+
+## 📸 Screenshots
+
+> Adicione prints em `docs/screenshots/` e referencie aqui. Sugestão:
+> `docs/screenshots/dashboard.png`, `docs/screenshots/editor.png`, `docs/screenshots/pricing.png`
+
+| Dashboard | Editor | Pricing |
+|---|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Editor](docs/screenshots/editor.png) | ![Pricing](docs/screenshots/pricing.png) |
 
 ## 🚀 Sobre o Projeto
 
