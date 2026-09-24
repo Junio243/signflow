@@ -8,9 +8,10 @@ import {
   ExternalLink, FileText, Link2, Loader2, Shield, Timer, Trash2,
   User, PenTool, AlertCircle,
 } from 'lucide-react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmModal'
+const supabase = createClient()
 
 type Doc = {
   id: string

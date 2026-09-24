@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparkles, ArrowLeft, CheckCircle, AlertCircle, Loader2, Download } from 'lucide-react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import CertificateTypeSelector from '@/components/certificates/CertificateTypeSelector'
 import ECPFForm from '@/components/certificates/ECPFForm'
 import ECNPJForm from '@/components/certificates/ECNPJForm'
 import type { CertificateType, ECPFFormData, ECNPJFormData, CertificateFormData } from '@/types/certificate'
 import { CERTIFICATE_VALIDITY_DAYS, isECPFFormData, isECNPJFormData } from '@/types/certificate'
+const supabase = createClient()
 
 type Step = 'type' | 'form' | 'review' | 'result'
 

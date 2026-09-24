@@ -19,8 +19,9 @@ import {
   User,
 } from 'lucide-react'
 
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import { abbreviateName } from '@/lib/formatName'
+const supabase = createClient()
 
 type SessionUser = {
   email?: string

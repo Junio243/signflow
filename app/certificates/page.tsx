@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Upload, CheckCircle, AlertCircle, ArrowLeft, FileKey, Trash2, Sparkles, Download } from 'lucide-react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+const supabase = createClient()
 
 type Certificate = {
   id: string

@@ -10,11 +10,12 @@ import {
   XCircle, Zap, Sparkles, History, ShieldCheck, PenTool, Shield,
   ChevronLeft, ChevronRight, ExternalLink,
 } from 'lucide-react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import { useUserProfile } from '@/hooks/useUserProfile'
 import BatchSignModal from '@/components/BatchSignModal'
 import { useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmModal'
+const supabase = createClient()
 
 const STATUS_META = {
   signed:   { label: 'Assinado',  icon: CheckCircle2, badge: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },

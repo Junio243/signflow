@@ -1,6 +1,9 @@
+'use client'
+
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import type { CertificateProfile } from '@/types/certificates'
+const supabase = createClient()
 
 export function useProfiles() {
   const [profiles, setProfiles] = useState<CertificateProfile[]>([])

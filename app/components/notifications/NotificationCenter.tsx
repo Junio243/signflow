@@ -2,10 +2,11 @@
 
 import { X, Check, Trash2, Settings, ExternalLink } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import type { Notification } from '@/lib/notifications/types'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale/pt-BR'
+const supabase = createClient()
 
 interface Props {
   isOpen: boolean

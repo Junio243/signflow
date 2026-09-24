@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
@@ -22,9 +22,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    if (!supabase) {
-      throw new Error('Supabase client não configurado')
-    }
+    const supabase = await createClient()
 
     // Trocar o code por uma sessão
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)

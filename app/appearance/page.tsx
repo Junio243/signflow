@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState, lazy, Suspense } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { DashboardSkeleton } from '@/components/ui/PageSkeleton';
+const supabase = createClient()
 
 type Profile = { id: string; name: string; type: 'medico' | 'faculdade' | 'generico'; theme: any };
 

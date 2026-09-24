@@ -3,9 +3,10 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type ReactNode, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import { formatErrorForDisplay } from '@/lib/errorMessages'
 import { AlertCircle, ArrowLeft, ArrowRight, Check, Loader2, User, Briefcase, Shield, Info } from 'lucide-react'
+const supabase = createClient()
 
 function Wrapper({ children }: { children: ReactNode }) {
   return (
