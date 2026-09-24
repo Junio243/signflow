@@ -18,9 +18,8 @@ jobs:
       - run: npm ci
       - name: Lint
         run: npm run lint
-      - name: Type check (informativo — errors pré-existentes em lib/supabase, driver.js)
+      - name: Type check
         run: npm run type-check
-        continue-on-error: true
       - name: Tests
         run: npm test
       - name: Build (com env dummy — o app exige vars Supabase no build)

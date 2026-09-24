@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 
 type TemplateRow = {
   id: string;
@@ -13,8 +13,8 @@ type TemplateRow = {
   created_at?: string;
 };
 
-export default function OrgTemplates({ params }: { params: { orgId: string } }) {
-  const orgId = params.orgId;
+export default function OrgTemplates() {
+  const { orgId } = useParams<{ orgId: string }>();
   const router = useRouter();
   const supabaseClient = supabase;
   const [loading, setLoading] = useState(true);

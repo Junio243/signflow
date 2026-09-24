@@ -20,5 +20,5 @@ export function createBrowserClient() {
 // Para uso em Server Components
 export function createServerClient(context?: any) {
   if (!supabaseUrl || !supabaseAnonKey) return null
-  return createServerSupabaseClient({ supabaseUrl, supabaseKey: supabaseAnonKey }, context)
+  return createServerSupabaseClient(context, { supabaseUrl, supabaseKey: supabaseAnonKey })
 }

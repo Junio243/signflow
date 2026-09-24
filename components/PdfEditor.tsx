@@ -110,8 +110,8 @@ export default function PdfEditor({
 
     return () => {
       cancelled = true;
-      try { task?.destroy?.(); } catch {}
-      if (blobUrl) { try { URL.revokeObjectURL(blobUrl); } catch {} }
+      try { task?.destroy?.(); } catch { /* Best-effort cleanup; resources may already be released. */ }
+      if (blobUrl) { try { URL.revokeObjectURL(blobUrl); } catch { /* Best-effort cleanup; resources may already be released. */ } }
     };
   }, [file]);
 
@@ -146,7 +146,7 @@ export default function PdfEditor({
       try {
         // cancela render anterior se houver
         if (renderTaskRef.current) {
-          try { renderTaskRef.current.cancel(); } catch {}
+          try { renderTaskRef.current.cancel(); } catch { /* Best-effort cleanup; resources may already be released. */ }
           renderTaskRef.current = null;
         }
 

@@ -59,12 +59,12 @@ const rateLimiter = createRateLimiter('/api/validate', {
   message: 'Muitas tentativas de validação. Tente novamente em alguns minutos.',
 });
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // Apply rate limiting
   const rateLimitResult = await rateLimiter(req);
   if (!rateLimitResult.allowed) return rateLimitResult.response;
 
-  const idResult = documentIdSchema.safeParse(params.id);
+  const idResult = documentIdSchema.safeParse((await params).id);
   if (!idResult.success) {
     return NextResponse.json({ error: 'id inválido' }, { status: 400 });
   }
@@ -112,12 +112,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }, rateLimitResult.headers);
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // Apply rate limiting
   const rateLimitResult = await rateLimiter(req);
   if (!rateLimitResult.allowed) return rateLimitResult.response;
 
-  const idResult = documentIdSchema.safeParse(params.id);
+  const idResult = documentIdSchema.safeParse((await params).id);
   if (!idResult.success) {
     return NextResponse.json({ error: 'id inválido' }, { status: 400 });
   }

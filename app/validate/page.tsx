@@ -36,8 +36,8 @@ async function fetchDoc(id: string, url: string, anon: string): Promise<FetchDoc
   }
 }
 
-export default async function ValidatePage({ searchParams }: { searchParams: { id?: string } }) {
-  const id = searchParams?.id;
+export default async function ValidatePage({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
+  const id = (await searchParams).id;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const validationUnavailable = !supabaseUrl || !supabaseAnon;

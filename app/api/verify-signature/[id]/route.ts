@@ -16,13 +16,13 @@ export const runtime = 'nodejs';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = getSupabaseAdmin();
     
     // Validar ID
-    const idResult = documentIdSchema.safeParse(params.id);
+    const idResult = documentIdSchema.safeParse((await params).id);
     if (!idResult.success) {
       return NextResponse.json(
         { error: 'ID inválido' },

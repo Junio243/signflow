@@ -70,7 +70,9 @@ export default function ValidatePage() {
       await navigator.clipboard.writeText(window.location.href)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch {}
+    } catch (error) {
+      console.warn('Não foi possível copiar o link de validação:', error)
+    }
   }
 
   if (loading) {

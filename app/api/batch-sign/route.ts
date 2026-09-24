@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, degrees } from 'pdf-lib';
 import QRCode from 'qrcode';
 import { signPdfComplete, isCertificateConfigured } from '@/lib/digitalSignature';
 
@@ -129,7 +129,7 @@ async function signDocument(
   signerInfo: string | undefined,
   userId: string
 ) {
-  try {
+  {
     const { data: pdfData } = await supabaseAdmin.storage
       .from('signflow')
       .download(document.original_pdf_path);
@@ -157,7 +157,7 @@ async function signDocument(
           y: height - position.y - position.height,
           width: position.width,
           height: position.height,
-          rotate: { angle: position.rotation || 0 }
+          rotate: degrees(position.rotation || 0)
         });
       }
     }
@@ -201,7 +201,7 @@ async function signDocument(
     let finalPdfBytes = await pdfDoc.save();
 
     // ✨ NOVO: Adicionar assinatura digital PKI se certificado estiver configurado
-    const hasCertificate = isCertificateConfigured();
+    const hasCertificate = await isCertificateConfigured();
     if (hasCertificate) {
       try {
         console.log(`🔐 Aplicando assinatura digital PKI no documento ${document.id}...`);
@@ -265,7 +265,5 @@ async function signDocument(
       digitalSignatureApplied: hasCertificate
     };
 
-  } catch (error) {
-    throw error;
   }
 }

@@ -48,7 +48,7 @@ export function useProfiles() {
   }) => {
     if (!supabase) throw new Error('Supabase não configurado')
 
-    try {
+    {
       // Pegar token de autenticação
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
@@ -72,15 +72,13 @@ export function useProfiles() {
 
       await fetchProfiles() // Recarregar lista
       return { success: true, profile: result.profile }
-    } catch (err) {
-      throw err
     }
   }
 
   const deleteProfile = async (profileId: string) => {
     if (!supabase) throw new Error('Supabase não configurado')
 
-    try {
+    {
       const { error: deleteError } = await supabase
         .from('certificate_profiles')
         .delete()
@@ -90,15 +88,13 @@ export function useProfiles() {
 
       await fetchProfiles() // Recarregar lista
       return { success: true }
-    } catch (err) {
-      throw err
     }
   }
 
   const setDefaultProfile = async (profileId: string) => {
     if (!supabase) throw new Error('Supabase não configurado')
 
-    try {
+    {
       // O trigger do banco vai desmarcar os outros automaticamente
       const { error: updateError } = await supabase
         .from('certificate_profiles')
@@ -109,8 +105,6 @@ export function useProfiles() {
 
       await fetchProfiles() // Recarregar lista
       return { success: true }
-    } catch (err) {
-      throw err
     }
   }
 

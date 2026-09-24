@@ -165,7 +165,6 @@ export default function NewCertificatePage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
         throw new Error('Sessão expirada')
-        return
       }
 
       const response = await fetch(`/api/certificates/${generatedCertId}/download`, {
@@ -293,13 +292,13 @@ export default function NewCertificatePage() {
             <ECPFForm
               onSubmit={handleFormSubmit}
               onBack={handleBackToType}
-              initialData={isECPFFormData(formData || {}) ? formData : undefined}
+              initialData={formData && isECPFFormData(formData) ? formData : undefined}
             />
           ) : (
             <ECNPJForm
               onSubmit={handleFormSubmit}
               onBack={handleBackToType}
-              initialData={isECNPJFormData(formData || {}) ? formData : undefined}
+              initialData={formData && isECNPJFormData(formData) ? formData : undefined}
             />
           )}
         </>
