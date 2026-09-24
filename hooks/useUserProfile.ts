@@ -16,13 +16,14 @@ export function useUserProfile() {
       return
     }
 
+    const client = supabase
     const fetchProfile = async () => {
       try {
         setLoading(true)
         setError(null)
 
         // Buscar usuário autenticado
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user } } = await client.auth.getUser()
         
         if (!user) {
           setProfile(null)
@@ -30,7 +31,7 @@ export function useUserProfile() {
         }
 
         // Buscar perfil do usuário
-        const { data, error: profileError } = await supabase
+        const { data, error: profileError } = await client
           .from('user_profiles')
           .select('*')
           .eq('id', user.id)
@@ -39,7 +40,7 @@ export function useUserProfile() {
         if (profileError) {
           // Se não existe perfil, criar um novo
           if (profileError.code === 'PGRST116') {
-            const { data: newProfile, error: insertError } = await supabase
+            const { data: newProfile, error: insertError } = await client
               .from('user_profiles')
               .insert({
                 id: user.id,

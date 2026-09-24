@@ -300,21 +300,16 @@ export default function AdvancedSignPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-semibold text-slate-900">
-                            {cert.certificate_type === 'e-CPF' ? '📄' : '🏢'}
+                            {'📄'}
                             {' '}
                             {cert.certificate_type}
                           </span>
-                          {cert.profile_type && (
-                            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                              {cert.profile_type}
-                            </span>
-                          )}
                         </div>
                         <p className="text-sm text-slate-600">
                           {cert.subject_data?.fullName || cert.subject_data?.companyName || 'Certificado'}
                         </p>
                         <p className="text-xs text-slate-400 mt-1">
-                          Válido até: {new Date(cert.expires_at).toLocaleDateString('pt-BR')}
+                          Válido até: {cert.expires_at && Number.isFinite(Date.parse(cert.expires_at)) ? new Date(cert.expires_at).toLocaleDateString('pt-BR') : 'Não informado'}
                         </p>
                       </div>
                       {selectedCertificateId === cert.id && (

@@ -42,7 +42,7 @@ export async function DELETE(request: NextRequest) {
         action: 'document.delete',
         resourceType: 'document',
         resourceId: documentId,
-        status: 'failure',
+        status: 'error',
         ip: clientIp,
         details: { reason: 'document_not_found' }
       });
@@ -65,7 +65,7 @@ export async function DELETE(request: NextRequest) {
         action: 'auth.denied',
         resourceType: 'document',
         resourceId: documentId,
-        status: 'denied',
+        status: 'error',
         ip: clientIp,
         details: { 
           reason: 'cannot_delete_signed_document',

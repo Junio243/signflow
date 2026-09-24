@@ -2,7 +2,7 @@
 // NOTIFICATION SERVICE - CORE LOGIC
 // ============================================
 
-import { createClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient as createClient } from '@/lib/supabase/server'
 import { emailService, EmailService } from './email-service'
 import type { 
   NotificationPayload, 

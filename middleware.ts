@@ -98,9 +98,9 @@ export async function middleware(request: NextRequest) {
     })
 
     // Validação real do token — não apenas presença do cookie
-    const { data: { session }, error } = await supabase.auth.getSession()
+    const { data: { user }, error } = await supabase.auth.getUser()
 
-    if (error || !session) {
+    if (error || !user) {
       if (process.env.NODE_ENV === 'development') {
         console.log('[Middleware] Sessão inválida ou ausente, redirecionando para login')
       }

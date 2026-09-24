@@ -296,7 +296,7 @@ export default function EditorPage() {
     if (!profileLogoFile) { setProfileLogoPreview(profileLogoExistingUrl ?? null); return }
     const objectUrl = URL.createObjectURL(profileLogoFile)
     setProfileLogoPreview(objectUrl)
-    return () => { try { URL.revokeObjectURL(objectUrl) } catch {} }
+    return () => { try { URL.revokeObjectURL(objectUrl) } catch { /* Best-effort cleanup; resources may already be released. */ } }
   }, [profileLogoFile, profileLogoExistingUrl])
 
   useEffect(() => {
@@ -306,7 +306,7 @@ export default function EditorPage() {
       try {
         const ab = await pdfFile.arrayBuffer()
         const pdfjs = await import('pdfjs-dist/legacy/build/pdf')
-        try { (pdfjs as any).GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs' } catch {}
+        pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
         const loadingTask = pdfjs.getDocument({ data: ab })
         const pdf = await loadingTask.promise
         if (cancelled) { pdf.destroy?.(); return }
@@ -315,12 +315,12 @@ export default function EditorPage() {
           const p = await pdf.getPage(i)
           const vp = p.getViewport({ scale: 1 })
           sizes.push({ width: vp.width, height: vp.height })
-          try { p.cleanup?.() } catch {}
+          try { p.cleanup?.() } catch { /* Best-effort cleanup; resources may already be released. */ }
         }
         setPageSizes(sizes)
         setPdfPageCount(sizes.length || 1)
         setActivePage(1)
-        try { pdf.destroy?.() } catch {}
+        try { pdf.destroy?.() } catch { /* Best-effort cleanup; resources may already be released. */ }
       } catch (err) {
         console.error('[Editor] Falha ao ler PDF', err)
         setStatus({ tone: 'error', text: 'Não consegui ler o PDF. Tente outro arquivo.' })
@@ -334,7 +334,7 @@ export default function EditorPage() {
   useEffect(() => {
     return () => {
       if (sigPreviewUrl?.startsWith('blob:')) {
-        try { URL.revokeObjectURL(sigPreviewUrl) } catch {}
+        try { URL.revokeObjectURL(sigPreviewUrl) } catch { /* Best-effort cleanup; resources may already be released. */ }
       }
     }
   }, [sigPreviewUrl])

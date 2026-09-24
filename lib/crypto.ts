@@ -31,7 +31,7 @@ function bufferToBase64(buffer: ArrayBuffer): string {
   return Buffer.from(buffer).toString('base64');
 }
 
-function base64ToBuffer(b64: string): Uint8Array {
+function base64ToBuffer(b64: string) {
   return new Uint8Array(Buffer.from(b64, 'base64'));
 }
 
@@ -57,7 +57,7 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
   return crypto.subtle.deriveKey(
     {
       name: KEY_DERIVATION_ALGORITHM,
-      salt,
+      salt: new Uint8Array(salt),
       iterations: PBKDF2_ITERATIONS,
       hash: HASH_ALGORITHM,
     },
@@ -162,7 +162,7 @@ export async function encryptData(data: Uint8Array | string): Promise<EncryptedD
   const crypto = globalThis.crypto;
 
   const rawData =
-    typeof data === 'string' ? new TextEncoder().encode(data) : data;
+    typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data);
 
   // Gerar chave aleatória
   const key = await crypto.subtle.generateKey(

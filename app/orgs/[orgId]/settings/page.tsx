@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
 type OrgRow = {
@@ -17,8 +17,8 @@ type OrgRow = {
   address?: string;
 };
 
-export default function OrgSettings({ params }: { params: { orgId: string } }) {
-  const orgId = params.orgId;
+export default function OrgSettings() {
+  const { orgId } = useParams<{ orgId: string }>();
   const router = useRouter();
   const supabaseClient = supabase;
   const [loading, setLoading] = useState(true);

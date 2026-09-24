@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "eslint . --ext .js,.ts,.tsx",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -24,6 +24,7 @@
     "@supabase/supabase-js": "^2.39.1",
     "classnames": "^2.5.1",
     "date-fns": "^3.3.1",
+    "driver.js": "^1.8.0",
     "framer-motion": "^11.0.5",
     "lucide-react": "^0.263.1",
     "next": "15.5.10",
@@ -35,6 +36,7 @@
     "react": "^18",
     "react-dom": "^18",
     "react-dropzone": "^14.2.3",
+    "tailwind-merge": "2.6.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {

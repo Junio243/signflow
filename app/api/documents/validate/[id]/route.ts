@@ -9,10 +9,10 @@ const supabase = createClient(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
     const { searchParams } = new URL(request.url)
     const validationCode = searchParams.get('code')
     const clientIp = extractIpFromRequest(request);
@@ -37,7 +37,7 @@ export async function GET(
         action: 'document.validate',
         resourceType: 'document',
         resourceId: id,
-        status: 'failure',
+        status: 'error',
         ip: clientIp,
         details: { reason: 'document_not_found' }
       });
@@ -112,7 +112,7 @@ export async function GET(
           action: 'auth.denied',
           resourceType: 'validation',
           resourceId: id,
-          status: 'denied',
+          status: 'error',
           ip: clientIp,
           details: { reason: 'invalid_validation_code' }
         });
@@ -183,10 +183,10 @@ export async function GET(
 // POST para validar com código no body
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
     const body = await request.json()
     const { code } = body
 

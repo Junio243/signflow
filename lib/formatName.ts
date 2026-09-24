@@ -88,9 +88,9 @@ export function getSignatureDisplay(sig: {
   
   let date = 'Data desconhecida'
   if (sig.created_at) {
-    try {
+    if (Number.isFinite(Date.parse(sig.created_at))) {
       date = new Date(sig.created_at).toLocaleDateString('pt-BR')
-    } catch {}
+    }
   }
   
   return {

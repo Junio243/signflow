@@ -34,6 +34,9 @@ export function CertificateSelector({
   const selectedCert = certificates.find(c => c.id === selectedCertificateId)
 
   const getCertificateStatus = (cert: Certificate) => {
+    if (!cert.expires_at || !Number.isFinite(Date.parse(cert.expires_at))) {
+      return { status: 'unknown', label: 'Validade não informada', color: 'slate' }
+    }
     const expiresAt = new Date(cert.expires_at)
     const now = new Date()
     const daysUntilExpiry = Math.floor((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
@@ -100,7 +103,7 @@ export function CertificateSelector({
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-2">
-                    Expira em: {format(new Date(cert.expires_at), 'dd/MM/yyyy', { locale: ptBR })}
+                    Expira em: {cert.expires_at && Number.isFinite(Date.parse(cert.expires_at)) ? format(new Date(cert.expires_at), 'dd/MM/yyyy', { locale: ptBR }) : 'Não informado'}
                   </p>
                 </div>
               </label>

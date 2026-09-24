@@ -4,6 +4,7 @@ export const runtime = 'nodejs';
 import { createHash, randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Database } from '@/lib/types';
 import {
   documentIdSchema,
@@ -63,6 +64,12 @@ export async function POST(req: NextRequest) {
   structuredLog('info', { ...baseCtx, event: 'request_received' });
 
   try {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Autenticação necessária', code: 'UNAUTHORIZED' }, { status: 401 });
+    }
+    const userId = user.id;
     const supabaseAdmin = getSupabaseAdmin();
 
     const ipHeader =
@@ -78,7 +85,6 @@ export async function POST(req: NextRequest) {
     const signatureMetaRaw = form.get('signature_meta')?.toString() || 'null';
     const validationThemeRaw = form.get('validation_theme_snapshot')?.toString() || 'null';
     const validationProfileId = form.get('validation_profile_id')?.toString() || null;
-    const userId = form.get('user_id')?.toString() || null;
     const signersRaw = form.get('signers')?.toString() || '[]';
     const qrPositionRaw = form.get('qr_position')?.toString() || 'bottom-left';
     const qrPageRaw = form.get('qr_page')?.toString() || 'last';
@@ -108,22 +114,6 @@ export async function POST(req: NextRequest) {
     const id = documentIdSchema.parse(randomUUID());
     let ip_hash = 'unknown';
     try { ip_hash = await sha256Hex(ip); } catch { ip_hash = 'error'; }
-
-    // Upload PDF
-    try {
-      const pdfBytes = new Uint8Array(await pdf.arrayBuffer());
-      const up1 = await supabaseAdmin.storage.from('signflow').upload(`${id}/original.pdf`, pdfBytes, { contentType: 'application/pdf', upsert: true });
-      if (up1.error) return NextResponse.json({ error: up1.error.message }, { status: 500 });
-    } catch (err: any) { return NextResponse.json({ error: String(err?.message || err) }, { status: 500 }); }
-
-    // Upload assinatura
-    if (signature) {
-      try {
-        const sigBytes = new Uint8Array(await signature.arrayBuffer());
-        const up2 = await supabaseAdmin.storage.from('signflow').upload(`${id}/signature`, sigBytes, { contentType: signature.type || 'image/png', upsert: true });
-        if (up2.error) return NextResponse.json({ error: up2.error.message }, { status: 500 });
-      } catch (err: any) { return NextResponse.json({ error: String(err?.message || err) }, { status: 500 }); }
-    }
 
     const parsedPositions = parseJsonField(positionsRaw || '[]', 'positions');
     if (!parsedPositions.success || !Array.isArray(parsedPositions.data)) return NextResponse.json({ error: parsedPositions.success ? 'positions deve ser um array' : parsedPositions.error }, { status: 400 });
@@ -169,6 +159,22 @@ export async function POST(req: NextRequest) {
     const validationTheme = metadataResult.data.validation_theme_snapshot ?? null;
     const validationProfileIdSanitized = metadataResult.data.validation_profile_id ?? null;
     const sanitizedSigners = (metadataResult.data.signers || []).map((signer: unknown) => signerSchema.parse(signer));
+
+    // Upload PDF
+    try {
+      const pdfBytes = new Uint8Array(await pdf.arrayBuffer());
+      const up1 = await supabaseAdmin.storage.from('signflow').upload(`${id}/original.pdf`, pdfBytes, { contentType: 'application/pdf', upsert: true });
+      if (up1.error) return NextResponse.json({ error: up1.error.message }, { status: 500 });
+    } catch (err: any) { return NextResponse.json({ error: String(err?.message || err) }, { status: 500 }); }
+
+    // Upload assinatura
+    if (signature) {
+      try {
+        const sigBytes = new Uint8Array(await signature.arrayBuffer());
+        const up2 = await supabaseAdmin.storage.from('signflow').upload(`${id}/signature`, sigBytes, { contentType: signature.type || 'image/png', upsert: true });
+        if (up2.error) return NextResponse.json({ error: up2.error.message }, { status: 500 });
+      } catch (err: any) { return NextResponse.json({ error: String(err?.message || err) }, { status: 500 }); }
+    }
 
     const now = new Date();
     const expires = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);

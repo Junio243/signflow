@@ -16,7 +16,7 @@ export default function CertificateTypeSelector({ selectedType, onSelect }: Cert
       title: 'e-CPF',
       subtitle: 'Pessoa Física',
       description: 'Para cidadãos, médicos, advogados, contadores e profissionais liberais',
-      color: 'blue'
+      color: 'blue' as const
     },
     {
       value: 'e-CNPJ' as CertificateType,
@@ -24,7 +24,7 @@ export default function CertificateTypeSelector({ selectedType, onSelect }: Cert
       title: 'e-CNPJ',
       subtitle: 'Pessoa Jurídica',
       description: 'Para empresas, corporações, condomínios e associações',
-      color: 'purple'
+      color: 'purple' as const
     }
   ]
 
